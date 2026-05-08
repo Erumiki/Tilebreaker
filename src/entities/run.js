@@ -3,11 +3,12 @@ export const BattleOutcome = {
     Defeat: 'defeat',
 };
 
-export function createRunState({ totalBattles }) {
+export function createRunState({ totalBattles, playerHp }) {
     return {
         totalBattles,
         currentBattle: 1,
         completedBattles: 0,
+        playerHp,
         upgrades: [],
     };
 }

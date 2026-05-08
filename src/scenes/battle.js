@@ -1,42 +1,321 @@
 import { BattleOutcome } from '../entities/run.js';
+import {
+    canPlaceTile,
+    COMBAT_COLORS,
+    createTileBattleState,
+    createTilesFromManifest,
+    getRoundAttack,
+    placeTile,
+    resolveTileRound,
+    startNextTileRound,
+} from '../entities/tileBattle.js';
 
-function getLayout(screen) {
-    const centerX = screen.width / 2;
-    const buttonWidth = Math.min(260, screen.width / 2 - 36);
-    const buttonY = screen.height - 112;
+const COLOR_HEX = {
+    red: '#e55353',
+    blue: '#4f8cff',
+    green: '#55c978',
+    gray: '#7d8790',
+};
+
+const COLOR_LABELS = {
+    red: 'Красный',
+    blue: 'Синий',
+    green: 'Зеленый',
+};
+
+function insetRect(rect, amount) {
+    return {
+        x: rect.x + amount,
+        y: rect.y + amount,
+        width: rect.width - amount * 2,
+        height: rect.height - amount * 2,
+    };
+}
+
+function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
+    ui.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: thickness }, color, alpha);
+    ui.drawRect({ x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color, alpha);
+    ui.drawRect({ x: rect.x, y: rect.y, width: thickness, height: rect.height }, color, alpha);
+    ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
+}
+
+function getLayout(screen, settings) {
+    const boardPixels = Math.min(screen.width - 360, screen.height - 290, 438);
+    const boardSize = Math.max(300, boardPixels);
+    const boardX = Math.max(24, Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - 300));
+    const boardY = 144;
+    const handSlot = Math.min(82, (screen.width - 64) / settings.handSize - 8);
+    const handWidth = settings.handSize * handSlot + (settings.handSize - 1) * 8;
+    const handY = screen.height - handSlot - 28;
+    const sideX = boardX + boardSize + 24;
+    const sideWidth = Math.max(240, screen.width - sideX - 24);
 
     return {
-        panel: {
-            x: Math.max(24, centerX - 360),
-            y: Math.max(92, screen.height * 0.24),
-            width: Math.min(720, screen.width - 48),
-            height: 250,
+        board: {
+            x: boardX,
+            y: boardY,
+            width: boardSize,
+            height: boardSize,
         },
-        victoryButton: {
-            x: centerX - buttonWidth - 12,
-            y: buttonY,
-            width: buttonWidth,
-            height: 58,
+        cellSize: boardSize / settings.boardSize,
+        hand: Array.from({ length: settings.handSize }, (_, index) => ({
+            x: screen.width / 2 - handWidth / 2 + index * (handSlot + 8),
+            y: handY,
+            width: handSlot,
+            height: handSlot,
+        })),
+        endRoundButton: {
+            x: sideX,
+            y: handY - 82,
+            width: sideWidth,
+            height: 56,
         },
-        defeatButton: {
-            x: centerX + 12,
-            y: buttonY,
-            width: buttonWidth,
-            height: 58,
+        sidePanel: {
+            x: sideX,
+            y: boardY,
+            width: sideWidth,
+            height: Math.min(390, boardSize),
         },
     };
 }
 
+function getBoardCell(layout, settings, point) {
+    if (point.x < layout.board.x
+        || point.y < layout.board.y
+        || point.x > layout.board.x + layout.board.width
+        || point.y > layout.board.y + layout.board.height) {
+        return null;
+    }
+
+    return {
+        x: Math.floor((point.x - layout.board.x) / layout.cellSize),
+        y: Math.floor((point.y - layout.board.y) / layout.cellSize),
+    };
+}
+
+function drawTile(ui, tileDef, rect, options = {}) {
+    if (!tileDef) {
+        return;
+    }
+
+    const gap = Math.max(1, Math.floor(rect.width * 0.035));
+    const microSize = (rect.width - gap * 4) / 3;
+    ui.drawRect(rect, options.background ?? '#202b34', options.alpha ?? 1);
+
+    for (let y = 0; y < 3; y += 1) {
+        for (let x = 0; x < 3; x += 1) {
+            const symbol = tileDef.cells[y][x];
+            const color = symbol === 'R'
+                ? COLOR_HEX.red
+                : symbol === 'B'
+                    ? COLOR_HEX.blue
+                    : symbol === 'G'
+                        ? COLOR_HEX.green
+                        : COLOR_HEX.gray;
+            ui.drawRect({
+                x: rect.x + gap + x * (microSize + gap),
+                y: rect.y + gap + y * (microSize + gap),
+                width: microSize,
+                height: microSize,
+            }, color, symbol === '.' ? 0.52 : 0.95);
+        }
+    }
+}
+
+function drawAttackRow(ui, rect, color, attack, result) {
+    ui.drawRect(rect, '#132334', 0.96);
+    ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, COLOR_HEX[color], 1);
+    ui.drawText(COLOR_LABELS[color], rect.x + 18, rect.y + 9, {
+        size: 16,
+        color: '#ecf6ff',
+    });
+    ui.drawText(`Атака ${attack[color] ?? 0}`, rect.x + rect.width - 92, rect.y + 9, {
+        size: 15,
+        color: '#afc4d7',
+    });
+
+    if (!result) {
+        return;
+    }
+
+    const colorResult = result.byColor[color];
+    const label = colorResult.enemyDamage > 0
+        ? `Захват ${colorResult.closedDamage} -> враг`
+        : `Захват ${colorResult.closedDamage}, недобор ${colorResult.playerDamage}`;
+    ui.drawText(label, rect.x + 18, rect.y + 34, {
+        size: 14,
+        color: colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7',
+    });
+}
+
+function drawBoard(ui, layout, settings, state, mouse) {
+    const selectedTile = state.hand[state.selectedHandIndex];
+
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            const rect = {
+                x: layout.board.x + x * layout.cellSize,
+                y: layout.board.y + y * layout.cellSize,
+                width: layout.cellSize,
+                height: layout.cellSize,
+            };
+            const isHovered = ui.contains(rect, mouse);
+            const isValid = state.phase === 'placing'
+                && canPlaceTile(state.board, selectedTile, x, y, settings);
+            const fill = isValid
+                ? isHovered ? '#31566b' : '#203748'
+                : '#162432';
+            const border = isValid
+                ? isHovered ? '#9de7ff' : '#4f93b2'
+                : '#24394c';
+
+            ui.drawRect(rect, fill, 1);
+            drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
+            drawTile(ui, state.board[y][x], insetRect(rect, 5));
+        }
+    }
+
+    if (state.phase !== 'result' || !state.lastResult) {
+        return;
+    }
+
+    const microSize = layout.cellSize / 3;
+    for (const zone of state.lastResult.score.zones) {
+        for (const cell of zone.interiorCells) {
+            ui.drawRect({
+                x: layout.board.x + cell.x * microSize,
+                y: layout.board.y + cell.y * microSize,
+                width: microSize,
+                height: microSize,
+            }, COLOR_HEX[zone.color], 0.42);
+        }
+    }
+}
+
+function drawHand(ui, layout, state, mouse) {
+    layout.hand.forEach((rect, index) => {
+        const tileDef = state.hand[index];
+        const hovered = ui.contains(rect, mouse);
+        const selected = index === state.selectedHandIndex && tileDef;
+
+        ui.drawRect(rect, hovered ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
+        drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
+        drawTile(ui, tileDef, insetRect(rect, 8));
+    });
+}
+
+function drawSidePanel(ui, layout, battle, state) {
+    const panel = layout.sidePanel;
+    const attack = getRoundAttack(battle, state.round);
+
+    ui.drawRect(panel, '#0f1d2b', 0.94);
+    drawBorder(ui, panel, '#28445c', 2, 0.9);
+    ui.drawText(battle.name, panel.x + 18, panel.y + 18, {
+        size: 24,
+        color: '#ffffff',
+    });
+    ui.drawText(`Раунд ${state.round}`, panel.x + 18, panel.y + 52, {
+        size: 17,
+        color: '#9fb8ca',
+    });
+    ui.drawText(`Игрок HP ${state.playerHp}`, panel.x + 18, panel.y + 86, {
+        size: 20,
+        color: '#c8f7dd',
+    });
+    ui.drawText(`Враг HP ${state.enemyHp}`, panel.x + 18, panel.y + 116, {
+        size: 20,
+        color: '#ffd4d8',
+    });
+
+    COMBAT_COLORS.forEach((color, index) => {
+        drawAttackRow(ui, {
+            x: panel.x + 16,
+            y: panel.y + 164 + index * 66,
+            width: panel.width - 32,
+            height: 56,
+        }, color, attack, state.lastResult);
+    });
+
+    if (state.lastResult) {
+        const zones = state.lastResult.score.zones.length;
+        ui.drawText(`Замкнуто зон: ${zones}`, panel.x + 18, panel.y + 364, {
+            size: 16,
+            color: '#d8e7f2',
+        });
+    }
+}
+
+function getButtonLabel(state) {
+    if (state.phase === 'placing') {
+        return 'Закончить раунд';
+    }
+
+    if (state.outcome) {
+        return 'К результату битвы';
+    }
+
+    return 'Новый раунд';
+}
+
+function getHoverKey(ui, layout, settings, mouse) {
+    const boardCell = getBoardCell(layout, settings, mouse);
+    const handIndex = layout.hand.findIndex((rect) => ui.contains(rect, mouse));
+    const buttonHover = ui.contains(layout.endRoundButton, mouse);
+
+    return [
+        boardCell ? `${boardCell.x},${boardCell.y}` : '-',
+        handIndex,
+        buttonHover ? 1 : 0,
+    ].join('|');
+}
+
+function createRenderKey({ ui, layout, settings, state, mouse, screen }) {
+    const boardKey = state.board.map((row) => (
+        row.map((tileDef) => tileDef?.id ?? '-').join(',')
+    )).join(';');
+    const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
+    const resultKey = state.lastResult
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}`
+        : '-';
+
+    return [
+        screen.width,
+        screen.height,
+        state.phase,
+        state.outcome ?? '-',
+        state.round,
+        state.playerHp,
+        state.enemyHp,
+        state.selectedHandIndex,
+        boardKey,
+        handKey,
+        resultKey,
+        getHoverKey(ui, layout, settings, mouse),
+        state.feedback ?? '-',
+    ].join('/');
+}
+
 export function createBattleScene({
+    config,
     input,
     ui,
     run,
     battle,
     onFinish,
 }) {
+    const settings = config.game.tileBattle;
+    const tiles = createTilesFromManifest(config.tileManifest);
+    const state = createTileBattleState({
+        battle,
+        run,
+        settings,
+        tiles,
+    });
+
     return {
         name: 'battle',
         layout: null,
+        lastRenderKey: null,
         update() {
             const click = input.consumeClick();
 
@@ -44,55 +323,128 @@ export function createBattleScene({
                 return;
             }
 
-            if (ui.contains(this.layout.victoryButton, click)) {
-                onFinish(BattleOutcome.Victory);
+            const handIndex = this.layout.hand.findIndex((rect) => ui.contains(rect, click));
+            if (state.phase === 'placing' && handIndex >= 0 && state.hand[handIndex]) {
+                state.selectedHandIndex = handIndex;
+                state.feedback = `Выбран ${COLOR_LABELS[state.hand[handIndex].color] ?? 'Серый'} ${state.hand[handIndex].pattern}`;
+                return;
             }
 
-            if (ui.contains(this.layout.defeatButton, click)) {
-                onFinish(BattleOutcome.Defeat);
+            const boardCell = getBoardCell(this.layout, settings, click);
+            if (state.phase === 'placing' && boardCell) {
+                const placed = placeTile(state, settings, boardCell.x, boardCell.y);
+                state.feedback = placed
+                    ? state.selectedHandIndex >= 0
+                        ? 'Тайл поставлен'
+                        : 'Рука разыграна, заканчивай раунд'
+                    : 'Нельзя поставить: смежные края должны совпасть';
+                return;
             }
+
+            if (!ui.contains(this.layout.endRoundButton, click)) {
+                return;
+            }
+
+            if (state.phase === 'placing') {
+                resolveTileRound(state, battle, settings);
+                run.playerHp = state.playerHp;
+                state.feedback = null;
+                return;
+            }
+
+            if (state.outcome === 'victory') {
+                onFinish(BattleOutcome.Victory);
+                return;
+            }
+
+            if (state.outcome === 'defeat') {
+                onFinish(BattleOutcome.Defeat);
+                return;
+            }
+
+            startNextTileRound(state, {
+                battle,
+                settings,
+                tiles,
+            });
+            state.feedback = null;
         },
         render(app) {
-            ui.begin();
             const screen = app.screen;
-            this.layout = getLayout(screen);
             const mouse = input.getMouse();
-
-            ui.drawText(`Битва ${run.currentBattle} / ${run.totalBattles}`, screen.width / 2, 48, {
-                align: 'center',
-                size: 32,
-                color: '#f5fbff',
-            });
-
-            ui.drawRect(this.layout.panel, '#102031', 0.9);
-            ui.drawText(battle.name, screen.width / 2, this.layout.panel.y + 34, {
-                align: 'center',
-                size: 34,
-                color: '#ffffff',
-            });
-            ui.drawText([
-                `Анте: ${battle.ante}`,
-                `Цель: ${battle.targetScore}`,
-                `Награда: ${battle.reward}`,
-            ], screen.width / 2, this.layout.panel.y + 92, {
-                align: 'center',
-                size: 22,
-                color: '#b9ccdd',
-                lineHeight: 34,
-            });
-
-            ui.drawButton(this.layout.victoryButton, 'Победа', {
+            this.layout = getLayout(screen, settings);
+            const renderKey = createRenderKey({
+                ui,
+                layout: this.layout,
+                settings,
+                state,
                 mouse,
-                color: '#1f4b3c',
-                hoverColor: '#69d29d',
-                edgeColor: '#9ff0bd',
+                screen,
             });
-            ui.drawButton(this.layout.defeatButton, 'Поражение', {
+
+            if (renderKey === this.lastRenderKey) {
+                return;
+            }
+
+            this.lastRenderKey = renderKey;
+            ui.begin();
+
+            ui.drawText(`Битва ${run.currentBattle} / ${run.totalBattles}`, 28, 24, {
+                size: 24,
+                color: '#eef8ff',
+            });
+            ui.drawText('Собери замкнутую цветную границу и перебей атаки', 28, 58, {
+                size: 17,
+                color: '#98b4c8',
+            });
+
+            drawBoard(ui, this.layout, settings, state, mouse);
+            drawSidePanel(ui, this.layout, battle, state);
+            drawHand(ui, this.layout, state, mouse);
+            if (state.feedback) {
+                ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
+                    size: 16,
+                    color: '#f3d991',
+                });
+            }
+            ui.drawButton(this.layout.endRoundButton, getButtonLabel(state), {
                 mouse,
-                color: '#4a2430',
-                hoverColor: '#f0788b',
-                edgeColor: '#ffadba',
+                color: state.phase === 'placing' ? '#243f54' : '#1f4b3c',
+                hoverColor: state.phase === 'placing' ? '#66c7f4' : '#69d29d',
+                edgeColor: '#9fdfff',
+                textSize: 20,
             });
+        },
+        getDebugState() {
+            return {
+                phase: state.phase,
+                outcome: state.outcome,
+                enemyHp: state.enemyHp,
+                playerHp: state.playerHp,
+                round: state.round,
+                placedCount: state.board.reduce((sum, row) => (
+                    sum + row.filter(Boolean).length
+                ), 0),
+                board: state.board.map((row) => row.map((tileDef) => (
+                    tileDef ? {
+                        id: tileDef.id,
+                        color: tileDef.color,
+                        pattern: tileDef.pattern,
+                    } : null
+                ))),
+                hand: state.hand.map((tileDef) => tileDef ? {
+                    id: tileDef.id,
+                    color: tileDef.color,
+                    pattern: tileDef.pattern,
+                } : null),
+                lastResult: state.lastResult ? {
+                    enemyDamage: state.lastResult.enemyDamage,
+                    playerDamage: state.lastResult.playerDamage,
+                    zones: state.lastResult.score.zones.length,
+                    damageByColor: state.lastResult.score.damageByColor,
+                } : null,
+                layout: this.layout,
+            };
         },
     };
 }

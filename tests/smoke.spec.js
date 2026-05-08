@@ -14,10 +14,77 @@ async function clickCanvas(page, xRatio, yRatio) {
   );
 }
 
+async function clickRect(page, rect) {
+  await page.mouse.click(
+    rect.x + rect.width / 2,
+    rect.y + rect.height / 2,
+  );
+}
+
 async function expectScene(page, name) {
   await expect.poll(() => page.evaluate(() => (
     window.__tilebreakerDebug?.getSceneName?.()
   ))).toBe(name);
+}
+
+async function getBattleDebug(page) {
+  await expect.poll(() => page.evaluate(() => {
+    const debug = window.__tilebreakerDebug?.getBattleDebug?.();
+    return Boolean(debug?.layout);
+  })).toBe(true);
+
+  return page.evaluate(() => window.__tilebreakerDebug.getBattleDebug());
+}
+
+async function placePattern(page, pattern, cellX, cellY) {
+  let debug = await getBattleDebug(page);
+  const placedBefore = debug.placedCount;
+  const handIndex = debug.hand.findIndex((tile) => tile?.pattern === pattern);
+  expect(handIndex).toBeGreaterThanOrEqual(0);
+  await clickRect(page, debug.layout.hand[handIndex]);
+  await page.waitForTimeout(50);
+
+  debug = await getBattleDebug(page);
+  const { board, cellSize } = debug.layout;
+  await page.mouse.click(
+    board.x + (cellX + 0.5) * cellSize,
+    board.y + (cellY + 0.5) * cellSize,
+  );
+  await page.waitForTimeout(50);
+
+  debug = await getBattleDebug(page);
+  expect(
+    debug.placedCount,
+    `${pattern} should be placed on ${cellX},${cellY}: ${JSON.stringify(debug.board)}`,
+  ).toBe(placedBefore + 1);
+}
+
+async function playClosureRound(page) {
+  await placePattern(page, 'corner_rd', 2, 2);
+  await placePattern(page, 'corner_dl', 3, 2);
+  await placePattern(page, 'corner_ur', 2, 3);
+  await placePattern(page, 'corner_lu', 3, 3);
+
+  let debug = await getBattleDebug(page);
+  const enemyHpBefore = debug.enemyHp;
+  expect(debug.placedCount).toBe(4);
+  await clickRect(page, debug.layout.endRoundButton);
+
+  await expect.poll(() => page.evaluate(() => (
+    window.__tilebreakerDebug.getBattleDebug()?.phase
+  ))).toBe('result');
+
+  debug = await getBattleDebug(page);
+  expect(debug.lastResult.zones).toBeGreaterThan(0);
+  expect(debug.lastResult.enemyDamage).toBeGreaterThan(0);
+  expect(debug.enemyHp).toBeLessThan(enemyHpBefore);
+
+  await clickRect(page, debug.layout.endRoundButton);
+  await expect.poll(() => page.evaluate(() => {
+    const scene = window.__tilebreakerDebug.getSceneName();
+    const battle = window.__tilebreakerDebug.getBattleDebug?.();
+    return scene === 'result' || battle?.phase === 'placing';
+  })).toBe(true);
 }
 
 test('player can complete the 5-battle prototype loop', async ({ page }) => {
@@ -30,7 +97,15 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   await expectScene(page, 'battle');
 
   for (let battle = 1; battle <= 5; battle += 1) {
-    await clickCanvas(page, 0.36, 0.88);
+    for (let round = 0; round < 5; round += 1) {
+      await playClosureRound(page);
+
+      const scene = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+      if (scene === 'result') {
+        break;
+      }
+    }
+
     await expectScene(page, 'result');
 
     const run = await page.evaluate(() => window.__tilebreakerDebug.getRun());

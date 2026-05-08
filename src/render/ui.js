@@ -8,13 +8,6 @@ function colorToPixi(color) {
     return color;
 }
 
-function destroyChildren(container) {
-    const children = container.removeChildren();
-    children.forEach((child) => {
-        child.destroy({ children: true });
-    });
-}
-
 function contains(rect, point) {
     return point.x >= rect.x
         && point.x <= rect.x + rect.width
@@ -24,42 +17,70 @@ function contains(rect, point) {
 
 export function createUiRenderer(PIXI, stage) {
     const layer = new PIXI.Container();
+    const drawItems = [];
+    let drawCursor = 0;
     stage.addChild(layer);
 
+    function useDrawItem(kind, create) {
+        const index = drawCursor;
+        drawCursor += 1;
+        const existing = drawItems[index];
+
+        if (existing?.kind === kind) {
+            existing.object.visible = true;
+            return existing.object;
+        }
+
+        if (existing) {
+            layer.removeChild(existing.object);
+            existing.object.destroy({ children: true });
+        }
+
+        const object = create();
+        drawItems[index] = { kind, object };
+        layer.addChildAt(object, Math.min(index, layer.children.length));
+        return object;
+    }
+
     function drawRect(rect, color, alpha = 1) {
-        const graphic = new PIXI.Graphics()
+        const graphic = useDrawItem('rect', () => new PIXI.Graphics());
+        graphic
+            .clear()
             .rect(rect.x, rect.y, rect.width, rect.height)
             .fill({
                 color: colorToPixi(color),
                 alpha,
             });
 
-        layer.addChild(graphic);
         return graphic;
     }
 
     function drawText(text, x, y, options = {}) {
         const content = Array.isArray(text) ? text.join('\n') : String(text);
         const align = options.align ?? 'left';
-        const label = new PIXI.Text({
-            text: content,
-            style: {
-                fontFamily: options.family ?? 'Arial, sans-serif',
-                fontSize: options.size ?? 24,
-                fontWeight: options.weight ?? 600,
-                fill: colorToPixi(options.color ?? '#ffffff'),
-                align,
-                lineHeight: options.lineHeight ?? Math.round((options.size ?? 24) * 1.25),
-            },
-        });
+        const label = useDrawItem('text', () => new PIXI.Text({
+            text: '',
+            style: {},
+        }));
+
+        label.text = content;
+        label.style = {
+            fontFamily: options.family ?? 'Arial, sans-serif',
+            fontSize: options.size ?? 24,
+            fontWeight: options.weight ?? 600,
+            fill: colorToPixi(options.color ?? '#ffffff'),
+            align,
+            lineHeight: options.lineHeight ?? Math.round((options.size ?? 24) * 1.25),
+        };
 
         if (align === 'center') {
             label.anchor.set(0.5, 0);
+        } else {
+            label.anchor.set(0, 0);
         }
 
         label.x = x;
         label.y = y;
-        layer.addChild(label);
         return label;
     }
 
@@ -81,7 +102,12 @@ export function createUiRenderer(PIXI, stage) {
 
     return {
         begin() {
-            destroyChildren(layer);
+            drawCursor = 0;
+            for (const item of drawItems) {
+                if (item) {
+                    item.object.visible = false;
+                }
+            }
         },
         drawRect,
         drawText,

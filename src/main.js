@@ -37,6 +37,7 @@ function showMainMenu() {
 
 function showBattle() {
     scene = createBattleScene({
+        config,
         input,
         ui,
         run,
@@ -78,6 +79,7 @@ function showUpgrades() {
 function startRun() {
     run = createRunState({
         totalBattles,
+        playerHp: config.game.tileBattle.startingPlayerHp,
     });
     showBattle();
 }
@@ -96,5 +98,8 @@ window.__tilebreakerDebug = {
     },
     getRun() {
         return run ? { ...run } : null;
+    },
+    getBattleDebug() {
+        return scene?.getDebugState?.() ?? null;
     },
 };

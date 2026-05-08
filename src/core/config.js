@@ -17,6 +17,16 @@ export async function loadConfig() {
     );
 
     configs = Object.fromEntries(entries);
+
+    const manifestPath = configs.game.tileBattle?.manifestPath;
+    if (manifestPath) {
+        const response = await fetch(manifestPath);
+        if (!response.ok) {
+            throw new Error(`Failed to load tile manifest: ${manifestPath}`);
+        }
+        configs.tileManifest = await response.json();
+    }
+
     return configs;
 }
 
