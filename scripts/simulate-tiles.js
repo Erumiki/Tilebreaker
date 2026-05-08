@@ -18,6 +18,8 @@ const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
 const HAND_RUNS = Number(process.env.HAND_RUNS ?? 40);
 const FIGHT_RUNS = Number(process.env.FIGHT_RUNS ?? 40);
 const PLACEMENT_ATTEMPTS = Number(process.env.PLACEMENT_ATTEMPTS ?? 40);
+const OPENING_DRAW_COUNT = Number(process.env.OPENING_DRAW_COUNT ?? 12);
+const HAND_SAMPLE_COUNT = Number(process.env.HAND_SAMPLE_COUNT ?? 12);
 const GUARANTEED_LOOP_HANDS = TILE_SETTINGS.guaranteedLoopHands === true;
 const HAND_SELECTION_DRAWS = GUARANTEED_LOOP_HANDS
     ? TILE_SETTINGS.handSelectionDraws ?? 3
@@ -682,16 +684,21 @@ function cleanupPlacementsAfterRound(placements, score) {
 
 function findBestPlacement(rng, hand, attack = null, strictEdges = true, startingPlacements = new Map(), strategy = 'payoff') {
     let best = null;
+    const startingZoneCount = scorePlacement(startingPlacements, attack).zones.length;
 
     for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt += 1) {
         const placements = clonePlacements(startingPlacements);
         const handOrder = shuffle(rng, hand);
         const placedBefore = placements.size;
+        let firstCaptureAt = null;
 
         for (const tileDef of handOrder) {
             if (placements.size === 0) {
                 const center = Math.floor(BOARD_SIZE / 2);
                 placements.set(key(center, center), tileDef);
+                if (firstCaptureAt === null && scorePlacement(placements, attack).zones.length > startingZoneCount) {
+                    firstCaptureAt = placements.size - placedBefore;
+                }
                 continue;
             }
 
@@ -703,6 +710,10 @@ function findBestPlacement(rng, hand, attack = null, strictEdges = true, startin
 
             const chosen = pick(rng, candidates);
             placements.set(key(chosen.x, chosen.y), tileDef);
+
+            if (firstCaptureAt === null && scorePlacement(placements, attack).zones.length > startingZoneCount) {
+                firstCaptureAt = placements.size - placedBefore;
+            }
         }
 
         const score = scorePlacement(placements, attack);
@@ -714,6 +725,7 @@ function findBestPlacement(rng, hand, attack = null, strictEdges = true, startin
                 placements,
                 score,
                 placedThisRound,
+                firstCaptureAt,
                 retainedBefore: placedBefore,
                 value,
             };
@@ -844,6 +856,7 @@ function analyzeHands(rng, deck, strictEdges) {
             zones: best.score.zones.length,
             zoneAreas: best.score.zones.map((zone) => zone.size),
             minimalZones: best.score.zones.filter((zone) => zone.size <= LARGE_ZONE_MIN_AREA).length,
+            firstCaptureAt: best.firstCaptureAt,
             areaBonus: best.score.zones.reduce((sum, zone) => sum + zone.areaBonus, 0),
             grayBonus: best.score.zones.reduce((sum, zone) => sum + zone.grayBonus, 0),
             grayInteriorCells: best.score.zones.reduce((sum, zone) => sum + zone.grayInteriorCells, 0),
@@ -1025,18 +1038,95 @@ function printDeck(deck) {
     }
 }
 
+function shapeGroup(tileDef) {
+    if (tileDef.color === 'gray') {
+        return 'gray';
+    }
+
+    if (CORNER_PATTERNS.includes(tileDef.kind)) {
+        return 'corner';
+    }
+
+    if (tileDef.kind === 'plus') {
+        return 'plus';
+    }
+
+    if (tileDef.kind.startsWith('line_')) {
+        return 'line';
+    }
+
+    if (tileDef.kind.startsWith('tee_')) {
+        return 'tee';
+    }
+
+    return tileDef.kind;
+}
+
+function countBy(items, getGroup) {
+    const counts = new Map();
+
+    for (const item of items) {
+        const group = getGroup(item);
+        counts.set(group, (counts.get(group) || 0) + 1);
+    }
+
+    return [...counts.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([group, count]) => `${group}:${count}`)
+        .join(', ');
+}
+
+function formatPercent(numerator, denominator) {
+    if (denominator === 0) {
+        return '0%';
+    }
+
+    return `${((numerator / denominator) * 100).toFixed(0)}%`;
+}
+
+function printOpeningDrawReport(label, rng, deck) {
+    const drawState = createDrawState(rng, deck);
+    const draw = drawFromState(rng, drawState, OPENING_DRAW_COUNT);
+    const sequence = draw.map((tileDef) => `${tileDef.color}:${tileDef.kind}`).join(' | ');
+
+    console.log(`\n=== ${label}: first ${draw.length} draws ===`);
+    console.log(`  sequence: ${sequence}`);
+    console.log(`  colors:   ${countBy(draw, (tileDef) => tileDef.color)}`);
+    console.log(`  shapes:   ${countBy(draw, shapeGroup)}`);
+}
+
+function printHandSamples(reports) {
+    const samples = reports.slice(0, HAND_SAMPLE_COUNT);
+
+    console.log(`  first ${samples.length} hand samples:`);
+
+    samples.forEach((report, index) => {
+        console.log(
+            `    #${String(index + 1).padStart(2, '0')} `
+            + `colors [${countBy(report.hand, (tileDef) => tileDef.color)}] `
+            + `shapes [${countBy(report.hand, shapeGroup)}]`,
+        );
+    });
+}
+
 function printHandReport(label, reports) {
     const zoneAreas = flattenZoneAreas(reports);
     const totalZones = reports.reduce((sum, report) => sum + report.zones, 0);
     const minimalZones = reports.reduce((sum, report) => sum + report.minimalZones, 0);
     const quickCornerLoops = reports.filter((report) => report.quickCornerLoop).length;
+    const firstCaptureValues = reports
+        .filter((report) => report.firstCaptureAt !== null)
+        .map((report) => report.firstCaptureAt);
 
     console.log(`\n${label}`);
     console.log(`  placed:       ${formatSummary(summarize(reports.map((report) => report.placed)))}`);
     console.log(`  captures:     ${formatSummary(summarize(reports.map((report) => report.zones)))}`);
     console.log(`  total damage: ${formatSummary(summarize(reports.map((report) => report.totalDamage)))}`);
     console.log(`  zone area:    ${formatSummary(summarize(zoneAreas))}`);
-    console.log(`  min captures: ${minimalZones}/${totalZones} zones <= area ${LARGE_ZONE_MIN_AREA}`);
+    console.log(`  avg capture area: ${zoneAreas.length === 0 ? '0.0' : (zoneAreas.reduce((sum, area) => sum + area, 0) / zoneAreas.length).toFixed(1)}`);
+    console.log(`  min captures: ${minimalZones}/${totalZones} zones <= area ${LARGE_ZONE_MIN_AREA} (${formatPercent(minimalZones, totalZones)})`);
+    console.log(`  minimal capture share: ${formatPercent(minimalZones, totalZones)}`);
+    console.log(`  placements before capture: ${formatSummary(summarize(firstCaptureValues))}`);
     console.log(`  quick loops:  ${quickCornerLoops}/${reports.length} hands with 4-corner loop`);
     console.log(`  area bonus:   ${formatSummary(summarize(reports.map((report) => report.areaBonus)))}`);
     console.log(`  gray bonus:   ${formatSummary(summarize(reports.map((report) => report.grayBonus)))}`);
@@ -1050,6 +1140,7 @@ function printHandReport(label, reports) {
     const allTilesPlaced = reports.filter((report) => report.placed === HAND_SIZE).length;
     console.log(`  zero damage hands: ${zeroDamage}/${reports.length}`);
     console.log(`  all tiles placed:  ${allTilesPlaced}/${reports.length}`);
+    printHandSamples(reports);
 }
 
 function printStrategyComparison(label, reports) {
@@ -1137,7 +1228,7 @@ function printBattleReport(label, reports) {
             + `rounds ${formatSummary(summarize(fights.map((fight) => fight.rounds)))} | `
             + `enemy dmg ${formatSummary(summarize(fights.map((fight) => fight.totalEnemyDamage)))} | `
             + `player dmg ${formatSummary(summarize(fights.map((fight) => fight.totalPlayerDamage)))} | `
-            + `captures ${capturedZones}, min ${minimalZones}, avg area ${(captureAreaTotal / Math.max(1, capturedZones)).toFixed(1)} | `
+            + `captures ${capturedZones}, min ${minimalZones} (${formatPercent(minimalZones, capturedZones)}), avg area ${(captureAreaTotal / Math.max(1, capturedZones)).toFixed(1)} | `
             + `zero ${zeroDamageRounds}/${totalRounds} rounds | `
             + `dead-end ${fights.reduce((sum, fight) => sum + fight.deadEndRounds, 0)}`
             + `/${totalRounds} rounds`
@@ -1180,6 +1271,7 @@ function run() {
             const battleReports = analyzeBattles(createRng(seed + presetSeedOffset + 66666), presetDeck, strictEdges);
             const presetLabel = `${modeLabel} / ${preset} deck (${presetDeck.length} tiles)`;
 
+            printOpeningDrawReport(presetLabel, createRng(seed + presetSeedOffset + 11111), presetDeck);
             printHandReport(`\n=== ${presetLabel}: ${HAND_RUNS} ${GUARANTEED_LOOP_HANDS ? 'smoothed' : 'honest'} hands ===`, handReports);
             printStrategyComparison(`=== ${presetLabel}: close ASAP vs payoff ===`, strategyReports);
             printBattleReport(`\n=== ${presetLabel}: theoretical battles, ${FIGHT_RUNS} fights each ===`, battleReports);

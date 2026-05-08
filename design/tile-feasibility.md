@@ -103,6 +103,55 @@ fewer both:        hand captures avg 0.0, zero damage 39/40, battle_01 wins 12/4
 - Серый blank теперь считается neutral wildcard при размещении: его можно ставить рядом с цветной границей и достраивать цветную границу рядом с ним, чтобы `grayInteriorBonus` был достижимым правилом, а не только формулой.
 - Следующие рычаги по плану — queue-режим и честный color/pattern bag: они должны чаще давать игроку промежуточный выбор, а не только редкую готовую петлю.
 
+## День 3: baseline доминирования минимального квадрата
+
+Задача этого прогона — не менять правила, а измерить, насколько текущая выдача и эвристика все еще приводят к малому `area <= 12` закрытию.
+
+Симулятор теперь печатает дополнительные диагностические метрики:
+
+- `minimal capture share`: доля закрытых зон с `area <= 12`;
+- `avg capture area`: средняя площадь закрытия;
+- `placements before capture`: сколько поставленных тайлов проходит до первого закрытия в руке;
+- `zero damage hands` и `zero ... rounds`;
+- `hands with 4-corner loop`;
+- первые 12 выдач: последовательность, цвета и shape-группы `corner/plus/line/tee/gray`;
+- первые 12 hand-samples: счетчики цветов и shape-групп в раздаче.
+
+Команда baseline:
+
+```sh
+HAND_RUNS=40 FIGHT_RUNS=40 PLACEMENT_ATTEMPTS=40 ./scripts/node.sh scripts/simulate-tiles.js 20260508
+```
+
+Baseline для `STRICT edge matching / current deck`, seed `20260508`:
+
+```text
+first 12 draws:
+colors: blue 6, green 3, red 3
+shapes: corner 4, line 4, plus 1, tee 3
+
+40 honest hands:
+captures avg 0.2
+total damage avg 4.2
+avg capture area 12.0
+minimal capture share 7/7 = 100%
+placements before capture avg 6.0
+quick 4-corner loops 0/40
+zero damage hands 33/40
+all tiles placed 40/40
+
+theoretical battles:
+battle_01 wins 23/40, captures 52, minimal 48/52 = 92%, avg area 12.9, zero damage 199/250 rounds
+battle_02 wins 20/40, captures 55, minimal 53/55 = 96%, avg area 12.6, zero damage 206/258 rounds
+battle_03 wins  7/40, captures 56, minimal 55/56 = 98%, avg area 12.2, zero damage 256/309 rounds
+battle_04 wins  8/40, captures 61, minimal 60/61 = 98%, avg area 12.4, zero damage 247/303 rounds
+battle_05 wins  3/40, captures 59, minimal 57/59 = 97%, avg area 12.4, zero damage 256/312 rounds
+```
+
+Сравнение с быстрыми deck-предсетами подтверждает старый риск: простое удаление `corner`/`plus` не решает проблему, а в основном снижает проходимость. В hand-тестах все закрытия у `current`, `fewer corners`, `fewer plus` и `fewer both` снова имеют `avg capture area 12.0` и `minimal capture share 100%`.
+
+Вывод: payoff-формула уже делает большие зоны выгодными в контролируемом сценарии, но текущая честная hand-выдача почти никогда не приводит к большим зонам сама. Следующая задача должна работать с составом стартовой колоды/recipe и потом с opening bag или queue, а не с уроном.
+
 ## Результаты сглаженной v2 capture-fill
 
 Симуляция использует `assets/tiles_v2/tile_manifest.json`, строгий edge matching как основной режим, `damage = area * 2` и сглаживание раздачи через выбор лучшей из 3 кандидатных рук.

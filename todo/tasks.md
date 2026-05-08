@@ -74,25 +74,9 @@
 
 ---
 
-### [2026-05-08] День 3: измерить доминирование минимального квадрата
+### ~~[2026-05-08] День 3: измерить доминирование минимального квадрата~~ ВЫПОЛНЕНО
 
-**Idea:** прежде чем дальше крутить баланс, добавить метрики именно про маленькие area-12 закрытия, чтобы видеть, стало ли лучше.
-
-**Why:** сейчас ощущение игрока точнее старой симуляции: payoff за большую зону есть, но реальные руки все равно толкают в 2x2. Нужна измеримая цель, иначе мы будем спорить по ощущениям и случайным прогонам.
-
-**MVP:**
-
-- в `scripts/simulate-tiles.js` печатать `minimal capture share` для зон `area <= 12`;
-- печатать `avg placements before capture`, `avg capture area`, `zero damage rounds/hands`, `hands with quick 4-corner loop`;
-- отдельно показывать первые 8-12 выдач: цвета, паттерны, количество `corner`, `plus`, `line`, `tee`, `gray`;
-- записать baseline в `design/tile-feasibility.md`;
-- не менять правила боя и состав колоды в этой задаче.
-
-**Acceptance:** после запуска симулятора видно, какой процент закрытий является area-12, сколько ходов/поставленных тайлов проходит до первого закрытия, и ухудшилась ли частота нулевых рук; baseline зафиксирован в `design/tile-feasibility.md`.
-
-**Priority:** must
-
-**Layer:** MVP
+**Статус:** `scripts/simulate-tiles.js` печатает `minimal capture share`, `avg capture area`, `placements before capture`, `zero damage rounds/hands`, `quick 4-corner loop`, первые 12 draws и первые 12 hand-samples по цветам/shape-группам. Baseline записан в `design/tile-feasibility.md`: current deck дает 100% малых hand-закрытий и 92-98% малых закрытий в боях.
 
 ---
 

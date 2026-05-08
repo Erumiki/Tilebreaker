@@ -29,3 +29,5 @@
 - Color multipliers are stored on the run and multiply the zone's configured base damage after area and gray bonuses.
 - Combat UI shows player HP, enemy HP, round number, enemy attacks, deck/discard counts, board, hand, and per-color round results: enemy attack, captured area, capture sum, multiplier, payoff bonus, enemy damage or player damage.
 - A minimal 2x2 corner loop scores area 12 with no size bonus; a larger closed zone can now beat it clearly, especially when a gray blank is enclosed as preparation/fill.
+- The simulator now reports small-capture diagnostics: `minimal capture share`, `avg capture area`, `placements before capture`, zero-damage hands/rounds, quick 4-corner loops, and opening draw/hand composition by color and shape.
+- Current baseline still shows small-zone dominance: `current deck` has 100% `area <= 12` hand captures and 92-98% `area <= 12` battle captures on seed `20260508`.
