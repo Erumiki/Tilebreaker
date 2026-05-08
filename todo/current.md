@@ -8,10 +8,13 @@
 
 **Current design truth:**
 
-- Tile assets come from `assets/tiles_v2/tile_manifest.json`.
+- Tile-battle tuning lives in JSON configs, not in code.
+- `configs/game.json` stores board size, hand size, starting player HP, starting deck size, damage formula, active tile manifest path, seed and run battle count.
+- `configs/levels.json` stores battle list, enemy HP and enemy color attacks.
+- The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The starting MVP tile set has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blanks.
 - `dot` and base `cap` tiles are not in the MVP deck.
 - A combat color's micro-cells are territory boundaries.
 - A fully enclosed empty or filled interior becomes captured land for that color.
-- Scoring for the first prototype uses `capture area * 2`.
+- Scoring for the first prototype uses configured `damageFormula.type = areaMultiplier` with `areaMultiplier = 2`.
 - The first prototype smooths early hands by selecting the best of 3 candidate draws and discarding the rest.
