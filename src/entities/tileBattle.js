@@ -94,6 +94,14 @@ function getTileByPattern(tiles, color, patternName) {
     ));
 }
 
+function getDamagePerArea(settings) {
+    if (settings.damageFormula?.type === 'areaMultiplier') {
+        return settings.damageFormula.areaMultiplier ?? 1;
+    }
+
+    return settings.damagePerArea ?? 1;
+}
+
 function selectPrimaryAttackColor(attack) {
     return COMBAT_COLORS.reduce((best, color) => (
         (attack[color] ?? 0) > (attack[best] ?? 0) ? color : best
@@ -285,7 +293,7 @@ function findCapturedAreas(board, settings) {
                     interiorSize: region.interiorCells.length,
                     boundarySize: region.boundaryCells.length,
                     area,
-                    damage: area * settings.damagePerArea,
+                    damage: area * getDamagePerArea(settings),
                     interiorCells: region.interiorCells,
                     boundaryCells: region.boundaryCells,
                 });
@@ -296,8 +304,10 @@ function findCapturedAreas(board, settings) {
     return zones;
 }
 
-export function createTilesFromManifest(manifest) {
-    return manifest.tiles.map((entry) => {
+export function createTilesFromManifest(manifest, settings = {}) {
+    const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
+
+    return manifest.tiles.slice(0, deckSize).map((entry) => {
         const symbol = colorSymbol(entry.color);
         const rows = entry.matrix.map((row) => row.replaceAll('X', symbol));
 

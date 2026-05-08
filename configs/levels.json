@@ -4,7 +4,6 @@
             "id": "battle_01",
             "name": "Первый раунд",
             "ante": 1,
-            "targetScore": 300,
             "reward": 3,
             "enemyHp": 35,
             "attacks": [
@@ -17,7 +16,6 @@
             "id": "battle_02",
             "name": "Ставка повыше",
             "ante": 1,
-            "targetScore": 450,
             "reward": 4,
             "enemyHp": 45,
             "attacks": [
@@ -30,7 +28,6 @@
             "id": "battle_03",
             "name": "Сложная доска",
             "ante": 2,
-            "targetScore": 650,
             "reward": 5,
             "enemyHp": 55,
             "attacks": [
@@ -43,7 +40,6 @@
             "id": "battle_04",
             "name": "Проверка билда",
             "ante": 2,
-            "targetScore": 850,
             "reward": 6,
             "enemyHp": 65,
             "attacks": [
@@ -56,7 +52,6 @@
             "id": "battle_05",
             "name": "Финальная ставка",
             "ante": 3,
-            "targetScore": 1200,
             "reward": 8,
             "enemyHp": 75,
             "attacks": [

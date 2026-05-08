@@ -304,7 +304,7 @@ export function createBattleScene({
     onFinish,
 }) {
     const settings = config.game.tileBattle;
-    const tiles = createTilesFromManifest(config.tileManifest);
+    const tiles = createTilesFromManifest(config.tileManifest, settings);
     const state = createTileBattleState({
         battle,
         run,
