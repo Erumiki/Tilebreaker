@@ -53,10 +53,18 @@ function getCaptureBonusByColor(result) {
     }
 
     for (const zone of result.score.zones) {
-        bonusByColor[zone.color] += (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0);
+        bonusByColor[zone.color] += (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0) + (zone.focusBonus ?? 0);
     }
 
     return bonusByColor;
+}
+
+function isPlacementPayoffVariant(settings) {
+    return getGameplayVariant(settings).id === 'placement_payoff';
+}
+
+function getPlacementFocusMax(settings) {
+    return settings.placementPayoff?.maxFocus ?? 4;
 }
 
 function formatDamage(value) {
@@ -325,6 +333,12 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             color: '#f6f0a8',
         });
     }
+    if (isPlacementPayoffVariant(settings)) {
+        ui.drawText(`Focus ${state.placementFocus ?? 0}/${getPlacementFocusMax(settings)}`, panel.x + panel.width - 112, panel.y + 144, {
+            size: 15,
+            color: '#f3d991',
+        });
+    }
 
     ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
@@ -343,7 +357,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
     if (state.lastResult) {
         const zones = state.lastResult.score.zones.length;
         const totalBonus = state.lastResult.score.zones.reduce((sum, zone) => (
-            sum + (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0)
+            sum + (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0) + (zone.focusBonus ?? 0)
         ), 0);
         ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`, panel.x + 18, panel.y + 400, {
             size: 15,
@@ -366,6 +380,28 @@ function getButtonLabel(state) {
     }
 
     return 'Новый раунд';
+}
+
+function getPlacedFeedback(state, settings) {
+    if (isPlacementPayoffVariant(settings)) {
+        if ((state.lastPlacementFocusDelta ?? 0) > 0) {
+            return `Focus +${state.lastPlacementFocusDelta} (${state.placementFocus}/${getPlacementFocusMax(settings)})`;
+        }
+
+        if ((state.lastPlacementClosedZones ?? 0) > 0 && (state.placementFocus ?? 0) > 0) {
+            return `Захват готов: Focus ${state.placementFocus} усилит итог раунда`;
+        }
+    }
+
+    if (isQueueDrawMode(settings)) {
+        return state.selectedHandIndex >= 0
+            ? 'Текущий тайл поставлен, queue сдвинулся'
+            : 'Лимит queue на раунд сыгран, заканчивай раунд';
+    }
+
+    return state.selectedHandIndex >= 0
+        ? 'Тайл поставлен'
+        : 'Рука разыграна, заканчивай раунд';
 }
 
 function getHoverKey(ui, layout, settings, mouse) {
@@ -452,7 +488,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}`
         : '-';
 
     return [
@@ -466,6 +502,8 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.selectedHandIndex,
         state.queuePlayedThisRound ?? 0,
         state.queueReserve?.map((tileDef) => tileDef?.id ?? '-').join(',') ?? '-',
+        state.placementFocus ?? 0,
+        state.lastPlacementFocusDelta ?? 0,
         getGameplayVariant(settings).id,
         boardKey,
         handKey,
@@ -522,13 +560,7 @@ export function createBattleScene({
                     advanceTileQueue(run, state, settings, tiles);
                 }
                 state.feedback = placed
-                    ? isQueueDrawMode(settings)
-                        ? state.selectedHandIndex >= 0
-                            ? 'Текущий тайл поставлен, queue сдвинулся'
-                            : 'Лимит queue на раунд сыгран, заканчивай раунд'
-                        : state.selectedHandIndex >= 0
-                            ? 'Тайл поставлен'
-                            : 'Рука разыграна, заканчивай раунд'
+                    ? getPlacedFeedback(state, settings)
                     : 'Нельзя поставить: смежные края должны совпасть';
                 return;
             }
@@ -655,8 +687,15 @@ export function createBattleScene({
                         areaBonus: zone.areaBonus,
                         grayBonus: zone.grayBonus,
                         grayInteriorCells: zone.grayInteriorCells,
+                        focusBonus: zone.focusBonus ?? 0,
                     })),
+                    placementFocusSpent: state.lastResult.placementFocusSpent,
+                    placementFocusBonus: state.lastResult.placementFocusBonus,
+                    placementFocusRemaining: state.lastResult.placementFocusRemaining,
                 } : null,
+                placementFocus: state.placementFocus ?? 0,
+                lastPlacementFocusDelta: state.lastPlacementFocusDelta ?? 0,
+                lastPlacementClosedZones: state.lastPlacementClosedZones ?? 0,
                 deck: getRunDeckStats(run),
                 colorMultipliers: { ...run.colorMultipliers },
                 layout: this.layout,

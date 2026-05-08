@@ -41,10 +41,28 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 | Variant | Хочется растить 5+ клеток | Цель хода понятна | Нулевые ходы редки/терпимы | Damage читается | Analysis не вязкий | Еще один забег? | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `legacy` |  |  |  |  |  |  |  |
-| `placement_payoff` |  |  |  |  |  |  |  |
+| `placement_payoff` | 4 | 4 | 3 | 4 | 4 | 4 | Seed `20260508`: Focus набрался до cap за setup-раунды и дал +12 к первому closure; это заметно, но не ломает closure. |
 | `one_color_chain` |  |  |  |  |  |  |  |
 | `connect_targets` |  |  |  |  |  |  |  |
 | `road_mode` |  |  |  |  |  |  |  |
+
+## Variant A: Placement Payoff
+
+`placement_payoff` добавляет Focus поверх текущего two-color queue/capture-fill:
+
+- полезная постановка рядом с существующей землей, которая еще не закрывает зону, дает `Focus +1`;
+- первый изолированный тайл и закрывающая постановка сами по себе Focus не фармят;
+- Focus имеет cap из `configs/game.json` (`placementPayoff.maxFocus`);
+- Focus не наносит прямой урон на placement и конвертируется только при следующем captured zone;
+- при конвертации весь Focus добавляется как flat bonus к самой большой закрытой зоне и сбрасывается;
+- UI показывает текущий Focus, всплывающий `Focus +N` и включает Focus в итоговый bonus.
+
+Баланс-прогон `2026-05-09`, seed `20260508`, real playable/debug:
+
+- legacy на том же debug-алгоритме: первый closure в 3-м раунде нанес 24 damage;
+- Variant A: 4 useful setup placements, max Focus 4, первый closure в 3-м раунде нанес 36 damage (`24 + Focus 12`);
+- вывод: `bonusPerFocus = 3` оставлен без изменения, потому что max Focus дает половину минимального closure damage и не заменяет сам closure;
+- риск для следующей проверки: если ручной игрок начнет фармить Focus "лапшой" без желания закрывать землю, первым коротким tuning будет `bonusPerFocus: 2`.
 
 ## Симуляционные Метрики
 
@@ -61,4 +79,4 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 
 ## Текущий Статус
 
-На этом шаге реализован только каркас переключения и протокол сравнения. `placement_payoff`, `one_color_chain`, `connect_targets` и `road_mode` пока используют legacy-правила, пока их отдельные задачи не добавят механику.
+Каркас переключения и протокол сравнения готовы. `placement_payoff` реализован как Focus-эксперимент без прямого урона за placement. `one_color_chain`, `connect_targets` и `road_mode` пока используют legacy-правила, пока их отдельные задачи не добавят механику.

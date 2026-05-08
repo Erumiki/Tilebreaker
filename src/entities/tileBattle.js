@@ -823,6 +823,60 @@ function prepareNextRoundBoard(state, settings) {
     return cloneBoard(state.board);
 }
 
+function isPlacementPayoffVariant(settings) {
+    return settings.gameplayVariant === 'placement_payoff';
+}
+
+function getPlacementPayoffRules(settings) {
+    return {
+        focusPerUsefulPlacement: settings.placementPayoff?.focusPerUsefulPlacement ?? 1,
+        maxFocus: settings.placementPayoff?.maxFocus ?? 4,
+        bonusPerFocus: settings.placementPayoff?.bonusPerFocus ?? 3,
+    };
+}
+
+function addPlacementFocus(state, settings, amount) {
+    const rules = getPlacementPayoffRules(settings);
+    const before = state.placementFocus ?? 0;
+    state.placementFocus = Math.min(rules.maxFocus, before + amount);
+    state.lastPlacementFocusDelta = state.placementFocus - before;
+}
+
+function applyPlacementFocusToScore(state, score, settings) {
+    if (!isPlacementPayoffVariant(settings) || score.zones.length === 0) {
+        return {
+            focusSpent: 0,
+            focusBonus: 0,
+        };
+    }
+
+    const rules = getPlacementPayoffRules(settings);
+    const focusSpent = Math.min(state.placementFocus ?? 0, rules.maxFocus);
+
+    if (focusSpent <= 0) {
+        return {
+            focusSpent: 0,
+            focusBonus: 0,
+        };
+    }
+
+    const focusBonus = focusSpent * rules.bonusPerFocus;
+    const targetZone = score.zones.reduce((best, zone) => (
+        zone.area > best.area ? zone : best
+    ), score.zones[0]);
+
+    targetZone.focusBonus = (targetZone.focusBonus ?? 0) + focusBonus;
+    targetZone.damage += focusBonus;
+    score.damageByColor[targetZone.color] += focusBonus;
+    score.totalDamage += focusBonus;
+    state.placementFocus = 0;
+
+    return {
+        focusSpent,
+        focusBonus,
+    };
+}
+
 export function createTilesFromManifest(manifest, settings = {}) {
     const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
 
@@ -936,6 +990,9 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         phase: 'placing',
         lastResult: null,
         outcome: null,
+        placementFocus: 0,
+        lastPlacementFocusDelta: 0,
+        lastPlacementClosedZones: 0,
     };
 }
 
@@ -961,37 +1018,7 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
         return false;
     }
 
-    if (!settings.offColorLeapPlacement || !isCombatTile(tileDef)) {
-        return false;
-    }
-
-    if (settings.offColorLeapOnlyWhenBlocked !== false
-        && hasAnyAdjacentPlacement(board, tileDef, settings)) {
-        return false;
-    }
-
-    const leapDistance = settings.offColorLeapDistance ?? 2;
-
-    for (const direction of DIRECTIONS) {
-        const anchorX = x + direction.dx * leapDistance;
-        const anchorY = y + direction.dy * leapDistance;
-        const gapX = x + direction.dx;
-        const gapY = y + direction.dy;
-
-        if (!isInsideBoard(settings.boardSize, anchorX, anchorY)
-            || !isInsideBoard(settings.boardSize, gapX, gapY)
-            || board[gapY][gapX]) {
-            continue;
-        }
-
-        const anchorTile = board[anchorY][anchorX];
-
-        if (anchorTile && isCombatTile(anchorTile) && anchorTile.color !== tileDef.color) {
-            return true;
-        }
-    }
-
-    return false;
+    return true;
 }
 
 export function placeTile(state, settings, x, y) {
@@ -1001,7 +1028,24 @@ export function placeTile(state, settings, x, y) {
         return false;
     }
 
+    const placedBefore = countPlacedTiles(state.board);
+    const hadDirectNeighbor = hasDirectNeighbor(state.board, x, y, settings);
     state.board[y][x] = tileDef;
+    const postPlacementScore = scoreTileBoard(state.board, settings);
+    state.lastPlacementClosedZones = postPlacementScore.zones.length;
+    state.lastPlacementFocusDelta = 0;
+
+    if (isPlacementPayoffVariant(settings)
+        && placedBefore > 0
+        && hadDirectNeighbor
+        && postPlacementScore.zones.length === 0) {
+        addPlacementFocus(
+            state,
+            settings,
+            getPlacementPayoffRules(settings).focusPerUsefulPlacement,
+        );
+    }
+
     state.playedThisRound.push(tileDef.id);
     state.queuePlayedThisRound += isQueueDrawMode(settings) ? 1 : 0;
     state.hand[state.selectedHandIndex] = null;
@@ -1034,6 +1078,7 @@ export function scoreTileBoard(board, settings, run = null) {
 export function resolveTileRound(state, battle, settings, run = null) {
     const attack = getRoundAttack(battle, state.round);
     const score = scoreTileBoard(state.board, settings, run);
+    const placementPayoff = applyPlacementFocusToScore(state, score, settings);
     let enemyDamage = 0;
     let playerDamage = 0;
     const byColor = {};
@@ -1071,6 +1116,9 @@ export function resolveTileRound(state, battle, settings, run = null) {
         byColor,
         enemyDamage,
         playerDamage,
+        placementFocusSpent: placementPayoff.focusSpent,
+        placementFocusBonus: placementPayoff.focusBonus,
+        placementFocusRemaining: state.placementFocus ?? 0,
         scoredTileKeys: [...getScoredTileKeys({ score })],
     };
 
@@ -1155,6 +1203,8 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
 
     state.selectedHandIndex = state.hand.findIndex(Boolean);
     state.queuePlayedThisRound = 0;
+    state.lastPlacementFocusDelta = 0;
+    state.lastPlacementClosedZones = 0;
     state.phase = 'placing';
     state.lastResult = null;
     state.outcome = null;

@@ -1,15 +1,15 @@
 # Current Version
 
-## v0.11 Gameplay Variant Scaffold
+## v0.12 Variant A Placement Payoff
 
-**Goal:** Keep the current two-color queue build preserved as `legacy` while making future gameplay variants selectable at run start.
+**Goal:** Keep the current two-color queue build preserved as `legacy` while testing Variant A: useful setup placements gain Focus that boosts the next capture without dealing direct per-placement damage.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player HP, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, off-color leap placement and run battle count.
+- `configs/game.json` stores board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player HP, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
 - Active default `gameplayVariant` is `legacy`. It is the preserved current `queue + two-color capture-fill` ruleset.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
 - URL overrides accept `?gameplayVariant=placement_payoff` and short aliases `?variant=a`, `?variant=b`, `?variant=c`, `?variant=d`.
@@ -17,7 +17,10 @@
 - The combat UI and debug state show the short variant id (`LEG`, `A`, `B`, `C`, `D`) so manual playtests do not get mixed.
 - `scripts/simulate-tiles.js` reads `GAMEPLAY_VARIANT` or config default and prints the active variant plus comparison order before the usual metrics.
 - Manual comparison protocol and scorecard live in `design/gameplay-variants.md`.
-- Non-legacy variants currently launch as scaffolds using legacy mechanics until their dedicated tasks implement the actual rule changes.
+- Variant A (`placement_payoff`) adds Focus: a useful direct-neighbor placement that extends existing land without closing a zone gives `Focus +1`, up to `placementPayoff.maxFocus`.
+- Focus does not damage the enemy on placement. It is converted only when a later round result contains a captured zone, adding `placementFocus * placementPayoff.bonusPerFocus` to the largest captured zone and then resetting Focus to 0.
+- Variant A UI shows `Focus current/max` in the side panel, immediate `Focus +N` feedback after setup placement and includes Focus in the round bonus/debug result.
+- Variants B-D currently launch as scaffolds using legacy mechanics until their dedicated tasks implement the actual rule changes.
 - Scoring uses configured `damageFormula.type = areaMultiplier`: base area damage is `area * areaMultiplier`, zones larger than `largeZoneBonus.minArea` gain `largeZoneBonus.bonusPerArea` per extra micro-cell, and gray tile micro-cells inside a closed zone add `grayInteriorBonus.bonusPerCell`.
 - `configs/levels.json` stores only the battle list, enemy HP and enemy color attacks.
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
@@ -37,7 +40,7 @@
 - Between rounds, closed/scored tiles are cleared and unclosed tiles stay on the board, so unfinished territory can be completed later.
 - A zero-damage first round is not automatically bad: it can be a valid setup round if the saved board contains useful, buildable contour that converts into captures in later rounds.
 - If the next hand cannot continue the saved board at all, the battle uses fresh-start recovery and clears the unclosed board for that hand.
-- A selected combat-color tile can start a new island two cells away from an existing combat tile of another color, with one empty gap cell between them. This off-color leap remains available even when the tile also has direct edge-match placements elsewhere.
+- Placement is broad by default: a tile can be placed in any empty cell with no direct neighbors; if it has direct neighbors, all touching edges must match. This supersedes the older off-color leap as the main escape from artificial placement narrowing.
 - Gray tiles use asymmetric wildcard placement when `grayWildcardPlacement` is enabled: a gray blank can be placed as fill next to gray or combat tiles, while a combat tile placed next to an existing gray blank must touch it with a blank edge. Gray blanks are neutral fill/setup pieces for larger interiors.
 - Color multipliers are stored on the run and multiply the zone's configured base damage after area and gray bonuses.
 - Combat UI shows player HP, enemy HP, round number, enemy attacks, deck/discard counts, board, hand, and per-color round results: enemy attack, captured area, capture sum, multiplier, payoff bonus, enemy damage or player damage.

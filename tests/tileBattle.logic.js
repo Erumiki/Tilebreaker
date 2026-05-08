@@ -15,6 +15,7 @@ import {
     createTileBattleState,
     createTilesFromManifest,
     placeTile,
+    resolveTileRound,
 } from '../src/entities/tileBattle.js';
 
 const settings = {
@@ -63,22 +64,77 @@ test('combat tile cannot connect an open edge into existing gray fill', () => {
     assert.equal(canPlaceTile(board, tile('tile_red_line_v'), 3, 2, settings), true);
 });
 
-test('combat tile can start an off-color island even when adjacent moves exist', () => {
+test('combat tile can start a separated island even when adjacent moves exist', () => {
     const board = emptyBoard();
-    const leapSettings = {
-        ...settings,
-        offColorLeapPlacement: true,
-        offColorLeapDistance: 2,
-        offColorLeapOnlyWhenBlocked: false,
-    };
 
     board[1][1] = tile('tile_green_tee_l');
     board[2][1] = tile('tile_gray_blank_01');
     board[1][3] = tile('tile_blue_line_h');
 
-    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 1, 0, leapSettings), true);
-    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 3, 3, leapSettings), true);
-    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 5, 1, leapSettings), true);
+    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 1, 0, settings), true);
+    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 3, 3, settings), true);
+    assert.equal(canPlaceTile(board, tile('tile_green_tee_l'), 5, 1, settings), true);
+});
+
+test('free cells without direct neighbors stay valid after the first tile', () => {
+    const board = emptyBoard();
+    board[2][2] = tile('tile_red_line_h');
+
+    assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 5, 5, settings), true);
+    assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 0, 0, settings), true);
+});
+
+test('placement payoff focus charges setup and boosts the next capture', () => {
+    const payoffSettings = {
+        ...settings,
+        gameplayVariant: 'placement_payoff',
+        placementPayoff: {
+            focusPerUsefulPlacement: 1,
+            maxFocus: 4,
+            bonusPerFocus: 3,
+        },
+    };
+    const state = {
+        round: 1,
+        playerHp: 30,
+        enemyHp: 60,
+        board: emptyBoard(),
+        hand: [tile('tile_red_line_h')],
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+        placementFocus: 0,
+    };
+
+    state.board[2][2] = tile('tile_red_line_h');
+
+    assert.equal(placeTile(state, payoffSettings, 3, 2), true);
+    assert.equal(state.placementFocus, 1);
+    assert.equal(state.lastPlacementFocusDelta, 1);
+
+    state.placementFocus = 2;
+    state.hand = [tile('tile_red_corner_lu')];
+    state.selectedHandIndex = 0;
+    state.board[2][2] = tile('tile_red_corner_rd');
+    state.board[2][3] = tile('tile_red_corner_dl');
+    state.board[3][2] = tile('tile_red_corner_ur');
+    state.board[3][3] = null;
+
+    assert.equal(placeTile(state, payoffSettings, 3, 3), true);
+
+    resolveTileRound(state, {
+        enemyHp: 60,
+        attacks: [{ red: 0, blue: 0, green: 0 }],
+    }, payoffSettings);
+
+    assert.equal(state.lastResult.placementFocusSpent, 2);
+    assert.equal(state.lastResult.placementFocusBonus, 6);
+    assert.equal(state.lastResult.score.zones.some((zone) => zone.focusBonus === 6), true);
+    assert.equal(state.placementFocus, 0);
 });
 
 test('opening draw bag caps early closers and keeps continuations', () => {
