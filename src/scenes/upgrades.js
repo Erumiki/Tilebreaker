@@ -55,6 +55,11 @@ export function createUpgradeScene({
                 size: 22,
                 color: '#b8c8d8',
             });
+            ui.drawText(`Колода ${run.deck.length}  |  Добор ${run.drawPile.length}  |  Сброс ${run.discardPile.length}`, screen.width / 2, screen.height * 0.38, {
+                align: 'center',
+                size: 17,
+                color: '#8fb1cb',
+            });
 
             upgrades.forEach((upgrade, index) => {
                 const rect = this.choiceRects[index];
@@ -78,6 +83,14 @@ export function createUpgradeScene({
                     lineHeight: 22,
                 });
             });
+        },
+        getDebugState() {
+            return {
+                upgrades,
+                layout: {
+                    choices: this.choiceRects,
+                },
+            };
         },
     };
 }

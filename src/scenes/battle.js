@@ -1,9 +1,10 @@
-import { BattleOutcome } from '../entities/run.js';
+import { BattleOutcome, getRunDeckStats } from '../entities/run.js';
 import {
     canPlaceTile,
     COMBAT_COLORS,
     createTileBattleState,
     createTilesFromManifest,
+    discardRoundHand,
     getRoundAttack,
     placeTile,
     resolveTileRound,
@@ -163,7 +164,8 @@ function drawAttackRow(ui, rect, color, attack, result) {
         : `Урон игроку +${colorResult.playerDamage}`;
     const outcomeColor = colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
 
-    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${colorResult.closedDamage}`, rect.x + 18, rect.y + 31, {
+    const multiplier = result.score.zones.find((zone) => zone.color === color)?.multiplier ?? 1;
+    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${colorResult.closedDamage}  |  x${multiplier}`, rect.x + 18, rect.y + 31, {
         size: 14,
         color: '#d8e7f2',
     });
@@ -229,9 +231,10 @@ function drawHand(ui, layout, state, mouse) {
     });
 }
 
-function drawSidePanel(ui, layout, battle, state) {
+function drawSidePanel(ui, layout, battle, run, state) {
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round);
+    const deck = getRunDeckStats(run);
     const totalCaptureArea = state.lastResult
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
@@ -254,8 +257,12 @@ function drawSidePanel(ui, layout, battle, state) {
         size: 20,
         color: '#ffd4d8',
     });
+    ui.drawText(`Колода ${deck.drawPile}  |  Сброс ${deck.discardPile}`, panel.x + 18, panel.y + 144, {
+        size: 15,
+        color: '#8fb1cb',
+    });
 
-    ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 148, {
+    ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
         color: '#8fb1cb',
     });
@@ -263,7 +270,7 @@ function drawSidePanel(ui, layout, battle, state) {
     COMBAT_COLORS.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
-            y: panel.y + 174 + index * 72,
+            y: panel.y + 194 + index * 72,
             width: panel.width - 32,
             height: 64,
         }, color, attack, state.lastResult);
@@ -271,11 +278,11 @@ function drawSidePanel(ui, layout, battle, state) {
 
     if (state.lastResult) {
         const zones = state.lastResult.score.zones.length;
-        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}`, panel.x + 18, panel.y + 396, {
+        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}`, panel.x + 18, panel.y + 410, {
             size: 16,
             color: '#d8e7f2',
         });
-        ui.drawText(`Врагу -${state.lastResult.enemyDamage}  |  Игроку -${state.lastResult.playerDamage}`, panel.x + 18, panel.y + 420, {
+        ui.drawText(`Врагу -${state.lastResult.enemyDamage}  |  Игроку -${state.lastResult.playerDamage}`, panel.x + 18, panel.y + 434, {
             size: 16,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
@@ -306,11 +313,12 @@ function getHoverKey(ui, layout, settings, mouse) {
     ].join('|');
 }
 
-function createRenderKey({ ui, layout, settings, state, mouse, screen }) {
+function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const boardKey = state.board.map((row) => (
         row.map((tileDef) => tileDef?.id ?? '-').join(',')
     )).join(';');
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
+    const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
         ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}`
         : '-';
@@ -326,6 +334,8 @@ function createRenderKey({ ui, layout, settings, state, mouse, screen }) {
         state.selectedHandIndex,
         boardKey,
         handKey,
+        `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}`,
+        COMBAT_COLORS.map((color) => run.colorMultipliers[color]).join(','),
         resultKey,
         getHoverKey(ui, layout, settings, mouse),
         state.feedback ?? '-',
@@ -383,7 +393,8 @@ export function createBattleScene({
             }
 
             if (state.phase === 'placing') {
-                resolveTileRound(state, battle, settings);
+                resolveTileRound(state, battle, settings, run);
+                discardRoundHand(run, state);
                 run.playerHp = state.playerHp;
                 state.feedback = null;
                 return;
@@ -400,6 +411,7 @@ export function createBattleScene({
             }
 
             startNextTileRound(state, {
+                run,
                 battle,
                 settings,
                 tiles,
@@ -414,6 +426,7 @@ export function createBattleScene({
                 ui,
                 layout: this.layout,
                 settings,
+                run,
                 state,
                 mouse,
                 screen,
@@ -436,7 +449,7 @@ export function createBattleScene({
             });
 
             drawBoard(ui, this.layout, settings, state, mouse);
-            drawSidePanel(ui, this.layout, battle, state);
+            drawSidePanel(ui, this.layout, battle, run, state);
             drawHand(ui, this.layout, state, mouse);
             if (state.feedback) {
                 ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
@@ -481,7 +494,13 @@ export function createBattleScene({
                     areaByColor: getCaptureAreaByColor(state.lastResult),
                     byColor: state.lastResult.byColor,
                     damageByColor: state.lastResult.score.damageByColor,
+                    zoneMultipliers: state.lastResult.score.zones.map((zone) => ({
+                        color: zone.color,
+                        multiplier: zone.multiplier,
+                    })),
                 } : null,
+                deck: getRunDeckStats(run),
+                colorMultipliers: { ...run.colorMultipliers },
                 layout: this.layout,
             };
         },

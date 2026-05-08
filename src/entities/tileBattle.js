@@ -1,3 +1,5 @@
+import { discardTileIds, drawTileIds } from './run.js';
+
 export const COMBAT_COLORS = ['red', 'blue', 'green'];
 export const TILE_COLORS = ['red', 'blue', 'green', 'gray'];
 
@@ -14,26 +16,6 @@ const DIRECTIONS = [
     { name: 'south', opposite: 'north', dx: 0, dy: 1 },
     { name: 'west', opposite: 'east', dx: -1, dy: 0 },
 ];
-
-function createRng(seed) {
-    let state = seed >>> 0;
-
-    return function next() {
-        state = (state * 1664525 + 1013904223) >>> 0;
-        return state / 0x100000000;
-    };
-}
-
-function shuffle(rng, items) {
-    const copy = [...items];
-
-    for (let index = copy.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(rng() * (index + 1));
-        [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-    }
-
-    return copy;
-}
 
 function pattern(rows) {
     return rows.map((row) => row.split(''));
@@ -88,12 +70,6 @@ function countPlacedTiles(board) {
     ), 0);
 }
 
-function getTileByPattern(tiles, color, patternName) {
-    return tiles.find((tileDef) => (
-        tileDef.color === color && tileDef.pattern === patternName
-    ));
-}
-
 function getDamagePerArea(settings) {
     if (settings.damageFormula?.type === 'areaMultiplier') {
         return settings.damageFormula.areaMultiplier ?? 1;
@@ -108,27 +84,142 @@ function selectPrimaryAttackColor(attack) {
     ), COMBAT_COLORS[0]);
 }
 
-function drawRoundHand({ tiles, battle, settings, round }) {
-    const attack = getRoundAttack(battle, round);
-    const rng = createRng((settings.seed ?? 20260508) + round * 97 + battle.id.length * 13);
-    const primaryColor = selectPrimaryAttackColor(attack);
+function evaluateHand(tileIds, tileMap, attack) {
     const loopPatterns = ['corner_rd', 'corner_dl', 'corner_ur', 'corner_lu'];
-    const hand = settings.guaranteedLoopHands === false
-        ? []
-        : loopPatterns
-            .map((patternName) => getTileByPattern(tiles, primaryColor, patternName))
-            .filter(Boolean);
-    const usedIds = new Set(hand.map((tileDef) => tileDef.id));
-    const fillers = shuffle(rng, tiles.filter((tileDef) => !usedIds.has(tileDef.id)));
+    const tiles = tileIds.map((tileId) => tileMap.get(tileId)).filter(Boolean);
+    const primaryColor = selectPrimaryAttackColor(attack);
+    let score = 0;
 
-    for (const tileDef of fillers) {
-        if (hand.length >= settings.handSize) {
-            break;
+    for (const color of COMBAT_COLORS) {
+        const colorTiles = tiles.filter((tileDef) => tileDef.color === color);
+        const patterns = new Set(colorTiles.map((tileDef) => tileDef.pattern));
+        const loopCount = loopPatterns.filter((patternName) => patterns.has(patternName)).length;
+
+        score += loopCount * (color === primaryColor ? 8 : 5);
+
+        if (loopCount === loopPatterns.length) {
+            score += color === primaryColor ? 160 : 120;
         }
-        hand.push(tileDef);
+
+        score += colorTiles.length * ((attack[color] ?? 0) + 1);
     }
 
-    return hand.slice(0, settings.handSize);
+    return score;
+}
+
+function createTileMap(tiles) {
+    return new Map(tiles.map((tileDef) => [tileDef.id, tileDef]));
+}
+
+function removeFirst(items, value) {
+    const index = items.indexOf(value);
+
+    if (index >= 0) {
+        items.splice(index, 1);
+        return true;
+    }
+
+    return false;
+}
+
+function getLoopTileIds(tiles, color) {
+    const loopPatterns = ['corner_rd', 'corner_dl', 'corner_ur', 'corner_lu'];
+
+    return loopPatterns
+        .map((patternName) => tiles.find((tileDef) => (
+            tileDef.color === color && tileDef.pattern === patternName
+        ))?.id)
+        .filter(Boolean);
+}
+
+function completeLoopFromDraw(run, tileIds, tiles, tileMap, attack) {
+    const colors = [
+        selectPrimaryAttackColor(attack),
+        ...COMBAT_COLORS.filter((color) => color !== selectPrimaryAttackColor(attack)),
+    ];
+
+    for (const color of colors) {
+        const loopTileIds = getLoopTileIds(tiles, color);
+        const handSet = new Set(tileIds);
+        const missingIds = loopTileIds.filter((tileId) => !handSet.has(tileId));
+
+        if (missingIds.length === 0) {
+            return tileIds;
+        }
+
+        if (!missingIds.every((tileId) => run.drawPile.includes(tileId))) {
+            continue;
+        }
+
+        const replaceableIndexes = tileIds
+            .map((tileId, index) => ({ tileId, index }))
+            .filter(({ tileId }) => !loopTileIds.includes(tileId))
+            .map(({ index }) => index);
+
+        if (replaceableIndexes.length < missingIds.length) {
+            continue;
+        }
+
+        const replacedTileIds = [];
+        const completed = [...tileIds];
+
+        for (let index = 0; index < missingIds.length; index += 1) {
+            const missingId = missingIds[index];
+            const replaceIndex = replaceableIndexes[index];
+            removeFirst(run.drawPile, missingId);
+            replacedTileIds.push(completed[replaceIndex]);
+            completed[replaceIndex] = missingId;
+        }
+
+        discardTileIds(run, replacedTileIds);
+        completed.sort((leftId, rightId) => (
+            evaluateHand([rightId], tileMap, attack) - evaluateHand([leftId], tileMap, attack)
+        ));
+        return completed;
+    }
+
+    return tileIds;
+}
+
+function drawRoundHand({ run, tiles, battle, settings, round }) {
+    const attack = getRoundAttack(battle, round);
+    const tileMap = createTileMap(tiles);
+    const candidateCount = settings.guaranteedLoopHands === false
+        ? 1
+        : settings.handSelectionDraws ?? 3;
+    const candidates = [];
+
+    for (let index = 0; index < candidateCount; index += 1) {
+        const tileIds = completeLoopFromDraw(
+            run,
+            drawTileIds(run, settings.handSize),
+            tiles,
+            tileMap,
+            attack,
+        );
+
+        if (tileIds.length === 0) {
+            break;
+        }
+
+        candidates.push({
+            tileIds,
+            score: evaluateHand(tileIds, tileMap, attack),
+        });
+    }
+
+    if (candidates.length === 0) {
+        return [];
+    }
+
+    candidates.sort((left, right) => right.score - left.score);
+    const [chosen, ...discarded] = candidates;
+
+    for (const candidate of discarded) {
+        discardTileIds(run, candidate.tileIds);
+    }
+
+    return chosen.tileIds.map((tileId) => tileMap.get(tileId)).filter(Boolean);
 }
 
 function buildMicroGrid(board, boardSize) {
@@ -293,6 +384,7 @@ function findCapturedAreas(board, settings) {
                     interiorSize: region.interiorCells.length,
                     boundarySize: region.boundaryCells.length,
                     area,
+                    baseDamage: area * getDamagePerArea(settings),
                     damage: area * getDamagePerArea(settings),
                     interiorCells: region.interiorCells,
                     boundaryCells: region.boundaryCells,
@@ -323,14 +415,22 @@ export function createTilesFromManifest(manifest, settings = {}) {
 
 export function createTileBattleState({ battle, run, settings, tiles }) {
     const round = 1;
+    const hand = drawRoundHand({
+        run,
+        tiles,
+        battle,
+        settings,
+        round,
+    });
 
     return {
         round,
         playerHp: run.playerHp,
         enemyHp: battle.enemyHp,
         board: createEmptyBoard(settings.boardSize),
-        hand: drawRoundHand({ tiles, battle, settings, round }),
-        selectedHandIndex: 0,
+        hand,
+        selectedHandIndex: hand.findIndex(Boolean),
+        playedThisRound: [],
         phase: 'placing',
         lastResult: null,
         outcome: null,
@@ -385,18 +485,23 @@ export function placeTile(state, settings, x, y) {
     }
 
     state.board[y][x] = tileDef;
+    state.playedThisRound.push(tileDef.id);
     state.hand[state.selectedHandIndex] = null;
     const nextIndex = state.hand.findIndex(Boolean);
     state.selectedHandIndex = nextIndex >= 0 ? nextIndex : -1;
     return true;
 }
 
-export function scoreTileBoard(board, settings) {
+export function scoreTileBoard(board, settings, run = null) {
     const zones = findCapturedAreas(board, settings);
     const damageByColor = Object.fromEntries(TILE_COLORS.map((color) => [color, 0]));
 
     for (const zone of zones) {
-        damageByColor[symbolToColor(colorSymbol(zone.color))] += zone.damage;
+        const color = symbolToColor(colorSymbol(zone.color));
+        const multiplier = run?.colorMultipliers?.[color] ?? 1;
+        zone.damage = zone.baseDamage * multiplier;
+        zone.multiplier = multiplier;
+        damageByColor[color] += zone.damage;
     }
 
     return {
@@ -408,9 +513,9 @@ export function scoreTileBoard(board, settings) {
     };
 }
 
-export function resolveTileRound(state, battle, settings) {
+export function resolveTileRound(state, battle, settings, run = null) {
     const attack = getRoundAttack(battle, state.round);
-    const score = scoreTileBoard(state.board, settings);
+    const score = scoreTileBoard(state.board, settings, run);
     let enemyDamage = 0;
     let playerDamage = 0;
     const byColor = {};
@@ -459,10 +564,25 @@ export function resolveTileRound(state, battle, settings) {
     return state.lastResult;
 }
 
-export function startNextTileRound(state, { battle, settings, tiles }) {
+export function discardRoundHand(run, state) {
+    const unplayedTileIds = state.hand
+        .filter(Boolean)
+        .map((tileDef) => tileDef.id);
+
+    discardTileIds(run, [
+        ...state.playedThisRound,
+        ...unplayedTileIds,
+    ]);
+    state.hand = state.hand.map(() => null);
+    state.playedThisRound = [];
+    state.selectedHandIndex = -1;
+}
+
+export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.round += 1;
     state.board = createEmptyBoard(settings.boardSize);
     state.hand = drawRoundHand({
+        run,
         tiles,
         battle,
         settings,

@@ -6,9 +6,11 @@ import {
     applyUpgrade,
     BattleOutcome,
     createRunState,
+    getRewardChoices,
     getCurrentBattle,
     resolveBattle,
 } from './entities/run.js';
+import { createTilesFromManifest } from './entities/tileBattle.js';
 import { createUiRenderer } from './render/ui.js';
 import { createBattleScene } from './scenes/battle.js';
 import { createMainMenuScene } from './scenes/mainmenu.js';
@@ -21,7 +23,7 @@ const app = await initPixi(PIXI, canvas, config);
 const input = initInput(canvas);
 const ui = createUiRenderer(PIXI, app.stage);
 const battles = config.levels.battles;
-const upgrades = config.levels.upgrades;
+const tiles = createTilesFromManifest(config.tileManifest, config.game.tileBattle);
 const totalBattles = Math.min(config.game.run.totalBattles, battles.length);
 let run = null;
 let scene = null;
@@ -68,7 +70,7 @@ function showUpgrades() {
         input,
         ui,
         run,
-        upgrades,
+        upgrades: getRewardChoices(run, tiles),
         onChoose(upgrade) {
             applyUpgrade(run, upgrade);
             showBattle();
@@ -80,6 +82,8 @@ function startRun() {
     run = createRunState({
         totalBattles,
         playerHp: config.game.tileBattle.startingPlayerHp,
+        startingDeck: tiles.map((tileDef) => tileDef.id),
+        seed: config.game.tileBattle.seed,
     });
     showBattle();
 }
@@ -101,5 +105,8 @@ window.__tilebreakerDebug = {
     },
     getBattleDebug() {
         return scene?.getDebugState?.() ?? null;
+    },
+    getUpgradeDebug() {
+        return scene?.name === 'upgrades' ? scene.getDebugState?.() ?? null : null;
     },
 };
