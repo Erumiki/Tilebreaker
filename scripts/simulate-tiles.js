@@ -18,7 +18,10 @@ const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
 const HAND_RUNS = Number(process.env.HAND_RUNS ?? 40);
 const FIGHT_RUNS = Number(process.env.FIGHT_RUNS ?? 40);
 const PLACEMENT_ATTEMPTS = Number(process.env.PLACEMENT_ATTEMPTS ?? 40);
-const HAND_SELECTION_DRAWS = TILE_SETTINGS.handSelectionDraws ?? 3;
+const GUARANTEED_LOOP_HANDS = TILE_SETTINGS.guaranteedLoopHands === true;
+const HAND_SELECTION_DRAWS = GUARANTEED_LOOP_HANDS
+    ? TILE_SETTINGS.handSelectionDraws ?? 3
+    : 1;
 const MAX_ROUNDS = 8;
 const STARTING_PLAYER_HP = TILE_SETTINGS.startingPlayerHp ?? 45;
 const TILE_MANIFEST_PATH = TILE_SETTINGS.manifestPath ?? 'assets/tiles_v2/tile_manifest.json';
@@ -928,7 +931,9 @@ function run() {
     console.log(`Seed: ${seed}`);
     console.log(`Tile set: ${deckDefinition.label}`);
     console.log(`Board: ${BOARD_SIZE}x${BOARD_SIZE}, hand: ${HAND_SIZE}, placement attempts per hand: ${PLACEMENT_ATTEMPTS}`);
-    console.log(`Hand smoothing: best of ${HAND_SELECTION_DRAWS} candidate draws`);
+    console.log(GUARANTEED_LOOP_HANDS
+        ? `Hand smoothing: best of ${HAND_SELECTION_DRAWS} candidate draws`
+        : 'Hand smoothing: off, honest single draw');
     console.log(`Capture damage: area * ${CAPTURE_DAMAGE_PER_AREA}`);
     console.log(`Round board cleanup: ${ROUND_BOARD_CLEANUP}, dead-end recovery: ${DEAD_END_RECOVERY}`);
     console.log(`Off-color leap: ${OFF_COLOR_LEAP_PLACEMENT}, distance: ${OFF_COLOR_LEAP_DISTANCE}, only blocked: ${OFF_COLOR_LEAP_ONLY_WHEN_BLOCKED}`);
@@ -944,7 +949,7 @@ function run() {
         const handReports = analyzeHands(rng, deck, strictEdges);
         const battleReports = analyzeBattles(rng, deck, strictEdges);
 
-        printHandReport(`\n=== ${modeLabel}: ${HAND_RUNS} smoothed hands ===`, handReports);
+        printHandReport(`\n=== ${modeLabel}: ${HAND_RUNS} ${GUARANTEED_LOOP_HANDS ? 'smoothed' : 'honest'} hands ===`, handReports);
         printBattleReport(`\n=== ${modeLabel}: theoretical battles, ${FIGHT_RUNS} fights each ===`, battleReports);
     }
 }

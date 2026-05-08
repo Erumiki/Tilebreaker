@@ -14,9 +14,8 @@
             "areaMultiplier": 2
         },
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
-        "seed": 20260508,
         "handSelectionDraws": 3,
-        "guaranteedLoopHands": true,
+        "guaranteedLoopHands": false,
         "roundBoardCleanup": "clearScoredTiles",
         "deadEndRecovery": "freshStart",
         "offColorLeapPlacement": true,

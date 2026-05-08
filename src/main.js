@@ -25,8 +25,57 @@ const ui = createUiRenderer(PIXI, app.stage);
 const battles = config.levels.battles;
 const tiles = createTilesFromManifest(config.tileManifest, config.game.tileBattle);
 const totalBattles = Math.min(config.game.run.totalBattles, battles.length);
+const debugOverrides = getDebugOverrides();
 let run = null;
 let scene = null;
+let lastRunSeed = null;
+
+function parseSeed(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const seed = Number(value);
+
+    if (!Number.isFinite(seed)) {
+        return null;
+    }
+
+    return seed >>> 0;
+}
+
+function createRandomSeed() {
+    if (globalThis.crypto?.getRandomValues) {
+        const values = new Uint32Array(1);
+        globalThis.crypto.getRandomValues(values);
+        return values[0];
+    }
+
+    return (Date.now() ^ Math.floor(Math.random() * 0x100000000)) >>> 0;
+}
+
+function getDebugOverrides() {
+    const params = new URLSearchParams(window.location.search);
+    const seed = parseSeed(params.get('seed'));
+    const guaranteedLoopHands = params.get('guaranteedLoopHands');
+
+    return {
+        seed,
+        guaranteedLoopHands: guaranteedLoopHands === null
+            ? null
+            : guaranteedLoopHands === 'true' || guaranteedLoopHands === '1',
+    };
+}
+
+function applyDebugOverrides() {
+    if (debugOverrides.guaranteedLoopHands !== null) {
+        config.game.tileBattle.guaranteedLoopHands = debugOverrides.guaranteedLoopHands;
+    }
+}
+
+function getRunSeed() {
+    return debugOverrides.seed ?? createRandomSeed();
+}
 
 function showMainMenu() {
     scene = createMainMenuScene({
@@ -79,15 +128,17 @@ function showUpgrades() {
 }
 
 function startRun() {
+    lastRunSeed = getRunSeed();
     run = createRunState({
         totalBattles,
         playerHp: config.game.tileBattle.startingPlayerHp,
         startingDeck: tiles.map((tileDef) => tileDef.id),
-        seed: config.game.tileBattle.seed,
+        seed: lastRunSeed,
     });
     showBattle();
 }
 
+applyDebugOverrides();
 showMainMenu();
 
 app.ticker.add((ticker) => {
@@ -102,6 +153,9 @@ window.__tilebreakerDebug = {
     },
     getRun() {
         return run ? { ...run } : null;
+    },
+    getRunSeed() {
+        return lastRunSeed;
     },
     getBattleDebug() {
         return scene?.getDebugState?.() ?? null;

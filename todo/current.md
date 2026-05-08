@@ -1,20 +1,21 @@
 # Current Version
 
-## v0.4 Deck Progression MVP
+## v0.5 Honest Draw MVP
 
-**Goal:** Turn the tile battle prototype into a small run loop with deck draw, discard and post-battle progression.
+**Goal:** Make the run feel less scripted by removing default loop autocomplete and fixed normal-run seed.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, starting player HP, starting deck size, damage formula, active tile manifest path, seed, hand selection draw count, round board cleanup, dead-end recovery, off-color leap placement and run battle count.
+- `configs/game.json` stores board size, hand size, starting player HP, starting deck size, damage formula, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, off-color leap placement and run battle count.
 - `configs/levels.json` stores only the battle list, enemy HP and enemy color attacks.
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The starting MVP tile set has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blanks.
 - A new run starts with a 36-tile deck built from the active v2 manifest.
-- Battle hands are drawn from run draw pile; best-of-3 hand smoothing may complete a loop from cards still in the draw pile, then unchosen candidate hands go to discard.
+- Normal battle hands are drawn honestly from the run draw pile: one hand, no default best-of-3 smoothing, no automatic loop completion from the remaining draw pile.
+- Stable debug/smoke runs use URL overrides such as `?seed=20260508&guaranteedLoopHands=true`; normal player runs generate a fresh seed on each start.
 - At round end, played and unplayed hand tiles go to discard; when draw pile is empty, discard is shuffled back into draw pile.
 - After each won battle, the player chooses one of three rewards: add a tile to discard/deck, remove a tile from deck, or increase a combat color multiplier.
 - `dot` and base `cap` tiles are not in the MVP deck.

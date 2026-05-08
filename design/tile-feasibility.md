@@ -178,6 +178,33 @@ battle_05: 15/40 побед, avg 6.9 раунда, avg player damage 95.8, dead-
 
 Вывод: принимаем как safety valve. Вариант "leap всегда" ухудшал симуляцию, потому что эвристика распыляла доску на лишние острова. Ограничение "только если выбранный тайл заблокирован" сохраняет основной контурный геймплей и дает выход из блокировки.
 
+## Баланс-пасс: честная раздача без guaranteed loop
+
+Гипотеза: если убрать автодостройку полного loop из draw pile, выключить best-of-3 как дефолт и давать обычному игроку новый seed на каждый run, прогон станет менее повторяемым и перестанет системно вести к первому красному квадрату.
+
+Решение для MVP:
+
+- `guaranteedLoopHands = false` в normal config;
+- `drawRoundHand` в normal run берет одну руку из draw pile и не заменяет тайлы недостающими corner-loop;
+- фиксированный seed вынесен из normal config: обычный старт генерирует новый seed, debug/smoke использует URL `?seed=20260508&guaranteedLoopHands=true`;
+- при равных атаках `selectPrimaryAttackColor` возвращает отсутствие primary color, а не красный.
+
+Проверка: seed `20260508`, strict edge matching, 40 честных рук, 40 прогонов каждого боя, 40 случайных попыток выкладки на руку, урон `area * 2`, игрок `120 HP`, текущие HP/атаки из `configs/levels.json`.
+
+```text
+honest hands:
+placed avg 7.0/7, captures avg 0.1, total damage avg 1.8, zero damage 37/40
+red damage avg 0.6, blue damage avg 0.6, green damage avg 0.6
+
+battle_01: 21/40 побед, avg 6.4 раунда, avg player damage 24.9, dead-end 24/256 rounds
+battle_02: 23/40 побед, avg 6.5 раунда, avg player damage 40.5, dead-end 29/258 rounds
+battle_03: 10/40 побед, avg 7.5 раунда, avg player damage 70.8, dead-end 33/299 rounds
+battle_04: 6/40 побед, avg 7.8 раунда, avg player damage 93.1, dead-end 33/310 rounds
+battle_05: 6/40 побед, avg 7.7 раунда, avg player damage 112.0, dead-end 31/307 rounds
+```
+
+Вывод: повторяемость и красный bias убраны на уровне normal run: seed меняется каждый старт, генератор больше не достраивает готовый loop, а средний урон по red/blue/green в симуляции одинаковый. Цена честности высокая: первый бой просел до 53% побед, а нулевых рук стало 37/40. Это не откатываем в автосборку; следующий проверяемый путь — задачи про queue-режим и color/pattern bag, чтобы добавить разнообразие без скрытой сборки решений за игрока.
+
 ## Архив: v2 capture-fill до сглаживания
 
 Симуляция использует `assets/tiles_v2/tile_manifest.json`: на каждый боевой цвет есть `line_h`, `line_v`, четыре `corner`, четыре `tee` и `plus`. Пустая область внутри полностью замкнутой цветной границы считается захваченной землей.

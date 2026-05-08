@@ -132,9 +132,26 @@ function getDamagePerArea(settings) {
 }
 
 function selectPrimaryAttackColor(attack) {
-    return COMBAT_COLORS.reduce((best, color) => (
-        (attack[color] ?? 0) > (attack[best] ?? 0) ? color : best
-    ), COMBAT_COLORS[0]);
+    let primaryColor = null;
+    let primaryValue = -Infinity;
+    let tied = false;
+
+    for (const color of COMBAT_COLORS) {
+        const value = attack[color] ?? 0;
+
+        if (value > primaryValue) {
+            primaryColor = color;
+            primaryValue = value;
+            tied = false;
+            continue;
+        }
+
+        if (value === primaryValue) {
+            tied = true;
+        }
+    }
+
+    return tied ? null : primaryColor;
 }
 
 function evaluateHand(tileIds, tileMap, attack) {
@@ -186,10 +203,13 @@ function getLoopTileIds(tiles, color) {
 }
 
 function completeLoopFromDraw(run, tileIds, tiles, tileMap, attack) {
-    const colors = [
-        selectPrimaryAttackColor(attack),
-        ...COMBAT_COLORS.filter((color) => color !== selectPrimaryAttackColor(attack)),
-    ];
+    const primaryColor = selectPrimaryAttackColor(attack);
+    const colors = primaryColor
+        ? [
+            primaryColor,
+            ...COMBAT_COLORS.filter((color) => color !== primaryColor),
+        ]
+        : COMBAT_COLORS;
 
     for (const color of colors) {
         const loopTileIds = getLoopTileIds(tiles, color);
@@ -255,19 +275,21 @@ function hasAnyValidPlacement(board, hand, settings) {
 function drawRoundHand({ run, tiles, battle, settings, round, board = null }) {
     const attack = getRoundAttack(battle, round);
     const tileMap = createTileMap(tiles);
-    const candidateCount = settings.guaranteedLoopHands === false
-        ? 1
-        : settings.handSelectionDraws ?? 3;
+    const shouldGuaranteeLoop = settings.guaranteedLoopHands === true;
+    const candidateCount = shouldGuaranteeLoop ? settings.handSelectionDraws ?? 3 : 1;
     const candidates = [];
 
     for (let index = 0; index < candidateCount; index += 1) {
-        const tileIds = completeLoopFromDraw(
-            run,
-            drawTileIds(run, settings.handSize),
-            tiles,
-            tileMap,
-            attack,
-        );
+        const drawnTileIds = drawTileIds(run, settings.handSize);
+        const tileIds = shouldGuaranteeLoop
+            ? completeLoopFromDraw(
+                run,
+                drawnTileIds,
+                tiles,
+                tileMap,
+                attack,
+            )
+            : drawnTileIds;
 
         if (tileIds.length === 0) {
             break;
