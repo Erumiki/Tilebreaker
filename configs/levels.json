@@ -1,0 +1,11 @@
+{
+    "levels": [
+        {
+            "id": "level_01",
+            "name": "First Break",
+            "rows": 5,
+            "columns": 10,
+            "tileHealth": 1
+        }
+    ]
+}
