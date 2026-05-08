@@ -7,7 +7,8 @@
     "tileBattle": {
         "boardSize": 6,
         "handSize": 7,
-        "startingPlayerHp": 120,
+        "drawMode": "queue",
+        "startingPlayerHp": 160,
         "startingDeckSize": 36,
         "damageFormula": {
             "type": "areaMultiplier",
@@ -62,7 +63,7 @@
         "grayWildcardPlacement": true,
         "offColorLeapPlacement": true,
         "offColorLeapDistance": 2,
-        "offColorLeapOnlyWhenBlocked": true
+        "offColorLeapOnlyWhenBlocked": false
     },
     "run": {
         "totalBattles": 5

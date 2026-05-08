@@ -61,18 +61,24 @@ function getDebugOverrides() {
     const params = new URLSearchParams(window.location.search);
     const seed = parseSeed(params.get('seed'));
     const guaranteedLoopHands = params.get('guaranteedLoopHands');
+    const drawMode = params.get('drawMode');
 
     return {
         seed,
         guaranteedLoopHands: guaranteedLoopHands === null
             ? null
             : guaranteedLoopHands === 'true' || guaranteedLoopHands === '1',
+        drawMode: ['hand', 'queue'].includes(drawMode) ? drawMode : null,
     };
 }
 
 function applyDebugOverrides() {
     if (debugOverrides.guaranteedLoopHands !== null) {
         config.game.tileBattle.guaranteedLoopHands = debugOverrides.guaranteedLoopHands;
+    }
+
+    if (debugOverrides.drawMode) {
+        config.game.tileBattle.drawMode = debugOverrides.drawMode;
     }
 }
 

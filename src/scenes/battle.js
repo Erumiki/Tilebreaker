@@ -1,5 +1,6 @@
 import { BattleOutcome, getRunDeckStats } from '../entities/run.js';
 import {
+    advanceTileQueue,
     canPlaceTile,
     COMBAT_COLORS,
     createTileBattleState,
@@ -8,6 +9,7 @@ import {
     getRoundAttack,
     placeTile,
     resolveTileRound,
+    scoreTileBoard,
     startNextTileRound,
 } from '../entities/tileBattle.js';
 
@@ -23,6 +25,10 @@ const COLOR_LABELS = {
     blue: 'Синий',
     green: 'Зеленый',
 };
+
+function isQueueDrawMode(settings) {
+    return settings.drawMode === 'queue';
+}
 
 function getCaptureAreaByColor(result) {
     const areaByColor = Object.fromEntries(COMBAT_COLORS.map((color) => [color, 0]));
@@ -77,8 +83,15 @@ function getLayout(screen, settings) {
     const boardSize = Math.max(300, boardPixels);
     const boardX = Math.max(24, Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - 300));
     const boardY = 144;
-    const handSlot = Math.min(82, (screen.width - 64) / settings.handSize - 8);
-    const handWidth = settings.handSize * handSlot + (settings.handSize - 1) * 8;
+    const isQueue = isQueueDrawMode(settings);
+    const handSlot = isQueue
+        ? Math.min(116, (screen.width - 96) / 2.1)
+        : Math.min(82, (screen.width - 64) / settings.handSize - 8);
+    const previewSlot = isQueue ? Math.floor(handSlot * 0.72) : handSlot;
+    const handCount = isQueue ? 2 : settings.handSize;
+    const handWidth = isQueue
+        ? handSlot + 14 + previewSlot
+        : settings.handSize * handSlot + (settings.handSize - 1) * 8;
     const handY = screen.height - handSlot - 28;
     const sideX = boardX + boardSize + 24;
     const sideWidth = Math.max(240, screen.width - sideX - 24);
@@ -91,12 +104,24 @@ function getLayout(screen, settings) {
             height: boardSize,
         },
         cellSize: boardSize / settings.boardSize,
-        hand: Array.from({ length: settings.handSize }, (_, index) => ({
-            x: screen.width / 2 - handWidth / 2 + index * (handSlot + 8),
-            y: handY,
-            width: handSlot,
-            height: handSlot,
-        })),
+        hand: Array.from({ length: handCount }, (_, index) => {
+            if (!isQueue) {
+                return {
+                    x: screen.width / 2 - handWidth / 2 + index * (handSlot + 8),
+                    y: handY,
+                    width: handSlot,
+                    height: handSlot,
+                };
+            }
+
+            const size = index === 0 ? handSlot : previewSlot;
+            return {
+                x: screen.width / 2 - handWidth / 2 + (index === 0 ? 0 : handSlot + 14),
+                y: handY + (handSlot - size),
+                width: size,
+                height: size,
+            };
+        }),
         endRoundButton: {
             x: sideX,
             y: handY - 82,
@@ -238,19 +263,31 @@ function drawBoard(ui, layout, settings, state, mouse) {
     }
 }
 
-function drawHand(ui, layout, state, mouse) {
+function drawHand(ui, layout, settings, state, mouse) {
+    const isQueue = isQueueDrawMode(settings);
+
     layout.hand.forEach((rect, index) => {
         const tileDef = state.hand[index];
         const hovered = ui.contains(rect, mouse);
         const selected = index === state.selectedHandIndex && tileDef;
+        const label = isQueue
+            ? index === 0 ? 'Текущий' : 'Следующий'
+            : null;
 
-        ui.drawRect(rect, hovered ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
+        ui.drawRect(rect, hovered && (!isQueue || index === 0) ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
         drawTile(ui, tileDef, insetRect(rect, 8));
+
+        if (label) {
+            ui.drawText(label, rect.x, rect.y - 24, {
+                size: index === 0 ? 16 : 14,
+                color: index === 0 ? '#f6f0a8' : '#8fb1cb',
+            });
+        }
     });
 }
 
-function drawSidePanel(ui, layout, battle, run, state) {
+function drawSidePanel(ui, layout, battle, run, settings, state) {
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round);
     const deck = getRunDeckStats(run);
@@ -280,6 +317,12 @@ function drawSidePanel(ui, layout, battle, run, state) {
         size: 15,
         color: '#8fb1cb',
     });
+    if (isQueueDrawMode(settings)) {
+        ui.drawText(`Queue ${state.queuePlayedThisRound} / ${settings.handSize}`, panel.x + panel.width - 112, panel.y + 52, {
+            size: 15,
+            color: '#f6f0a8',
+        });
+    }
 
     ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
@@ -335,6 +378,71 @@ function getHoverKey(ui, layout, settings, mouse) {
     ].join('|');
 }
 
+function cloneBoard(board) {
+    return board.map((row) => [...row]);
+}
+
+function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewTile = null) {
+    const nextBoard = cloneBoard(board);
+    nextBoard[y][x] = tileDef;
+    const score = scoreTileBoard(nextBoard, settings, run);
+    const immediateValue = score.totalDamage * 12 + score.zones.length * 40;
+    let previewValue = 0;
+
+    if (previewTile) {
+        for (let previewY = 0; previewY < settings.boardSize; previewY += 1) {
+            for (let previewX = 0; previewX < settings.boardSize; previewX += 1) {
+                if (!canPlaceTile(nextBoard, previewTile, previewX, previewY, settings)) {
+                    continue;
+                }
+
+                const previewBoard = cloneBoard(nextBoard);
+                previewBoard[previewY][previewX] = previewTile;
+                const previewScore = scoreTileBoard(previewBoard, settings, run);
+                previewValue = Math.max(
+                    previewValue,
+                    previewScore.totalDamage * 12 + previewScore.zones.length * 40,
+                );
+            }
+        }
+    }
+
+    const defensiveValue = COMBAT_COLORS.reduce((sum, color) => {
+        const closedDamage = score.damageByColor[color] || 0;
+        const threat = attack[color] || 0;
+        return sum + Math.min(closedDamage, threat);
+    }, 0);
+
+    return immediateValue + previewValue * 0.35 + defensiveValue;
+}
+
+function getValidCells(state, settings, run, battle) {
+    if (state.phase !== 'placing') {
+        return [];
+    }
+
+    const tileDef = state.hand[state.selectedHandIndex];
+    const previewTile = isQueueDrawMode(settings) ? state.hand[1] : null;
+    const attack = getRoundAttack(battle, state.round);
+    const cells = [];
+
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            if (!canPlaceTile(state.board, tileDef, x, y, settings)) {
+                continue;
+            }
+
+            cells.push({
+                x,
+                y,
+                value: getPlacementValue(state.board, tileDef, x, y, settings, run, attack, previewTile),
+            });
+        }
+    }
+
+    return cells.sort((left, right) => right.value - left.value);
+}
+
 function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const boardKey = state.board.map((row) => (
         row.map((tileDef) => tileDef?.id ?? '-').join(',')
@@ -354,6 +462,8 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.playerHp,
         state.enemyHp,
         state.selectedHandIndex,
+        state.queuePlayedThisRound ?? 0,
+        state.queueReserve?.map((tileDef) => tileDef?.id ?? '-').join(',') ?? '-',
         boardKey,
         handKey,
         `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}`,
@@ -393,7 +503,10 @@ export function createBattleScene({
             }
 
             const handIndex = this.layout.hand.findIndex((rect) => ui.contains(rect, click));
-            if (state.phase === 'placing' && handIndex >= 0 && state.hand[handIndex]) {
+            if (state.phase === 'placing'
+                && handIndex >= 0
+                && state.hand[handIndex]
+                && (!isQueueDrawMode(settings) || handIndex === 0)) {
                 state.selectedHandIndex = handIndex;
                 state.feedback = `Выбран ${COLOR_LABELS[state.hand[handIndex].color] ?? 'Серый'} ${state.hand[handIndex].pattern}`;
                 return;
@@ -402,10 +515,17 @@ export function createBattleScene({
             const boardCell = getBoardCell(this.layout, settings, click);
             if (state.phase === 'placing' && boardCell) {
                 const placed = placeTile(state, settings, boardCell.x, boardCell.y);
+                if (placed) {
+                    advanceTileQueue(run, state, settings, tiles);
+                }
                 state.feedback = placed
-                    ? state.selectedHandIndex >= 0
-                        ? 'Тайл поставлен'
-                        : 'Рука разыграна, заканчивай раунд'
+                    ? isQueueDrawMode(settings)
+                        ? state.selectedHandIndex >= 0
+                            ? 'Текущий тайл поставлен, queue сдвинулся'
+                            : 'Лимит queue на раунд сыгран, заканчивай раунд'
+                        : state.selectedHandIndex >= 0
+                            ? 'Тайл поставлен'
+                            : 'Рука разыграна, заканчивай раунд'
                     : 'Нельзя поставить: смежные края должны совпасть';
                 return;
             }
@@ -471,8 +591,8 @@ export function createBattleScene({
             });
 
             drawBoard(ui, this.layout, settings, state, mouse);
-            drawSidePanel(ui, this.layout, battle, run, state);
-            drawHand(ui, this.layout, state, mouse);
+            drawSidePanel(ui, this.layout, battle, run, settings, state);
+            drawHand(ui, this.layout, settings, state, mouse);
             if (state.feedback) {
                 ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
                     size: 16,
@@ -509,6 +629,14 @@ export function createBattleScene({
                     color: tileDef.color,
                     pattern: tileDef.pattern,
                 } : null),
+                drawMode: settings.drawMode ?? 'hand',
+                queuePlayedThisRound: state.queuePlayedThisRound ?? 0,
+                queueReserve: state.queueReserve?.map((tileDef) => tileDef ? {
+                    id: tileDef.id,
+                    color: tileDef.color,
+                    pattern: tileDef.pattern,
+                } : null) ?? [],
+                validCells: getValidCells(state, settings, run, battle),
                 lastResult: state.lastResult ? {
                     enemyDamage: state.lastResult.enemyDamage,
                     playerDamage: state.lastResult.playerDamage,

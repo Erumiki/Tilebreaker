@@ -84,7 +84,7 @@ function edgesMatch(tileDef, neighbor, direction, settings) {
     }
 
     if (settings.grayWildcardPlacement === true && tileDef.color === 'gray' && isCombatTile(neighbor)) {
-        return isBlankEdge(neighbor, direction.opposite);
+        return true;
     }
 
     if (settings.grayWildcardPlacement === true && neighbor.color === 'gray' && isCombatTile(tileDef)) {
@@ -485,7 +485,9 @@ export function applyOpeningDrawBag(run, tiles, settings = {}) {
 }
 
 function hasAnyValidPlacement(board, hand, settings) {
-    return hand.some((tileDef) => {
+    const playableTiles = isQueueDrawMode(settings) ? [hand[0]] : hand;
+
+    return playableTiles.some((tileDef) => {
         if (!tileDef) {
             return false;
         }
@@ -500,6 +502,17 @@ function hasAnyValidPlacement(board, hand, settings) {
 
         return false;
     });
+}
+
+function isQueueDrawMode(settings) {
+    return settings.drawMode === 'queue';
+}
+
+function drawTileDefs(run, tiles, count) {
+    const tileMap = createTileMap(tiles);
+    return drawTileIds(run, count)
+        .map((tileId) => tileMap.get(tileId))
+        .filter(Boolean);
 }
 
 function drawRoundHand({ run, tiles, battle, settings, round, board = null }) {
@@ -548,6 +561,32 @@ function drawRoundHand({ run, tiles, battle, settings, round, board = null }) {
     }
 
     return chosen.tileIds.map((tileId) => tileMap.get(tileId)).filter(Boolean);
+}
+
+function drawRoundTiles({ run, tiles, battle, settings, round, board = null }) {
+    if (isQueueDrawMode(settings)) {
+        if (settings.guaranteedLoopHands === true) {
+            return drawRoundHand({
+                run,
+                tiles,
+                battle,
+                settings,
+                round,
+                board,
+            });
+        }
+
+        return drawTileDefs(run, tiles, settings.handSize ?? 7);
+    }
+
+    return drawRoundHand({
+        run,
+        tiles,
+        battle,
+        settings,
+        round,
+        board,
+    });
 }
 
 function buildMicroGrid(board, boardSize) {
@@ -874,7 +913,7 @@ export function createStartingDeckIds(tiles, settings = {}) {
 export function createTileBattleState({ battle, run, settings, tiles }) {
     const round = 1;
     applyOpeningDrawBag(run, tiles, settings);
-    const hand = drawRoundHand({
+    const roundTiles = drawRoundTiles({
         run,
         tiles,
         battle,
@@ -882,6 +921,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         round,
         board: createEmptyBoard(settings.boardSize),
     });
+    const hand = isQueueDrawMode(settings) ? roundTiles.slice(0, 2) : roundTiles;
 
     return {
         round,
@@ -890,7 +930,9 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         board: createEmptyBoard(settings.boardSize),
         hand,
         selectedHandIndex: hand.findIndex(Boolean),
+        queueReserve: isQueueDrawMode(settings) ? roundTiles.slice(2) : [],
         playedThisRound: [],
+        queuePlayedThisRound: 0,
         phase: 'placing',
         lastResult: null,
         outcome: null,
@@ -961,6 +1003,7 @@ export function placeTile(state, settings, x, y) {
 
     state.board[y][x] = tileDef;
     state.playedThisRound.push(tileDef.id);
+    state.queuePlayedThisRound += isQueueDrawMode(settings) ? 1 : 0;
     state.hand[state.selectedHandIndex] = null;
     const nextIndex = state.hand.findIndex(Boolean);
     state.selectedHandIndex = nextIndex >= 0 ? nextIndex : -1;
@@ -1044,20 +1087,56 @@ export function discardRoundHand(run, state) {
     const unplayedTileIds = state.hand
         .filter(Boolean)
         .map((tileDef) => tileDef.id);
+    const reserveTileIds = state.queueReserve
+        ?.filter(Boolean)
+        .map((tileDef) => tileDef.id) ?? [];
 
     discardTileIds(run, [
         ...state.playedThisRound,
         ...unplayedTileIds,
+        ...reserveTileIds,
     ]);
     state.hand = state.hand.map(() => null);
+    state.queueReserve = [];
     state.playedThisRound = [];
+    state.queuePlayedThisRound = 0;
     state.selectedHandIndex = -1;
+}
+
+export function advanceTileQueue(run, state, settings, tiles) {
+    if (!isQueueDrawMode(settings) || state.phase !== 'placing') {
+        return;
+    }
+
+    const roundLimit = settings.handSize ?? 7;
+
+    if (state.queuePlayedThisRound >= roundLimit) {
+        state.selectedHandIndex = -1;
+        return;
+    }
+
+    const nextTile = state.hand[1] ?? null;
+    const drawn = [];
+
+    while (drawn.length < (nextTile ? 1 : 2) && state.queueReserve?.length > 0) {
+        drawn.push(state.queueReserve.shift());
+    }
+
+    if (drawn.length < (nextTile ? 1 : 2)) {
+        drawn.push(...drawTileDefs(run, tiles, (nextTile ? 1 : 2) - drawn.length));
+    }
+
+    state.hand = [
+        nextTile ?? drawn.shift() ?? null,
+        drawn.shift() ?? null,
+    ];
+    state.selectedHandIndex = state.hand[0] ? 0 : -1;
 }
 
 export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.round += 1;
     state.board = prepareNextRoundBoard(state, settings);
-    state.hand = drawRoundHand({
+    const roundTiles = drawRoundTiles({
         run,
         tiles,
         battle,
@@ -1065,6 +1144,8 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
         round: state.round,
         board: state.board,
     });
+    state.hand = isQueueDrawMode(settings) ? roundTiles.slice(0, 2) : roundTiles;
+    state.queueReserve = isQueueDrawMode(settings) ? roundTiles.slice(2) : [];
 
     if (settings.deadEndRecovery === 'freshStart'
         && countPlacedTiles(state.board) > 0
@@ -1073,6 +1154,7 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
     }
 
     state.selectedHandIndex = state.hand.findIndex(Boolean);
+    state.queuePlayedThisRound = 0;
     state.phase = 'placing';
     state.lastResult = null;
     state.outcome = null;

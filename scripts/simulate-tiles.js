@@ -19,6 +19,8 @@ const TILE_SETTINGS = GAME_CONFIG.tileBattle ?? {};
 
 const BOARD_SIZE = TILE_SETTINGS.boardSize ?? 6;
 const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
+const DRAW_MODE = process.env.DRAW_MODE ?? TILE_SETTINGS.drawMode ?? 'hand';
+const QUEUE_BEAM_WIDTH = Number(process.env.QUEUE_BEAM_WIDTH ?? 12);
 const HAND_RUNS = Number(process.env.HAND_RUNS ?? 40);
 const FIGHT_RUNS = Number(process.env.FIGHT_RUNS ?? 40);
 const PLACEMENT_ATTEMPTS = Number(process.env.PLACEMENT_ATTEMPTS ?? 40);
@@ -764,6 +766,78 @@ function findBestPlacement(rng, hand, attack = null, strictEdges = true, startin
     return best;
 }
 
+function findBestQueuePlacement(queueTiles, attack = null, strictEdges = true, startingPlacements = new Map(), strategy = 'payoff') {
+    const startingZoneCount = scorePlacement(startingPlacements, attack).zones.length;
+    const placedBefore = startingPlacements.size;
+    let beam = [{
+        placements: clonePlacements(startingPlacements),
+        firstCaptureAt: null,
+        value: placementValue(scorePlacement(startingPlacements, attack), 0, attack, strategy),
+    }];
+
+    for (let index = 0; index < queueTiles.length; index += 1) {
+        const tileDef = queueTiles[index];
+        const expanded = [];
+
+        for (const node of beam) {
+            const candidates = node.placements.size === 0
+                ? [{ x: Math.floor(BOARD_SIZE / 2), y: Math.floor(BOARD_SIZE / 2) }]
+                : findCandidatePlacements(node.placements, tileDef, strictEdges);
+
+            if (candidates.length === 0) {
+                expanded.push({
+                    ...node,
+                    blocked: true,
+                });
+                continue;
+            }
+
+            for (const candidate of candidates) {
+                const placements = clonePlacements(node.placements);
+                placements.set(key(candidate.x, candidate.y), tileDef);
+                const score = scorePlacement(placements, attack);
+                const placedThisRound = placements.size - placedBefore;
+                const firstCaptureAt = node.firstCaptureAt === null
+                    && score.zones.length > startingZoneCount
+                    ? placedThisRound
+                    : node.firstCaptureAt;
+
+                expanded.push({
+                    placements,
+                    firstCaptureAt,
+                    blocked: false,
+                    value: placementValue(score, placedThisRound, attack, strategy),
+                });
+            }
+        }
+
+        if (expanded.length === 0) {
+            break;
+        }
+
+        expanded.sort((left, right) => right.value - left.value);
+        beam = expanded.slice(0, QUEUE_BEAM_WIDTH);
+
+        if (beam.every((node) => node.blocked)) {
+            break;
+        }
+    }
+
+    beam.sort((left, right) => right.value - left.value);
+    const best = beam[0];
+    const score = scorePlacement(best.placements, attack);
+    const placedThisRound = best.placements.size - placedBefore;
+
+    return {
+        placements: best.placements,
+        score,
+        placedThisRound,
+        firstCaptureAt: best.firstCaptureAt,
+        retainedBefore: placedBefore,
+        value: placementValue(score, placedThisRound, attack, strategy),
+    };
+}
+
 function drawHand(rng, deck, count) {
     return shuffle(rng, deck).slice(0, count);
 }
@@ -892,17 +966,23 @@ function analyzeHands(rng, deck, strictEdges, useOpeningBag) {
 
     for (let run = 0; run < HAND_RUNS; run += 1) {
         const drawState = createDrawState(rng, deck, useOpeningBag);
-        const candidate = drawBestCandidateHandFromState(
-            rng,
-            drawState,
-            HAND_SIZE,
-            strictEdges,
-            null,
-            new Map(),
-            'payoff',
-        );
-        const hand = candidate.hand;
-        const best = candidate.best;
+        const candidate = DRAW_MODE === 'queue'
+            ? null
+            : drawBestCandidateHandFromState(
+                rng,
+                drawState,
+                HAND_SIZE,
+                strictEdges,
+                null,
+                new Map(),
+                'payoff',
+            );
+        const hand = DRAW_MODE === 'queue'
+            ? drawFromState(rng, drawState, HAND_SIZE)
+            : candidate.hand;
+        const best = DRAW_MODE === 'queue'
+            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'payoff')
+            : candidate.best;
         reports.push({
             placed: best.placements.size,
             totalDamage: best.score.totalDamage,
@@ -929,8 +1009,12 @@ function analyzeStrategyComparison(rng, deck, strictEdges, useOpeningBag) {
     for (let run = 0; run < HAND_RUNS; run += 1) {
         const drawState = createDrawState(rng, deck, useOpeningBag);
         const hand = drawFromState(rng, drawState, HAND_SIZE);
-        const closeASAP = findBestPlacement(rng, hand, null, strictEdges, new Map(), 'closeASAP');
-        const payoff = findBestPlacement(rng, hand, null, strictEdges, new Map(), 'payoff');
+        const closeASAP = DRAW_MODE === 'queue'
+            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'closeASAP')
+            : findBestPlacement(rng, hand, null, strictEdges, new Map(), 'closeASAP');
+        const payoff = DRAW_MODE === 'queue'
+            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'payoff')
+            : findBestPlacement(rng, hand, null, strictEdges, new Map(), 'payoff');
 
         reports.push({
             hand,
@@ -962,27 +1046,23 @@ function simulateFight(rng, deck, battle, strictEdges, useOpeningBag) {
 
     while (rounds < MAX_ROUNDS && enemyHp > 0 && playerHp > 0) {
         const attack = battle.attacks[rounds % battle.attacks.length];
-        const candidate = drawBestCandidateHandFromState(
-            rng,
-            drawState,
-            HAND_SIZE,
-            strictEdges,
-            attack,
-            placements,
-        );
+        const hand = drawFromState(rng, drawState, HAND_SIZE);
 
-        if (!candidate) {
+        if (hand.length === 0) {
             break;
         }
 
-        const hand = candidate.hand;
-        let best = candidate.best;
+        let best = DRAW_MODE === 'queue'
+            ? findBestQueuePlacement(hand, attack, strictEdges, placements, 'payoff')
+            : findBestPlacement(rng, hand, attack, strictEdges, placements, 'payoff');
 
         if (best.placedThisRound === 0 && placements.size > 0) {
             deadEndRounds += 1;
 
             if (DEAD_END_RECOVERY === 'freshStart') {
-                best = findBestPlacement(rng, hand, attack, strictEdges, new Map(), 'payoff');
+                best = DRAW_MODE === 'queue'
+                    ? findBestQueuePlacement(hand, attack, strictEdges, new Map(), 'payoff')
+                    : findBestPlacement(rng, hand, attack, strictEdges, new Map(), 'payoff');
                 recoveredDeadEnds += 1;
             }
         }
@@ -1315,6 +1395,10 @@ function run() {
     console.log(`Seed: ${seed}`);
     console.log(`Tile set: ${deckDefinition.label}`);
     console.log(`Board: ${BOARD_SIZE}x${BOARD_SIZE}, hand: ${HAND_SIZE}, placement attempts per hand: ${PLACEMENT_ATTEMPTS}`);
+    console.log(`Draw mode: ${DRAW_MODE}`);
+    if (DRAW_MODE === 'queue') {
+        console.log(`Queue AI: beam width ${QUEUE_BEAM_WIDTH}`);
+    }
     console.log(GUARANTEED_LOOP_HANDS
         ? `Hand smoothing: best of ${HAND_SELECTION_DRAWS} candidate draws`
         : 'Hand smoothing: off, honest single draw');

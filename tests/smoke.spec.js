@@ -54,6 +54,27 @@ async function placeHandIndex(page, handIndex, cellX, cellY) {
   expect(debug.placedCount).toBe(placedBefore + 1);
 }
 
+async function placeCurrentQueueTile(page) {
+  let debug = await getBattleDebug(page);
+
+  if (debug.drawMode !== 'queue' || debug.phase !== 'placing' || !debug.hand[0] || debug.validCells.length === 0) {
+    return false;
+  }
+
+  const placedBefore = debug.placedCount;
+  const target = debug.validCells[0];
+  const { board, cellSize } = debug.layout;
+  await page.mouse.click(
+    board.x + (target.x + 0.5) * cellSize,
+    board.y + (target.y + 0.5) * cellSize,
+  );
+  await page.waitForTimeout(50);
+
+  debug = await getBattleDebug(page);
+  expect(debug.placedCount).toBe(placedBefore + 1);
+  return true;
+}
+
 function findClosureIndices(hand) {
   for (const color of ['red', 'blue', 'green']) {
     const indices = {
@@ -118,21 +139,38 @@ async function finishRound(page, expectedDamage = false) {
     expect(capturedArea).toBeGreaterThan(0);
   }
 
+  const enemyDamage = debug.lastResult.enemyDamage;
   await clickRect(page, debug.layout.endRoundButton);
   await expect.poll(() => page.evaluate(() => {
     const scene = window.__tilebreakerDebug.getSceneName();
     const battle = window.__tilebreakerDebug.getBattleDebug?.();
     return scene === 'result' || battle?.phase === 'placing';
   })).toBe(true);
+
+  return enemyDamage;
 }
 
 async function playUntilBattleResult(page) {
   let sawDamage = false;
 
   for (let round = 0; round < 36; round += 1) {
-    const playedClosure = await playClosureIfAvailable(page);
-    await finishRound(page, playedClosure);
-    sawDamage = sawDamage || playedClosure;
+    const debug = await getBattleDebug(page);
+    let expectedDamage = false;
+
+    if (debug.drawMode === 'queue') {
+      for (let step = 0; step < 7; step += 1) {
+        const placed = await placeCurrentQueueTile(page);
+
+        if (!placed) {
+          break;
+        }
+      }
+    } else {
+      expectedDamage = await playClosureIfAvailable(page);
+    }
+
+    const enemyDamage = await finishRound(page, expectedDamage);
+    sawDamage = sawDamage || enemyDamage > 0;
 
     const scene = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
     if (scene === 'result') {
@@ -157,7 +195,12 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => window.__tilebreakerDebug.getRunSeed())).toBe(20260508);
   expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
   expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
-  expect(run.drawPile.length + run.discardPile.length + battleDebug.hand.filter(Boolean).length).toBe(run.deck.length);
+  expect(
+    run.drawPile.length
+    + run.discardPile.length
+    + battleDebug.hand.filter(Boolean).length
+    + (battleDebug.queueReserve?.filter(Boolean).length ?? 0),
+  ).toBe(run.deck.length);
 
   for (let battle = 1; battle <= 5; battle += 1) {
     await playUntilBattleResult(page);
