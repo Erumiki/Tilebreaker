@@ -70,6 +70,59 @@ function countPlacedTiles(board) {
     ), 0);
 }
 
+function isCombatTile(tileDef) {
+    return COMBAT_COLORS.includes(tileDef?.color);
+}
+
+function canPlaceAdjacentTile(board, tileDef, x, y, settings) {
+    let hasNeighbor = false;
+
+    for (const direction of DIRECTIONS) {
+        const nextX = x + direction.dx;
+        const nextY = y + direction.dy;
+
+        if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+            continue;
+        }
+
+        const neighbor = board[nextY][nextX];
+
+        if (!neighbor) {
+            continue;
+        }
+
+        hasNeighbor = true;
+
+        if (edge(tileDef, direction.name) !== edge(neighbor, direction.opposite)) {
+            return false;
+        }
+    }
+
+    return hasNeighbor;
+}
+
+function hasDirectNeighbor(board, x, y, settings) {
+    return DIRECTIONS.some((direction) => {
+        const nextX = x + direction.dx;
+        const nextY = y + direction.dy;
+
+        return isInsideBoard(settings.boardSize, nextX, nextY) && Boolean(board[nextY][nextX]);
+    });
+}
+
+function hasAnyAdjacentPlacement(board, tileDef, settings) {
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            if (!board[y][x]
+                && canPlaceAdjacentTile(board, tileDef, x, y, settings)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 function getDamagePerArea(settings) {
     if (settings.damageFormula?.type === 'areaMultiplier') {
         return settings.damageFormula.areaMultiplier ?? 1;
@@ -181,7 +234,25 @@ function completeLoopFromDraw(run, tileIds, tiles, tileMap, attack) {
     return tileIds;
 }
 
-function drawRoundHand({ run, tiles, battle, settings, round }) {
+function hasAnyValidPlacement(board, hand, settings) {
+    return hand.some((tileDef) => {
+        if (!tileDef) {
+            return false;
+        }
+
+        for (let y = 0; y < settings.boardSize; y += 1) {
+            for (let x = 0; x < settings.boardSize; x += 1) {
+                if (canPlaceTile(board, tileDef, x, y, settings)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    });
+}
+
+function drawRoundHand({ run, tiles, battle, settings, round, board = null }) {
     const attack = getRoundAttack(battle, round);
     const tileMap = createTileMap(tiles);
     const candidateCount = settings.guaranteedLoopHands === false
@@ -204,7 +275,12 @@ function drawRoundHand({ run, tiles, battle, settings, round }) {
 
         candidates.push({
             tileIds,
-            score: evaluateHand(tileIds, tileMap, attack),
+            score: evaluateHand(tileIds, tileMap, attack)
+                + (board && hasAnyValidPlacement(
+                    board,
+                    tileIds.map((tileId) => tileMap.get(tileId)).filter(Boolean),
+                    settings,
+                ) ? 10000 : 0),
         });
     }
 
@@ -396,6 +472,56 @@ function findCapturedAreas(board, settings) {
     return zones;
 }
 
+function cloneBoard(board) {
+    return board.map((row) => [...row]);
+}
+
+function getScoredTileKeys(result) {
+    const scoredTileKeys = new Set();
+
+    if (!result) {
+        return scoredTileKeys;
+    }
+
+    for (const zone of result.score.zones) {
+        for (const cell of [...zone.interiorCells, ...zone.boundaryCells]) {
+            scoredTileKeys.add(boardKey(
+                Math.floor(cell.x / 3),
+                Math.floor(cell.y / 3),
+            ));
+        }
+    }
+
+    return scoredTileKeys;
+}
+
+function clearScoredTiles(board, result) {
+    const nextBoard = cloneBoard(board);
+    const scoredTileKeys = getScoredTileKeys(result);
+
+    for (const tileKey of scoredTileKeys) {
+        const [x, y] = tileKey.split(',').map(Number);
+
+        if (nextBoard[y]?.[x]) {
+            nextBoard[y][x] = null;
+        }
+    }
+
+    return nextBoard;
+}
+
+function prepareNextRoundBoard(state, settings) {
+    if (settings.roundBoardCleanup === 'clearAll') {
+        return createEmptyBoard(settings.boardSize);
+    }
+
+    if (settings.roundBoardCleanup === 'clearScoredTiles') {
+        return clearScoredTiles(state.board, state.lastResult);
+    }
+
+    return cloneBoard(state.board);
+}
+
 export function createTilesFromManifest(manifest, settings = {}) {
     const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
 
@@ -421,6 +547,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         battle,
         settings,
         round,
+        board: createEmptyBoard(settings.boardSize),
     });
 
     return {
@@ -451,30 +578,45 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
         return true;
     }
 
-    let hasNeighbor = false;
+    if (canPlaceAdjacentTile(board, tileDef, x, y, settings)) {
+        return true;
+    }
+
+    if (hasDirectNeighbor(board, x, y, settings)) {
+        return false;
+    }
+
+    if (!settings.offColorLeapPlacement || !isCombatTile(tileDef)) {
+        return false;
+    }
+
+    if (settings.offColorLeapOnlyWhenBlocked !== false
+        && hasAnyAdjacentPlacement(board, tileDef, settings)) {
+        return false;
+    }
+
+    const leapDistance = settings.offColorLeapDistance ?? 2;
 
     for (const direction of DIRECTIONS) {
-        const nextX = x + direction.dx;
-        const nextY = y + direction.dy;
+        const anchorX = x + direction.dx * leapDistance;
+        const anchorY = y + direction.dy * leapDistance;
+        const gapX = x + direction.dx;
+        const gapY = y + direction.dy;
 
-        if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+        if (!isInsideBoard(settings.boardSize, anchorX, anchorY)
+            || !isInsideBoard(settings.boardSize, gapX, gapY)
+            || board[gapY][gapX]) {
             continue;
         }
 
-        const neighbor = board[nextY][nextX];
+        const anchorTile = board[anchorY][anchorX];
 
-        if (!neighbor) {
-            continue;
-        }
-
-        hasNeighbor = true;
-
-        if (edge(tileDef, direction.name) !== edge(neighbor, direction.opposite)) {
-            return false;
+        if (anchorTile && isCombatTile(anchorTile) && anchorTile.color !== tileDef.color) {
+            return true;
         }
     }
 
-    return hasNeighbor;
+    return false;
 }
 
 export function placeTile(state, settings, x, y) {
@@ -553,6 +695,7 @@ export function resolveTileRound(state, battle, settings, run = null) {
         byColor,
         enemyDamage,
         playerDamage,
+        scoredTileKeys: [...getScoredTileKeys({ score })],
     };
 
     if (state.enemyHp <= 0) {
@@ -580,14 +723,22 @@ export function discardRoundHand(run, state) {
 
 export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.round += 1;
-    state.board = createEmptyBoard(settings.boardSize);
+    state.board = prepareNextRoundBoard(state, settings);
     state.hand = drawRoundHand({
         run,
         tiles,
         battle,
         settings,
         round: state.round,
+        board: state.board,
     });
+
+    if (settings.deadEndRecovery === 'freshStart'
+        && countPlacedTiles(state.board) > 0
+        && !hasAnyValidPlacement(state.board, state.hand, settings)) {
+        state.board = createEmptyBoard(settings.boardSize);
+    }
+
     state.selectedHandIndex = state.hand.findIndex(Boolean);
     state.phase = 'placing';
     state.lastResult = null;

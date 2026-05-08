@@ -9,7 +9,7 @@
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, starting player HP, starting deck size, damage formula, active tile manifest path, seed, hand selection draw count and run battle count.
+- `configs/game.json` stores board size, hand size, starting player HP, starting deck size, damage formula, active tile manifest path, seed, hand selection draw count, round board cleanup, dead-end recovery, off-color leap placement and run battle count.
 - `configs/levels.json` stores only the battle list, enemy HP and enemy color attacks.
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The starting MVP tile set has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blanks.
@@ -20,8 +20,9 @@
 - `dot` and base `cap` tiles are not in the MVP deck.
 - A combat color's micro-cells are territory boundaries.
 - A fully enclosed empty or filled interior becomes captured land for that color.
-- Current playtest risk: strict edge matching can dead-end after the first tile, leaving no valid continuation in the current hand.
-- Current design hypothesis for the next balance pass: clear only closed/scored tiles between rounds and keep unclosed tiles on the board, so unfinished territory can be completed on later turns.
+- Between rounds, closed/scored tiles are cleared and unclosed tiles stay on the board, so unfinished territory can be completed later.
+- If the next hand cannot continue the saved board at all, the battle uses fresh-start recovery and clears the unclosed board for that hand.
+- If a selected combat-color tile has no direct edge-match placement, it can start a new island two cells away from an existing combat tile of another color, with one empty gap cell between them.
 - Scoring for the first prototype uses configured `damageFormula.type = areaMultiplier` with `areaMultiplier = 2`.
 - Color multipliers are stored on the run and multiply captured area damage after base `areaMultiplier`.
 - Combat UI shows player HP, enemy HP, round number, enemy attacks, deck/discard counts, board, hand, and per-color round results: enemy attack, captured area, capture sum, multiplier, enemy damage or player damage.

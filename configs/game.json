@@ -16,7 +16,12 @@
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
         "seed": 20260508,
         "handSelectionDraws": 3,
-        "guaranteedLoopHands": true
+        "guaranteedLoopHands": true,
+        "roundBoardCleanup": "clearScoredTiles",
+        "deadEndRecovery": "freshStart",
+        "offColorLeapPlacement": true,
+        "offColorLeapDistance": 2,
+        "offColorLeapOnlyWhenBlocked": true
     },
     "run": {
         "totalBattles": 5

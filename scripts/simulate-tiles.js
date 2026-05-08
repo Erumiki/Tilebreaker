@@ -9,69 +9,26 @@ const SYMBOLS = {
     gray: '.',
 };
 
-const BOARD_SIZE = 6;
-const HAND_SIZE = 7;
-const HAND_RUNS = 100;
-const FIGHT_RUNS = 100;
-const PLACEMENT_ATTEMPTS = 250;
-const HAND_SELECTION_DRAWS = 3;
-const MAX_ROUNDS = 8;
-const STARTING_PLAYER_HP = 45;
-const TILE_MANIFEST_PATH = 'assets/tiles_v2/tile_manifest.json';
-const CAPTURE_DAMAGE_PER_AREA = 2;
+const GAME_CONFIG = JSON.parse(fs.readFileSync('configs/game.json', 'utf8'));
+const LEVEL_CONFIG = JSON.parse(fs.readFileSync('configs/levels.json', 'utf8'));
+const TILE_SETTINGS = GAME_CONFIG.tileBattle ?? {};
 
-const THEORETICAL_BATTLES = [
-    {
-        id: 'battle_01',
-        name: 'First Closure',
-        enemyHp: 35,
-        attacks: [
-            { red: 1, blue: 1, green: 1 },
-            { red: 2, blue: 1, green: 2 },
-            { red: 1, blue: 2, green: 2 },
-        ],
-    },
-    {
-        id: 'battle_02',
-        name: 'Small Pressure',
-        enemyHp: 50,
-        attacks: [
-            { red: 2, blue: 2, green: 2 },
-            { red: 3, blue: 2, green: 2 },
-            { red: 2, blue: 3, green: 3 },
-        ],
-    },
-    {
-        id: 'battle_03',
-        name: 'Medium Zones',
-        enemyHp: 70,
-        attacks: [
-            { red: 3, blue: 3, green: 3 },
-            { red: 4, blue: 3, green: 4 },
-            { red: 3, blue: 5, green: 3 },
-        ],
-    },
-    {
-        id: 'battle_04',
-        name: 'Risk Check',
-        enemyHp: 95,
-        attacks: [
-            { red: 5, blue: 4, green: 5 },
-            { red: 4, blue: 6, green: 5 },
-            { red: 6, blue: 5, green: 4 },
-        ],
-    },
-    {
-        id: 'battle_05',
-        name: 'Big Multiplier',
-        enemyHp: 125,
-        attacks: [
-            { red: 7, blue: 6, green: 7 },
-            { red: 6, blue: 8, green: 7 },
-            { red: 8, blue: 7, green: 6 },
-        ],
-    },
-];
+const BOARD_SIZE = TILE_SETTINGS.boardSize ?? 6;
+const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
+const HAND_RUNS = Number(process.env.HAND_RUNS ?? 40);
+const FIGHT_RUNS = Number(process.env.FIGHT_RUNS ?? 40);
+const PLACEMENT_ATTEMPTS = Number(process.env.PLACEMENT_ATTEMPTS ?? 40);
+const HAND_SELECTION_DRAWS = TILE_SETTINGS.handSelectionDraws ?? 3;
+const MAX_ROUNDS = 8;
+const STARTING_PLAYER_HP = TILE_SETTINGS.startingPlayerHp ?? 45;
+const TILE_MANIFEST_PATH = TILE_SETTINGS.manifestPath ?? 'assets/tiles_v2/tile_manifest.json';
+const CAPTURE_DAMAGE_PER_AREA = TILE_SETTINGS.damageFormula?.areaMultiplier ?? 2;
+const ROUND_BOARD_CLEANUP = TILE_SETTINGS.roundBoardCleanup ?? 'clearAll';
+const DEAD_END_RECOVERY = TILE_SETTINGS.deadEndRecovery ?? 'none';
+const OFF_COLOR_LEAP_PLACEMENT = TILE_SETTINGS.offColorLeapPlacement === true;
+const OFF_COLOR_LEAP_DISTANCE = TILE_SETTINGS.offColorLeapDistance ?? 2;
+const OFF_COLOR_LEAP_ONLY_WHEN_BLOCKED = TILE_SETTINGS.offColorLeapOnlyWhenBlocked !== false;
+const THEORETICAL_BATTLES = LEVEL_CONFIG.battles;
 
 function createRng(seed) {
     let state = seed >>> 0;
@@ -258,15 +215,38 @@ function getTile(placements, x, y) {
     return placements.get(key(x, y));
 }
 
-function canPlace(placements, tileDef, x, y, strictEdges) {
-    if (!isInsideBoard(x, y) || getTile(placements, x, y)) {
+function isCombatTile(tileDef) {
+    return DAMAGE_COLORS.includes(tileDef?.color);
+}
+
+function canPlaceOffColorLeap(placements, tileDef, x, y) {
+    if (!OFF_COLOR_LEAP_PLACEMENT || !isCombatTile(tileDef)) {
         return false;
     }
 
-    if (placements.size === 0) {
-        return true;
+    for (const direction of DIRECTIONS) {
+        const anchorX = x + direction.dx * OFF_COLOR_LEAP_DISTANCE;
+        const anchorY = y + direction.dy * OFF_COLOR_LEAP_DISTANCE;
+        const gapX = x + direction.dx;
+        const gapY = y + direction.dy;
+
+        if (!isInsideBoard(anchorX, anchorY)
+            || !isInsideBoard(gapX, gapY)
+            || getTile(placements, gapX, gapY)) {
+            continue;
+        }
+
+        const anchorTile = getTile(placements, anchorX, anchorY);
+
+        if (anchorTile && isCombatTile(anchorTile) && anchorTile.color !== tileDef.color) {
+            return true;
+        }
     }
 
+    return false;
+}
+
+function canPlaceAdjacent(placements, tileDef, x, y, strictEdges) {
     let hasNeighbor = false;
 
     for (const direction of DIRECTIONS) {
@@ -286,6 +266,32 @@ function canPlace(placements, tileDef, x, y, strictEdges) {
     return hasNeighbor;
 }
 
+function hasDirectNeighbor(placements, x, y) {
+    return DIRECTIONS.some((direction) => (
+        Boolean(getTile(placements, x + direction.dx, y + direction.dy))
+    ));
+}
+
+function canPlace(placements, tileDef, x, y, strictEdges) {
+    if (!isInsideBoard(x, y) || getTile(placements, x, y)) {
+        return false;
+    }
+
+    if (placements.size === 0) {
+        return true;
+    }
+
+    if (canPlaceAdjacent(placements, tileDef, x, y, strictEdges)) {
+        return true;
+    }
+
+    if (hasDirectNeighbor(placements, x, y)) {
+        return false;
+    }
+
+    return canPlaceOffColorLeap(placements, tileDef, x, y);
+}
+
 function findCandidatePlacements(placements, tileDef, strictEdges) {
     if (placements.size === 0) {
         const center = Math.floor(BOARD_SIZE / 2);
@@ -293,6 +299,7 @@ function findCandidatePlacements(placements, tileDef, strictEdges) {
     }
 
     const candidates = new Map();
+    const adjacentCandidates = new Map();
 
     for (const placementKey of placements.keys()) {
         const [placedX, placedY] = parseKey(placementKey);
@@ -300,6 +307,23 @@ function findCandidatePlacements(placements, tileDef, strictEdges) {
         for (const direction of DIRECTIONS) {
             const x = placedX + direction.dx;
             const y = placedY + direction.dy;
+
+            if (canPlace(placements, tileDef, x, y, strictEdges)) {
+                adjacentCandidates.set(key(x, y), { x, y });
+            }
+        }
+    }
+
+    if (adjacentCandidates.size > 0) {
+        return [...adjacentCandidates.values()];
+    }
+
+    for (const placementKey of placements.keys()) {
+        const [placedX, placedY] = parseKey(placementKey);
+
+        for (const direction of DIRECTIONS) {
+            const x = placedX + direction.dx * OFF_COLOR_LEAP_DISTANCE;
+            const y = placedY + direction.dy * OFF_COLOR_LEAP_DISTANCE;
 
             if (canPlace(placements, tileDef, x, y, strictEdges)) {
                 candidates.set(key(x, y), { x, y });
@@ -384,9 +408,9 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
     const size = grid.length;
     const queue = [originalIndex(size, start.x, start.y)];
     const boundary = new Uint8Array(size * size);
+    const interiorCells = [];
+    const boundaryCells = [];
     let cursor = 0;
-    let interiorSize = 0;
-    let boundarySize = 0;
     visited[queue[0]] = 1;
 
     while (cursor < queue.length) {
@@ -394,7 +418,7 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
         cursor += 1;
         const cellX = cellIndex % size;
         const cellY = Math.floor(cellIndex / size);
-        interiorSize += 1;
+        interiorCells.push({ x: cellX, y: cellY });
 
         for (const direction of DIRECTIONS) {
             const nextX = cellX + direction.dx;
@@ -410,7 +434,7 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
             if (nextColor === colorSymbolValue) {
                 if (!boundary[nextIndex]) {
                     boundary[nextIndex] = 1;
-                    boundarySize += 1;
+                    boundaryCells.push({ x: nextX, y: nextY });
                 }
                 continue;
             }
@@ -427,8 +451,8 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
     }
 
     return {
-        interiorSize,
-        boundarySize,
+        interiorCells,
+        boundaryCells,
     };
 }
 
@@ -453,18 +477,20 @@ function findCapturedAreas(placements) {
                 }
 
                 const region = collectEnclosedRegion(grid, colorSymbolValue, reachable, { x, y }, visited);
-                const area = region.interiorSize + region.boundarySize;
+                const area = region.interiorCells.length + region.boundaryCells.length;
 
-                if (region.interiorSize === 0 || region.boundarySize === 0) {
+                if (region.interiorCells.length === 0 || region.boundaryCells.length === 0) {
                     continue;
                 }
 
                 zones.push({
                     color: colorSymbolValue,
-                    interiorSize: region.interiorSize,
-                    boundarySize: region.boundarySize,
+                    interiorSize: region.interiorCells.length,
+                    boundarySize: region.boundaryCells.length,
                     size: area,
                     damage: captureDamage(area),
+                    interiorCells: region.interiorCells,
+                    boundaryCells: region.boundaryCells,
                 });
             }
         }
@@ -555,17 +581,58 @@ function placementValue(score, placedCount, attack) {
     );
 }
 
-function findBestPlacement(rng, hand, attack = null, strictEdges = true) {
+function clonePlacements(placements) {
+    return new Map(placements.entries());
+}
+
+function getScoredPlacementKeys(score) {
+    const scoredKeys = new Set();
+
+    for (const zone of score.zones) {
+        for (const cell of [...zone.interiorCells, ...zone.boundaryCells]) {
+            scoredKeys.add(key(
+                Math.floor(cell.x / 3),
+                Math.floor(cell.y / 3),
+            ));
+        }
+    }
+
+    return scoredKeys;
+}
+
+function cleanupPlacementsAfterRound(placements, score) {
+    if (ROUND_BOARD_CLEANUP === 'clearAll') {
+        return new Map();
+    }
+
+    if (ROUND_BOARD_CLEANUP !== 'clearScoredTiles') {
+        return clonePlacements(placements);
+    }
+
+    const nextPlacements = clonePlacements(placements);
+
+    for (const scoredKey of getScoredPlacementKeys(score)) {
+        nextPlacements.delete(scoredKey);
+    }
+
+    return nextPlacements;
+}
+
+function findBestPlacement(rng, hand, attack = null, strictEdges = true, startingPlacements = new Map()) {
     let best = null;
 
     for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt += 1) {
-        const placements = new Map();
+        const placements = clonePlacements(startingPlacements);
         const handOrder = shuffle(rng, hand);
-        const center = Math.floor(BOARD_SIZE / 2);
-        placements.set(key(center, center), handOrder[0]);
+        const placedBefore = placements.size;
 
-        for (let index = 1; index < handOrder.length; index += 1) {
-            const tileDef = handOrder[index];
+        for (const tileDef of handOrder) {
+            if (placements.size === 0) {
+                const center = Math.floor(BOARD_SIZE / 2);
+                placements.set(key(center, center), tileDef);
+                continue;
+            }
+
             const candidates = findCandidatePlacements(placements, tileDef, strictEdges);
 
             if (candidates.length === 0) {
@@ -577,12 +644,15 @@ function findBestPlacement(rng, hand, attack = null, strictEdges = true) {
         }
 
         const score = scorePlacement(placements, attack);
-        const value = placementValue(score, placements.size, attack);
+        const placedThisRound = placements.size - placedBefore;
+        const value = placementValue(score, placedThisRound, attack);
 
         if (!best || value > best.value) {
             best = {
                 placements,
                 score,
+                placedThisRound,
+                retainedBefore: placedBefore,
                 value,
             };
         }
@@ -601,7 +671,7 @@ function drawBestCandidateHand(rng, deck, count, strictEdges, attack = null) {
     for (let draw = 0; draw < HAND_SELECTION_DRAWS; draw += 1) {
         const hand = drawHand(rng, deck, count);
         const best = findBestPlacement(rng, hand, attack, strictEdges);
-        const value = placementValue(best.score, best.placements.size, attack);
+        const value = best.value;
 
         if (!bestCandidate || value > bestCandidate.value) {
             bestCandidate = {
@@ -641,7 +711,7 @@ function drawFromState(rng, state, count) {
     return hand;
 }
 
-function drawBestCandidateHandFromState(rng, state, count, strictEdges, attack) {
+function drawBestCandidateHandFromState(rng, state, count, strictEdges, attack, placements = new Map()) {
     const candidates = [];
 
     for (let draw = 0; draw < HAND_SELECTION_DRAWS; draw += 1) {
@@ -651,8 +721,8 @@ function drawBestCandidateHandFromState(rng, state, count, strictEdges, attack) 
             break;
         }
 
-        const best = findBestPlacement(rng, hand, attack, strictEdges);
-        const value = placementValue(best.score, best.placements.size, attack);
+        const best = findBestPlacement(rng, hand, attack, strictEdges, placements);
+        const value = best.value;
         candidates.push({
             hand,
             best,
@@ -721,28 +791,51 @@ function analyzeHands(rng, deck, strictEdges) {
 
 function simulateFight(rng, deck, battle, strictEdges) {
     const drawState = createDrawState(rng, deck);
+    let placements = new Map();
     let enemyHp = battle.enemyHp;
     let playerHp = STARTING_PLAYER_HP;
     let rounds = 0;
     let totalEnemyDamage = 0;
     let totalPlayerDamage = 0;
+    let deadEndRounds = 0;
+    let recoveredDeadEnds = 0;
+    let capturedZones = 0;
 
     while (rounds < MAX_ROUNDS && enemyHp > 0 && playerHp > 0) {
         const attack = battle.attacks[rounds % battle.attacks.length];
-        const candidate = drawBestCandidateHandFromState(rng, drawState, HAND_SIZE, strictEdges, attack);
+        const candidate = drawBestCandidateHandFromState(
+            rng,
+            drawState,
+            HAND_SIZE,
+            strictEdges,
+            attack,
+            placements,
+        );
 
         if (!candidate) {
             break;
         }
 
         const hand = candidate.hand;
-        const best = candidate.best;
+        let best = candidate.best;
+
+        if (best.placedThisRound === 0 && placements.size > 0) {
+            deadEndRounds += 1;
+
+            if (DEAD_END_RECOVERY === 'freshStart') {
+                best = findBestPlacement(rng, hand, attack, strictEdges, new Map());
+                recoveredDeadEnds += 1;
+            }
+        }
+
         const combat = best.score.combat;
 
         enemyHp -= combat.enemyDamage;
         playerHp -= combat.playerDamage;
         totalEnemyDamage += combat.enemyDamage;
         totalPlayerDamage += combat.playerDamage;
+        capturedZones += best.score.zones.length;
+        placements = cleanupPlacementsAfterRound(best.placements, best.score);
         drawState.discardPile.push(...hand);
         rounds += 1;
     }
@@ -754,6 +847,10 @@ function simulateFight(rng, deck, battle, strictEdges) {
         rounds,
         totalEnemyDamage,
         totalPlayerDamage,
+        deadEndRounds,
+        recoveredDeadEnds,
+        capturedZones,
+        retainedTiles: placements.size,
     };
 }
 
@@ -815,7 +912,9 @@ function printBattleReport(label, reports) {
             + `wins ${report.wins}/${fights.length} (${(winRate * 100).toFixed(0)}%) | `
             + `rounds ${formatSummary(summarize(fights.map((fight) => fight.rounds)))} | `
             + `enemy dmg ${formatSummary(summarize(fights.map((fight) => fight.totalEnemyDamage)))} | `
-            + `player dmg ${formatSummary(summarize(fights.map((fight) => fight.totalPlayerDamage)))}`
+            + `player dmg ${formatSummary(summarize(fights.map((fight) => fight.totalPlayerDamage)))} | `
+            + `dead-end ${fights.reduce((sum, fight) => sum + fight.deadEndRounds, 0)}`
+            + `/${fights.reduce((sum, fight) => sum + fight.rounds, 0)} rounds`
         );
     }
 }
@@ -831,9 +930,13 @@ function run() {
     console.log(`Board: ${BOARD_SIZE}x${BOARD_SIZE}, hand: ${HAND_SIZE}, placement attempts per hand: ${PLACEMENT_ATTEMPTS}`);
     console.log(`Hand smoothing: best of ${HAND_SELECTION_DRAWS} candidate draws`);
     console.log(`Capture damage: area * ${CAPTURE_DAMAGE_PER_AREA}`);
+    console.log(`Round board cleanup: ${ROUND_BOARD_CLEANUP}, dead-end recovery: ${DEAD_END_RECOVERY}`);
+    console.log(`Off-color leap: ${OFF_COLOR_LEAP_PLACEMENT}, distance: ${OFF_COLOR_LEAP_DISTANCE}, only blocked: ${OFF_COLOR_LEAP_ONLY_WHEN_BLOCKED}`);
     printDeck(deck);
 
-    for (const strictEdges of [true, false]) {
+    const modes = process.argv.includes('--with-loose') ? [true, false] : [true];
+
+    for (const strictEdges of modes) {
         const rng = createRng(seed + (strictEdges ? 0 : 9999));
         const modeLabel = strictEdges
             ? 'STRICT edge matching'
@@ -841,8 +944,8 @@ function run() {
         const handReports = analyzeHands(rng, deck, strictEdges);
         const battleReports = analyzeBattles(rng, deck, strictEdges);
 
-        printHandReport(`\n=== ${modeLabel}: 100 smoothed hands ===`, handReports);
-        printBattleReport(`\n=== ${modeLabel}: theoretical battles, 100 fights each ===`, battleReports);
+        printHandReport(`\n=== ${modeLabel}: ${HAND_RUNS} smoothed hands ===`, handReports);
+        printBattleReport(`\n=== ${modeLabel}: theoretical battles, ${FIGHT_RUNS} fights each ===`, battleReports);
     }
 }
 
