@@ -1,24 +1,21 @@
-export function initWebGL(canvas) {
-    return canvas.getContext('webgl', {
-        alpha: false,
+export function colorArrayToHex(color) {
+    return color.slice(0, 3).reduce((result, channel) => (
+        (result << 8) + Math.round(channel * 255)
+    ), 0);
+}
+
+export async function initPixi(PIXI, canvas, config) {
+    const app = new PIXI.Application();
+    await app.init({
+        canvas,
+        resizeTo: window,
+        backgroundColor: colorArrayToHex(config.game.clearColor),
+        backgroundAlpha: config.game.clearColor[3] ?? 1,
         antialias: false,
-        depth: false,
-        stencil: false,
+        autoDensity: true,
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
+        preference: 'webgl',
     });
-}
 
-export function resizeCanvas(gl, canvas) {
-    const width = Math.floor(canvas.clientWidth * window.devicePixelRatio);
-    const height = Math.floor(canvas.clientHeight * window.devicePixelRatio);
-
-    if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        gl.viewport(0, 0, width, height);
-    }
-}
-
-export function clearScreen(gl, color) {
-    gl.clearColor(color[0], color[1], color[2], color[3]);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    return app;
 }

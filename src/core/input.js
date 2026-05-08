@@ -3,17 +3,22 @@ export function initInput(canvas) {
         mouseX: 0,
         mouseY: 0,
         mouseDown: false,
+        mousePressed: false,
         keys: new Set(),
     };
 
-    canvas.addEventListener('mousemove', (event) => {
+    function updateMousePosition(event) {
         const rect = canvas.getBoundingClientRect();
         state.mouseX = event.clientX - rect.left;
         state.mouseY = event.clientY - rect.top;
-    });
+    }
 
-    canvas.addEventListener('mousedown', () => {
+    canvas.addEventListener('mousemove', updateMousePosition);
+
+    canvas.addEventListener('mousedown', (event) => {
+        updateMousePosition(event);
         state.mouseDown = true;
+        state.mousePressed = true;
     });
 
     window.addEventListener('mouseup', () => {
@@ -31,6 +36,14 @@ export function initInput(canvas) {
     return {
         getMouse() {
             return { x: state.mouseX, y: state.mouseY, down: state.mouseDown };
+        },
+        consumeClick() {
+            if (!state.mousePressed) {
+                return null;
+            }
+
+            state.mousePressed = false;
+            return { x: state.mouseX, y: state.mouseY };
         },
         isKeyDown(code) {
             return state.keys.has(code);

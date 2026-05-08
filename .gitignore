@@ -5,6 +5,7 @@
 .DS_Store
 
 # Dependencies and reports
+.tools/
 node_modules/
 coverage/
 test-results/

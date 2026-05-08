@@ -4,20 +4,29 @@
 
 ## Запуск
 
-Открой `index.html` через локальный web server, чтобы ES-модули и загрузка конфигов работали корректно.
-
-Пример:
+Проект запускается через Vite. Node.js LTS установлен локально в `.tools/`, поэтому используй wrapper-скрипт:
 
 ```sh
-python3 -m http.server 8000
+./scripts/npm.sh run dev
 ```
 
-Затем открой `http://localhost:8000`.
+Затем открой адрес, который покажет Vite. По умолчанию:
+
+```sh
+http://127.0.0.1:5173
+```
+
+## Проверки
+
+```sh
+./scripts/npm.sh run check
+./scripts/npm.sh run test:e2e
+```
 
 ## Стек
 
-- HTML + Vanilla JS + WebGL
-- Рендеринг и UI через canvas/WebGL
+- HTML + Vanilla JS + Pixi.js
+- Рендеринг и UI через canvas/Pixi.js
 - Баланс и настройки через JSON-конфиги
 - Документация и рабочие правила в Markdown
 

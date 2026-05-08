@@ -1,11 +1,56 @@
 {
-    "levels": [
+    "battles": [
         {
-            "id": "level_01",
-            "name": "First Break",
-            "rows": 5,
-            "columns": 10,
-            "tileHealth": 1
+            "id": "battle_01",
+            "name": "Первый раунд",
+            "ante": 1,
+            "targetScore": 300,
+            "reward": 3
+        },
+        {
+            "id": "battle_02",
+            "name": "Ставка повыше",
+            "ante": 1,
+            "targetScore": 450,
+            "reward": 4
+        },
+        {
+            "id": "battle_03",
+            "name": "Сложная доска",
+            "ante": 2,
+            "targetScore": 650,
+            "reward": 5
+        },
+        {
+            "id": "battle_04",
+            "name": "Проверка билда",
+            "ante": 2,
+            "targetScore": 850,
+            "reward": 6
+        },
+        {
+            "id": "battle_05",
+            "name": "Финальная ставка",
+            "ante": 3,
+            "targetScore": 1200,
+            "reward": 8
+        }
+    ],
+    "upgrades": [
+        {
+            "id": "wider_paddle",
+            "name": "Шире платформа",
+            "description": "+15% к ширине\nплатформы"
+        },
+        {
+            "id": "strong_start",
+            "name": "Сильный старт",
+            "description": "+1 заряд\nна первый ход"
+        },
+        {
+            "id": "bonus_reward",
+            "name": "Больше награда",
+            "description": "+1 монета\nпосле победы"
         }
     ]
 }

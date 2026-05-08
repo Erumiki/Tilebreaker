@@ -1,0 +1,19 @@
+{
+  "name": "tilebreaker",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
+    "check": "node --check src/main.js && node --check src/core/config.js && node --check src/core/input.js && node --check src/core/renderer.js && node --check src/entities/run.js && node --check src/render/ui.js && node --check src/scenes/mainmenu.js && node --check src/scenes/battle.js && node --check src/scenes/result.js && node --check src/scenes/upgrades.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "pixi.js": "8.18.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.57.0",
+    "vite": "7.3.3"
+  }
+}

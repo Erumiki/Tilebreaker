@@ -3,5 +3,8 @@
     "menuPulseColor": [0.08, 0.22, 0.28],
     "paddleSpeed": 620,
     "ballSpeed": 460,
-    "startingLives": 3
+    "startingLives": 3,
+    "run": {
+        "totalBattles": 5
+    }
 }
