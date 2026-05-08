@@ -3,6 +3,10 @@ import { loadConfig } from './core/config.js';
 import { initInput } from './core/input.js';
 import { initPixi } from './core/renderer.js';
 import {
+    getGameplayVariant,
+    normalizeGameplayVariantId,
+} from './entities/gameplayVariants.js';
+import {
     applyUpgrade,
     BattleOutcome,
     createRunState,
@@ -62,6 +66,7 @@ function getDebugOverrides() {
     const seed = parseSeed(params.get('seed'));
     const guaranteedLoopHands = params.get('guaranteedLoopHands');
     const drawMode = params.get('drawMode');
+    const gameplayVariant = params.get('gameplayVariant') ?? params.get('variant');
 
     return {
         seed,
@@ -69,16 +74,27 @@ function getDebugOverrides() {
             ? null
             : guaranteedLoopHands === 'true' || guaranteedLoopHands === '1',
         drawMode: ['hand', 'queue'].includes(drawMode) ? drawMode : null,
+        gameplayVariant: gameplayVariant === null
+            ? null
+            : normalizeGameplayVariantId(gameplayVariant),
     };
 }
 
 function applyDebugOverrides() {
+    config.game.tileBattle.gameplayVariant = normalizeGameplayVariantId(
+        config.game.tileBattle.gameplayVariant,
+    );
+
     if (debugOverrides.guaranteedLoopHands !== null) {
         config.game.tileBattle.guaranteedLoopHands = debugOverrides.guaranteedLoopHands;
     }
 
     if (debugOverrides.drawMode) {
         config.game.tileBattle.drawMode = debugOverrides.drawMode;
+    }
+
+    if (debugOverrides.gameplayVariant) {
+        config.game.tileBattle.gameplayVariant = debugOverrides.gameplayVariant;
     }
 }
 
@@ -128,7 +144,7 @@ function showUpgrades() {
         input,
         ui,
         run,
-        upgrades: getRewardChoices(run, tiles),
+        upgrades: getRewardChoices(run, tiles, config.game.tileBattle),
         onChoose(upgrade) {
             applyUpgrade(run, upgrade);
             showBattle();
@@ -136,13 +152,15 @@ function showUpgrades() {
     });
 }
 
-function startRun() {
+function startRun(gameplayVariantId = config.game.tileBattle.gameplayVariant) {
+    config.game.tileBattle.gameplayVariant = normalizeGameplayVariantId(gameplayVariantId);
     lastRunSeed = getRunSeed();
     run = createRunState({
         totalBattles,
         playerHp: config.game.tileBattle.startingPlayerHp,
         startingDeck: createStartingDeckIds(tiles, config.game.tileBattle),
         seed: lastRunSeed,
+        settings: config.game.tileBattle,
     });
     showBattle();
 }
@@ -165,6 +183,12 @@ window.__tilebreakerDebug = {
     },
     getRunSeed() {
         return lastRunSeed;
+    },
+    getGameplayVariant() {
+        return getGameplayVariant(config.game.tileBattle);
+    },
+    getMainMenuDebug() {
+        return scene?.name === 'mainmenu' ? scene.getDebugState?.() ?? null : null;
     },
     getBattleDebug() {
         return scene?.getDebugState?.() ?? null;

@@ -1,3 +1,5 @@
+import { getGameplayVariant } from './gameplayVariants.js';
+
 export const BattleOutcome = {
     Victory: 'victory',
     Defeat: 'defeat',
@@ -5,6 +7,14 @@ export const BattleOutcome = {
 
 const COMBAT_COLORS = ['red', 'blue', 'green'];
 const LOOP_PATTERNS = ['corner_rd', 'corner_dl', 'corner_ur', 'corner_lu'];
+
+function getActiveCombatColors(settings = {}) {
+    const colors = Array.isArray(settings.activeCombatColors)
+        ? settings.activeCombatColors.filter((color) => COMBAT_COLORS.includes(color))
+        : [];
+
+    return colors.length > 0 ? colors : COMBAT_COLORS;
+}
 
 function nextRandom(run) {
     run.rngState = (run.rngState * 1664525 + 1013904223) >>> 0;
@@ -67,16 +77,16 @@ function getPatternLabel(pattern) {
     }[pattern] ?? pattern;
 }
 
-function pickAddTile(run, tiles) {
-    const color = COMBAT_COLORS[run.completedBattles % COMBAT_COLORS.length];
-    const pattern = LOOP_PATTERNS[Math.floor(run.completedBattles / COMBAT_COLORS.length) % LOOP_PATTERNS.length];
+function pickAddTile(run, tiles, activeColors) {
+    const color = activeColors[run.completedBattles % activeColors.length];
+    const pattern = LOOP_PATTERNS[Math.floor(run.completedBattles / activeColors.length) % LOOP_PATTERNS.length];
 
     return tiles.find((tileDef) => tileDef.color === color && tileDef.pattern === pattern)
         ?? tiles.find((tileDef) => tileDef.color === color)
         ?? tiles[0];
 }
 
-function pickRemoveTile(run, tiles) {
+function pickRemoveTile(run, tiles, activeColors) {
     const allIds = [...run.drawPile, ...run.discardPile];
     const grayId = allIds.find((tileId) => getTileById(tiles, tileId)?.color === 'gray');
 
@@ -84,11 +94,11 @@ function pickRemoveTile(run, tiles) {
         return getTileById(tiles, grayId);
     }
 
-    const weakestColor = COMBAT_COLORS.reduce((weakest, color) => (
+    const weakestColor = activeColors.reduce((weakest, color) => (
         (run.colorMultipliers[color] ?? 1) < (run.colorMultipliers[weakest] ?? 1)
             ? color
             : weakest
-    ), COMBAT_COLORS[0]);
+    ), activeColors[0]);
 
     const removableId = allIds.find((tileId) => {
         const tileDef = getTileById(tiles, tileId);
@@ -98,8 +108,8 @@ function pickRemoveTile(run, tiles) {
     return getTileById(tiles, removableId);
 }
 
-function pickBoostColor(run) {
-    return COMBAT_COLORS[(run.completedBattles - 1 + COMBAT_COLORS.length) % COMBAT_COLORS.length];
+function pickBoostColor(run, activeColors) {
+    return activeColors[(run.completedBattles - 1 + activeColors.length) % activeColors.length];
 }
 
 export function createRunState({
@@ -107,18 +117,23 @@ export function createRunState({
     playerHp,
     startingDeck = [],
     seed = 20260508,
+    settings = {},
 }) {
+    const activeCombatColors = getActiveCombatColors(settings);
+    const gameplayVariant = getGameplayVariant(settings);
     const run = {
         totalBattles,
         currentBattle: 1,
         completedBattles: 0,
         playerHp,
+        gameplayVariant: gameplayVariant.id,
         upgrades: [],
         deck: [...startingDeck],
         drawPile: [],
         discardPile: [],
         rngState: seed >>> 0,
         reshuffles: 0,
+        activeCombatColors,
         colorMultipliers: Object.fromEntries(COMBAT_COLORS.map((color) => [color, 1])),
     };
 
@@ -182,10 +197,11 @@ export function getRunDeckStats(run) {
     };
 }
 
-export function getRewardChoices(run, tiles) {
-    const addTile = pickAddTile(run, tiles);
-    const removeTile = pickRemoveTile(run, tiles);
-    const boostColor = pickBoostColor(run);
+export function getRewardChoices(run, tiles, settings = {}) {
+    const activeColors = run.activeCombatColors ?? getActiveCombatColors(settings);
+    const addTile = pickAddTile(run, tiles, activeColors);
+    const removeTile = pickRemoveTile(run, tiles, activeColors);
+    const boostColor = pickBoostColor(run, activeColors);
 
     return [
         {

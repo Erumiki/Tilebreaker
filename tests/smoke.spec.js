@@ -36,6 +36,15 @@ async function getBattleDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getBattleDebug());
 }
 
+async function getMainMenuDebug(page) {
+  await expect.poll(() => page.evaluate(() => {
+    const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
+    return Boolean(debug?.layout?.startButton);
+  })).toBe(true);
+
+  return page.evaluate(() => window.__tilebreakerDebug.getMainMenuDebug());
+}
+
 async function placeHandIndex(page, handIndex, cellX, cellY) {
   let debug = await getBattleDebug(page);
   const placedBefore = debug.placedCount;
@@ -183,16 +192,21 @@ async function playUntilBattleResult(page) {
 }
 
 test('player can complete the 5-battle prototype loop', async ({ page }) => {
-  await page.goto('/?seed=20260508&guaranteedLoopHands=true');
+  await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
 
   await expect(page.locator('#game')).toBeVisible();
   await expectScene(page, 'mainmenu');
 
-  await clickCanvas(page, 0.5, 0.63);
+  let menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('legacy');
+  await clickRect(page, menuDebug.layout.startButton);
   await expectScene(page, 'battle');
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
   await expect.poll(() => page.evaluate(() => window.__tilebreakerDebug.getRunSeed())).toBe(20260508);
+  expect(run.gameplayVariant).toBe('legacy');
+  expect(battleDebug.gameplayVariant).toBe('legacy');
+  expect(run.activeCombatColors).toEqual(['red', 'blue']);
   expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
   expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
   expect(
@@ -229,4 +243,32 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
       await expectScene(page, 'mainmenu');
     }
   }
+});
+
+test('player can choose the first experiment from the temporary variant picker', async ({ page }) => {
+  await page.goto('/?seed=20260508');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  let menuDebug = await getMainMenuDebug(page);
+  const placementButton = menuDebug.layout.variants.find((button) => (
+    button.variant.id === 'placement_payoff'
+  ));
+  await clickRect(page, placementButton.rect);
+
+  menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('placement_payoff');
+
+  await clickRect(page, menuDebug.layout.startButton);
+  await expectScene(page, 'battle');
+
+  const variant = await page.evaluate(() => window.__tilebreakerDebug.getGameplayVariant());
+  expect(variant.id).toBe('placement_payoff');
+
+  const battleDebug = await getBattleDebug(page);
+  expect(battleDebug.gameplayVariant).toBe('placement_payoff');
+  expect(battleDebug.gameplayVariantLabel).toBe('A');
+  expect(battleDebug.drawMode).toBe('queue');
+  await expect(placeCurrentQueueTile(page)).resolves.toBe(true);
 });

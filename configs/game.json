@@ -8,6 +8,8 @@
         "boardSize": 6,
         "handSize": 7,
         "drawMode": "queue",
+        "gameplayVariant": "legacy",
+        "activeCombatColors": ["red", "blue"],
         "startingPlayerHp": 160,
         "startingDeckSize": 36,
         "damageFormula": {
@@ -28,35 +30,31 @@
             "enabled": true,
             "openingDraws": 12,
             "patternCaps": {
-                "corner": 3,
-                "plus": 1
+                "corner": 2,
+                "plus": 0
             },
             "patternMinimums": {
-                "line": 3,
+                "line": 4,
                 "tee": 4
             },
             "combatColorMinimums": {
-                "red": 2,
-                "blue": 2,
-                "green": 2
+                "red": 4,
+                "blue": 4
             },
-            "grayMax": 2
+            "grayMax": 1
         },
         "startingDeckRecipe": [
-            { "pattern": "line_h", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "line_v", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "tee_u", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "tee_r", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "tee_d", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "tee_l", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "plus", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "corner_ur", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "corner_rd", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "corner_dl", "colors": ["red", "blue", "green"], "count": 1 },
-            { "pattern": "corner_lu", "colors": ["red", "blue", "green"], "count": 1 },
-            { "id": "tile_gray_blank_01", "count": 2 },
-            { "id": "tile_gray_blank_02", "count": 1 },
-            { "id": "tile_gray_blank_03", "count": 1 }
+            { "pattern": "line_h", "colors": ["red", "blue"], "count": 2 },
+            { "pattern": "line_v", "colors": ["red", "blue"], "count": 2 },
+            { "pattern": "tee_u", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "tee_r", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "tee_d", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "tee_l", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "corner_ur", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "corner_rd", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "corner_dl", "colors": ["red", "blue"], "count": 1 },
+            { "pattern": "corner_lu", "colors": ["red", "blue"], "count": 1 },
+            { "id": "tile_gray_blank_01", "count": 1 }
         ],
         "roundBoardCleanup": "clearScoredTiles",
         "deadEndRecovery": "freshStart",

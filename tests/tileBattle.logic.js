@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import manifest from '../assets/tiles_v2/tile_manifest.json' with { type: 'json' };
-import { createRunState } from '../src/entities/run.js';
+import {
+    GAMEPLAY_VARIANT_ORDER,
+    getGameplayVariant,
+    normalizeGameplayVariantId,
+} from '../src/entities/gameplayVariants.js';
+import { createRunState, getRewardChoices } from '../src/entities/run.js';
 import {
     advanceTileQueue,
     applyOpeningDrawBag,
@@ -18,6 +23,21 @@ const settings = {
 };
 
 const tiles = createTilesFromManifest(manifest, settings);
+
+test('gameplay variants keep one comparison order and URL aliases', () => {
+    assert.deepEqual(GAMEPLAY_VARIANT_ORDER, [
+        'legacy',
+        'placement_payoff',
+        'one_color_chain',
+        'connect_targets',
+        'road_mode',
+    ]);
+    assert.equal(normalizeGameplayVariantId('baseline'), 'legacy');
+    assert.equal(normalizeGameplayVariantId('variant-a'), 'placement_payoff');
+    assert.equal(normalizeGameplayVariantId('B'), 'one_color_chain');
+    assert.equal(normalizeGameplayVariantId('unknown'), 'legacy');
+    assert.equal(getGameplayVariant({ gameplayVariant: 'road-mode' }).shortLabel, 'D');
+});
 
 function emptyBoard() {
     return Array.from({ length: settings.boardSize }, () => Array(settings.boardSize).fill(null));
@@ -149,4 +169,36 @@ test('queue draw mode exposes only current and next tile', () => {
     assert.equal(state.queuePlayedThisRound, 1);
     assert.equal(state.selectedHandIndex, 0);
     assert.equal(state.hand[0]?.id, previewBefore);
+});
+
+test('active combat colors constrain early reward colors', () => {
+    const deckIds = createStartingDeckIds(tiles, {
+        activeCombatColors: ['red', 'blue'],
+        startingDeckRecipe: [
+            { pattern: 'line_h', colors: ['red', 'blue'], count: 2 },
+            { pattern: 'line_v', colors: ['red', 'blue'], count: 2 },
+            { pattern: 'tee_u', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'tee_r', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'tee_d', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'tee_l', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'corner_ur', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'corner_rd', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'corner_dl', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'corner_lu', colors: ['red', 'blue'], count: 1 },
+            { id: 'tile_gray_blank_01', count: 1 },
+        ],
+    });
+    const run = createRunState({
+        totalBattles: 1,
+        playerHp: 30,
+        startingDeck: deckIds,
+        seed: 20260508,
+        settings: { activeCombatColors: ['red', 'blue'] },
+    });
+    const rewards = getRewardChoices(run, tiles, { activeCombatColors: ['red', 'blue'] });
+    const addTile = rewards.find((reward) => reward.type === 'add_tile');
+    const boost = rewards.find((reward) => reward.type === 'boost_color');
+
+    assert.equal(['red', 'blue'].includes(tile(addTile.tileId).color), true);
+    assert.equal(['red', 'blue'].includes(boost.color), true);
 });

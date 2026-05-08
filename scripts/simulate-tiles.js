@@ -3,6 +3,10 @@ import {
     applyOpeningDrawBag,
     createStartingDeckIds,
 } from '../src/entities/tileBattle.js';
+import {
+    GAMEPLAY_VARIANTS,
+    getGameplayVariant,
+} from '../src/entities/gameplayVariants.js';
 
 const COLORS = ['red', 'blue', 'green', 'gray'];
 const DAMAGE_COLORS = ['red', 'blue', 'green'];
@@ -16,6 +20,9 @@ const SYMBOLS = {
 const GAME_CONFIG = JSON.parse(fs.readFileSync('configs/game.json', 'utf8'));
 const LEVEL_CONFIG = JSON.parse(fs.readFileSync('configs/levels.json', 'utf8'));
 const TILE_SETTINGS = GAME_CONFIG.tileBattle ?? {};
+const GAMEPLAY_VARIANT = getGameplayVariant({
+    gameplayVariant: process.env.GAMEPLAY_VARIANT ?? TILE_SETTINGS.gameplayVariant,
+});
 
 const BOARD_SIZE = TILE_SETTINGS.boardSize ?? 6;
 const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
@@ -1393,6 +1400,8 @@ function run() {
 
     console.log(`Tilebreaker tile feasibility simulation`);
     console.log(`Seed: ${seed}`);
+    console.log(`Gameplay variant: ${GAMEPLAY_VARIANT.shortLabel}:${GAMEPLAY_VARIANT.id}`);
+    console.log(`Variant order: ${GAMEPLAY_VARIANTS.map((variant) => `${variant.shortLabel}:${variant.id}`).join(' -> ')}`);
     console.log(`Tile set: ${deckDefinition.label}`);
     console.log(`Board: ${BOARD_SIZE}x${BOARD_SIZE}, hand: ${HAND_SIZE}, placement attempts per hand: ${PLACEMENT_ATTEMPTS}`);
     console.log(`Draw mode: ${DRAW_MODE}`);

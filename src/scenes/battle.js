@@ -1,4 +1,5 @@
 import { BattleOutcome, getRunDeckStats } from '../entities/run.js';
+import { getGameplayVariant } from '../entities/gameplayVariants.js';
 import {
     advanceTileQueue,
     canPlaceTile,
@@ -291,6 +292,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round);
     const deck = getRunDeckStats(run);
+    const variant = getGameplayVariant(settings);
     const totalCaptureArea = state.lastResult
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
@@ -301,7 +303,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         size: 24,
         color: '#ffffff',
     });
-    ui.drawText(`Раунд ${state.round}`, panel.x + 18, panel.y + 52, {
+    ui.drawText(`Раунд ${state.round} · ${variant.shortLabel}`, panel.x + 18, panel.y + 52, {
         size: 17,
         color: '#9fb8ca',
     });
@@ -464,6 +466,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.selectedHandIndex,
         state.queuePlayedThisRound ?? 0,
         state.queueReserve?.map((tileDef) => tileDef?.id ?? '-').join(',') ?? '-',
+        getGameplayVariant(settings).id,
         boardKey,
         handKey,
         `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}`,
@@ -629,6 +632,8 @@ export function createBattleScene({
                     color: tileDef.color,
                     pattern: tileDef.pattern,
                 } : null),
+                gameplayVariant: getGameplayVariant(settings).id,
+                gameplayVariantLabel: getGameplayVariant(settings).shortLabel,
                 drawMode: settings.drawMode ?? 'hand',
                 queuePlayedThisRound: state.queuePlayedThisRound ?? 0,
                 queueReserve: state.queueReserve?.map((tileDef) => tileDef ? {
