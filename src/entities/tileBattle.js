@@ -74,6 +74,15 @@ function isCombatTile(tileDef) {
     return COMBAT_COLORS.includes(tileDef?.color);
 }
 
+function edgesMatch(tileDef, neighbor, direction, settings) {
+    if (settings.grayWildcardPlacement === true
+        && (tileDef.color === 'gray' || neighbor.color === 'gray')) {
+        return true;
+    }
+
+    return edge(tileDef, direction.name) === edge(neighbor, direction.opposite);
+}
+
 function canPlaceAdjacentTile(board, tileDef, x, y, settings) {
     let hasNeighbor = false;
 
@@ -93,7 +102,7 @@ function canPlaceAdjacentTile(board, tileDef, x, y, settings) {
 
         hasNeighbor = true;
 
-        if (edge(tileDef, direction.name) !== edge(neighbor, direction.opposite)) {
+        if (!edgesMatch(tileDef, neighbor, direction, settings)) {
             return false;
         }
     }
@@ -129,6 +138,42 @@ function getDamagePerArea(settings) {
     }
 
     return settings.damagePerArea ?? 1;
+}
+
+function getLargeZoneBonus(settings, area) {
+    const largeZoneBonus = settings.damageFormula?.largeZoneBonus;
+
+    if (!largeZoneBonus) {
+        return 0;
+    }
+
+    const minArea = largeZoneBonus.minArea ?? 0;
+    const bonusPerArea = largeZoneBonus.bonusPerArea ?? 0;
+
+    return Math.max(0, area - minArea) * bonusPerArea;
+}
+
+function getGrayInteriorBonus(settings, grayInteriorCells) {
+    const grayBonus = settings.damageFormula?.grayInteriorBonus;
+
+    if (!grayBonus) {
+        return 0;
+    }
+
+    return grayInteriorCells * (grayBonus.bonusPerCell ?? 0);
+}
+
+function getZoneDamageBreakdown(settings, area, grayInteriorCells) {
+    const areaDamage = area * getDamagePerArea(settings);
+    const areaBonus = getLargeZoneBonus(settings, area);
+    const grayBonus = getGrayInteriorBonus(settings, grayInteriorCells);
+
+    return {
+        areaDamage,
+        areaBonus,
+        grayBonus,
+        baseDamage: areaDamage + areaBonus + grayBonus,
+    };
 }
 
 function selectPrimaryAttackColor(attack) {
@@ -472,6 +517,12 @@ function findCapturedAreas(board, settings) {
                     visited,
                 );
                 const area = region.interiorCells.length + region.boundaryCells.length;
+                const grayInteriorCells = region.interiorCells.filter((cell) => {
+                    const tileDef = board[Math.floor(cell.y / 3)]?.[Math.floor(cell.x / 3)];
+
+                    return tileDef?.color === 'gray';
+                }).length;
+                const damage = getZoneDamageBreakdown(settings, area, grayInteriorCells);
 
                 if (region.interiorCells.length === 0 || region.boundaryCells.length === 0) {
                     continue;
@@ -482,8 +533,12 @@ function findCapturedAreas(board, settings) {
                     interiorSize: region.interiorCells.length,
                     boundarySize: region.boundaryCells.length,
                     area,
-                    baseDamage: area * getDamagePerArea(settings),
-                    damage: area * getDamagePerArea(settings),
+                    areaDamage: damage.areaDamage,
+                    areaBonus: damage.areaBonus,
+                    grayInteriorCells,
+                    grayBonus: damage.grayBonus,
+                    baseDamage: damage.baseDamage,
+                    damage: damage.baseDamage,
                     interiorCells: region.interiorCells,
                     boundaryCells: region.boundaryCells,
                 });

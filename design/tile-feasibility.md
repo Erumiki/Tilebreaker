@@ -67,6 +67,42 @@
 
 В v2 нет обычного `dot` с цветной клеткой только в центре: такой тайл не имеет выхода на край и не помогает строить границу. Базовые `cap`-тайлы тоже убираются из стартового набора, потому что они часто создают обрубки вместо замыканий. Их можно вернуть позже как special/low-power тайлы.
 
+## День 3: payoff против минимального квадрата
+
+Симуляция обновлена под честный draw, persistent board, fresh-start recovery и формулу из `configs/game.json`:
+
+```text
+damage = area * 2
+largeZoneBonus = max(0, area - 12) * 2
+grayInteriorBonus = gray tile micro-cells inside captured interior * 1
+grayWildcardPlacement = true
+```
+
+Контрольный сценарий показывает, зачем теперь достраивать:
+
+```text
+minimal 2x2 loop:       area 12, area bonus 0, gray bonus 0, damage 24
+3x3 loop with gray tile: area 41, area bonus 58, gray bonus 9, damage 149
+```
+
+То есть минимальный квадрат остается валидным безопасным ходом, но большая зона с серым fill становится отдельной ставкой, а не декоративным оверкиллом без понятного payoff.
+
+Сводка прогона `HAND_RUNS=40 FIGHT_RUNS=40 PLACEMENT_ATTEMPTS=40`:
+
+```text
+current deck:      hand captures avg 0.1, zero damage 37/40, battle_01 wins 20/40, avg capture area 12.5
+fewer corners:     hand captures avg 0.1, zero damage 37/40, battle_01 wins 17/40, avg capture area 13.3
+fewer plus:        hand captures avg 0.1, zero damage 37/40, battle_01 wins 15/40, avg capture area 12.9
+fewer both:        hand captures avg 0.0, zero damage 39/40, battle_01 wins 12/40, avg capture area 12.6
+```
+
+Выводы:
+
+- Урезание `plus` и `corner` не берем в MVP-конфиг прямо сейчас: оно снижает частоту побед и повышает ожидание нужных кусков сильнее, чем растит среднюю площадь.
+- Payoff-фикс сам по себе не заставляет случайного бота регулярно строить большие зоны; он делает такие зоны резко выгоднее, когда игрок или будущий режим выдачи дает возможность их планировать.
+- Серый blank теперь считается neutral wildcard при размещении: его можно ставить рядом с цветной границей и достраивать цветную границу рядом с ним, чтобы `grayInteriorBonus` был достижимым правилом, а не только формулой.
+- Следующие рычаги по плану — queue-режим и честный color/pattern bag: они должны чаще давать игроку промежуточный выбор, а не только редкую готовую петлю.
+
 ## Результаты сглаженной v2 capture-fill
 
 Симуляция использует `assets/tiles_v2/tile_manifest.json`, строгий edge matching как основной режим, `damage = area * 2` и сглаживание раздачи через выбор лучшей из 3 кандидатных рук.

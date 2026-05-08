@@ -38,6 +38,24 @@ function getCaptureAreaByColor(result) {
     return areaByColor;
 }
 
+function getCaptureBonusByColor(result) {
+    const bonusByColor = Object.fromEntries(COMBAT_COLORS.map((color) => [color, 0]));
+
+    if (!result) {
+        return bonusByColor;
+    }
+
+    for (const zone of result.score.zones) {
+        bonusByColor[zone.color] += (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0);
+    }
+
+    return bonusByColor;
+}
+
+function formatDamage(value) {
+    return Math.max(0, value || 0);
+}
+
 function insetRect(rect, amount) {
     return {
         x: rect.x + amount,
@@ -159,17 +177,18 @@ function drawAttackRow(ui, rect, color, attack, result) {
 
     const colorResult = result.byColor[color];
     const areaByColor = getCaptureAreaByColor(result);
+    const bonusByColor = getCaptureBonusByColor(result);
     const outcomeLabel = colorResult.enemyDamage > 0
-        ? `Урон врагу +${colorResult.enemyDamage}`
-        : `Урон игроку +${colorResult.playerDamage}`;
+        ? `Бонус +${bonusByColor[color]}  |  Врагу +${formatDamage(colorResult.enemyDamage)}`
+        : `Бонус +${bonusByColor[color]}  |  Игроку +${formatDamage(colorResult.playerDamage)}`;
     const outcomeColor = colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
 
     const multiplier = result.score.zones.find((zone) => zone.color === color)?.multiplier ?? 1;
-    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${colorResult.closedDamage}  |  x${multiplier}`, rect.x + 18, rect.y + 31, {
+    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${formatDamage(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, rect.y + 29, {
         size: 14,
         color: '#d8e7f2',
     });
-    ui.drawText(outcomeLabel, rect.x + 18, rect.y + 52, {
+    ui.drawText(outcomeLabel, rect.x + 18, rect.y + 49, {
         size: 14,
         color: outcomeColor,
     });
@@ -270,20 +289,23 @@ function drawSidePanel(ui, layout, battle, run, state) {
     COMBAT_COLORS.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
-            y: panel.y + 194 + index * 72,
+            y: panel.y + 190 + index * 68,
             width: panel.width - 32,
-            height: 64,
+            height: 62,
         }, color, attack, state.lastResult);
     });
 
     if (state.lastResult) {
         const zones = state.lastResult.score.zones.length;
-        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}`, panel.x + 18, panel.y + 410, {
-            size: 16,
+        const totalBonus = state.lastResult.score.zones.reduce((sum, zone) => (
+            sum + (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0)
+        ), 0);
+        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`, panel.x + 18, panel.y + 400, {
+            size: 15,
             color: '#d8e7f2',
         });
-        ui.drawText(`Врагу -${state.lastResult.enemyDamage}  |  Игроку -${state.lastResult.playerDamage}`, panel.x + 18, panel.y + 434, {
-            size: 16,
+        ui.drawText(`Врагу -${formatDamage(state.lastResult.enemyDamage)}  |  Игроку -${formatDamage(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
+            size: 15,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
     }
@@ -497,6 +519,9 @@ export function createBattleScene({
                     zoneMultipliers: state.lastResult.score.zones.map((zone) => ({
                         color: zone.color,
                         multiplier: zone.multiplier,
+                        areaBonus: zone.areaBonus,
+                        grayBonus: zone.grayBonus,
+                        grayInteriorCells: zone.grayInteriorCells,
                     })),
                 } : null,
                 deck: getRunDeckStats(run),
