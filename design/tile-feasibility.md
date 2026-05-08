@@ -152,6 +152,52 @@ battle_05 wins  3/40, captures 59, minimal 57/59 = 97%, avg area 12.4, zero dama
 
 Вывод: payoff-формула уже делает большие зоны выгодными в контролируемом сценарии, но текущая честная hand-выдача почти никогда не приводит к большим зонам сама. Следующая задача должна работать с составом стартовой колоды/recipe и потом с opening bag или queue, а не с уроном.
 
+## День 3: anti-small-square starting deck recipe
+
+Игра и симулятор теперь читают один источник стартовой колоды: `tileBattle.startingDeckRecipe` в `configs/game.json`. Recipe разворачивается в массив tile id и поддерживает дубли без изменения `assets/tiles_v2/tile_manifest.json`.
+
+Принятый MVP-рецепт консервативный:
+
+- все combat-тайлы v2 остаются по одному экземпляру;
+- `tile_gray_blank_01` получает вторую копию;
+- всего в стартовой колоде 37 tile ids;
+- `add_tile` добавляет одну копию id, `remove_tile` удаляет одну копию id.
+
+Проверенная более жесткая версия с 44 картами, дублированными `line_h/line_v` и 5 gray blank снижала готовые быстрые петли, но сильно сушила первый бой: `battle_01 wins 10/40` против baseline `23/40`. Поэтому ее не берем как активный MVP-рецепт до opening bag.
+
+Команда:
+
+```sh
+HAND_RUNS=40 FIGHT_RUNS=40 ./scripts/node.sh scripts/simulate-tiles.js 20260508
+```
+
+Результаты для `STRICT edge matching / current deck (37 tiles)`:
+
+```text
+first 12 draws:
+colors: blue 4, green 4, red 4
+shapes: corner 3, line 2, plus 1, tee 6
+
+40 honest hands:
+captures avg 0.1
+total damage avg 1.2
+avg capture area 12.0
+minimal capture share 2/2 = 100%
+quick 4-corner loops 1/40
+zero damage hands 38/40
+
+theoretical battles:
+battle_01 wins 14/40, captures 39, minimal 35/39 = 90%, avg area 13.7, zero damage 248/287 rounds
+battle_02 wins 15/40, captures 44, minimal 43/44 = 98%, avg area 12.3, zero damage 235/278 rounds
+battle_03 wins  3/40, captures 52, minimal 52/52 = 100%, avg area 12.0, zero damage 257/309 rounds
+battle_04 wins  8/40, captures 50, minimal 46/50 = 92%, avg area 13.2, zero damage 249/297 rounds
+battle_05 wins  0/40, captures 44, minimal 43/44 = 98%, avg area 12.3, zero damage 277/320 rounds
+```
+
+Вывод: recipe как изолированный рычаг дает небольшой сдвиг в сторону больших закрытий (`battle_01 avg area 13.7`, minimal share 90% вместо 92%), но не решает задачу полностью. Сильное урезание `corner/plus` ухудшает частоту урона и первый бой быстрее, чем улучшает размер зон. Следующая задача `opening shape-bag with cap on corner/plus` остается must: ограничивать раннюю выдачу замыкателей нужно по окну первых draw, а не только общим составом колоды.
+
+Важное уточнение по интерпретации: `zero damage` в первом раунде не является провалом, если persistent board сохраняет полезный контур, который закрывается позже. Для следующих симуляций нужно смотреть не только `zero damage rounds/hands`, а окно 2-3 раундов: длину нулевых серий, закрытия после setup-раунда, `dead-end/freshStart`, win rate и player damage. Не оптимизировать выдачу под гарантированный удар в R1: это снова подтолкнет систему к hidden loop guarantee и малым квадратам.
+
 ## Результаты сглаженной v2 capture-fill
 
 Симуляция использует `assets/tiles_v2/tile_manifest.json`, строгий edge matching как основной режим, `damage = area * 2` и сглаживание раздачи через выбор лучшей из 3 кандидатных рук.

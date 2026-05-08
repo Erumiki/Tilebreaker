@@ -155,8 +155,9 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
   await expect.poll(() => page.evaluate(() => window.__tilebreakerDebug.getRunSeed())).toBe(20260508);
-  expect(run.deck).toHaveLength(36);
-  expect(run.drawPile.length + run.discardPile.length + battleDebug.hand.filter(Boolean).length).toBe(36);
+  expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
+  expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
+  expect(run.drawPile.length + run.discardPile.length + battleDebug.hand.filter(Boolean).length).toBe(run.deck.length);
 
   for (let battle = 1; battle <= 5; battle += 1) {
     await playUntilBattleResult(page);

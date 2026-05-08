@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createStartingDeckIds } from '../src/entities/tileBattle.js';
 
 const COLORS = ['red', 'blue', 'green', 'gray'];
 const DAMAGE_COLORS = ['red', 'blue', 'green'];
@@ -153,6 +154,7 @@ function tileFromManifest(entry) {
         id: entry.id,
         color: entry.color,
         kind: entry.pattern,
+        pattern: entry.pattern,
         cells: pattern(rows),
     };
 }
@@ -160,9 +162,21 @@ function tileFromManifest(entry) {
 function createStartingDeck() {
     if (fs.existsSync(TILE_MANIFEST_PATH)) {
         const manifest = JSON.parse(fs.readFileSync(TILE_MANIFEST_PATH, 'utf8'));
+        const tiles = manifest.tiles.map(tileFromManifest);
+        const tileMap = new Map(tiles.map((tileDef) => [tileDef.id, tileDef]));
+        const deckIds = createStartingDeckIds(tiles, TILE_SETTINGS);
+
         return {
             label: manifest.tileSetVersion ?? TILE_MANIFEST_PATH,
-            tiles: manifest.tiles.map(tileFromManifest),
+            tiles: deckIds.map((tileId) => {
+                const tileDef = tileMap.get(tileId);
+
+                if (!tileDef) {
+                    throw new Error(`Unknown starting deck tile id: ${tileId}`);
+                }
+
+                return tileDef;
+            }),
         };
     }
 
@@ -278,12 +292,23 @@ function canPlaceAdjacent(placements, tileDef, x, y, strictEdges) {
 }
 
 function edgesMatch(tileDef, neighbor, direction) {
-    if (GRAY_WILDCARD_PLACEMENT
-        && (tileDef.color === 'gray' || neighbor.color === 'gray')) {
+    if (GRAY_WILDCARD_PLACEMENT && tileDef.color === 'gray' && neighbor.color === 'gray') {
         return true;
     }
 
+    if (GRAY_WILDCARD_PLACEMENT && tileDef.color === 'gray' && isCombatTile(neighbor)) {
+        return isBlankEdge(neighbor, direction.opposite);
+    }
+
+    if (GRAY_WILDCARD_PLACEMENT && neighbor.color === 'gray' && isCombatTile(tileDef)) {
+        return isBlankEdge(tileDef, direction.name);
+    }
+
     return edge(tileDef, direction.name) === edge(neighbor, direction.opposite);
+}
+
+function isBlankEdge(tileDef, directionName) {
+    return edge(tileDef, directionName).split('').every((symbol) => symbol === SYMBOLS.gray);
 }
 
 function hasDirectNeighbor(placements, x, y) {

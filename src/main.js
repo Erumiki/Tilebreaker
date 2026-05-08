@@ -10,7 +10,10 @@ import {
     getCurrentBattle,
     resolveBattle,
 } from './entities/run.js';
-import { createTilesFromManifest } from './entities/tileBattle.js';
+import {
+    createStartingDeckIds,
+    createTilesFromManifest,
+} from './entities/tileBattle.js';
 import { createUiRenderer } from './render/ui.js';
 import { createBattleScene } from './scenes/battle.js';
 import { createMainMenuScene } from './scenes/mainmenu.js';
@@ -132,7 +135,7 @@ function startRun() {
     run = createRunState({
         totalBattles,
         playerHp: config.game.tileBattle.startingPlayerHp,
-        startingDeck: tiles.map((tileDef) => tileDef.id),
+        startingDeck: createStartingDeckIds(tiles, config.game.tileBattle),
         seed: lastRunSeed,
     });
     showBattle();

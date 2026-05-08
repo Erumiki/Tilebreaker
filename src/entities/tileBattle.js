@@ -74,10 +74,21 @@ function isCombatTile(tileDef) {
     return COMBAT_COLORS.includes(tileDef?.color);
 }
 
+function isBlankEdge(tileDef, directionName) {
+    return edge(tileDef, directionName).split('').every((symbol) => symbol === COLOR_SYMBOLS.gray);
+}
+
 function edgesMatch(tileDef, neighbor, direction, settings) {
-    if (settings.grayWildcardPlacement === true
-        && (tileDef.color === 'gray' || neighbor.color === 'gray')) {
+    if (settings.grayWildcardPlacement === true && tileDef.color === 'gray' && neighbor.color === 'gray') {
         return true;
+    }
+
+    if (settings.grayWildcardPlacement === true && tileDef.color === 'gray' && isCombatTile(neighbor)) {
+        return isBlankEdge(neighbor, direction.opposite);
+    }
+
+    if (settings.grayWildcardPlacement === true && neighbor.color === 'gray' && isCombatTile(tileDef)) {
+        return isBlankEdge(tileDef, direction.name);
     }
 
     return edge(tileDef, direction.name) === edge(neighbor, direction.opposite);
@@ -614,6 +625,76 @@ export function createTilesFromManifest(manifest, settings = {}) {
             cells: pattern(rows),
         };
     });
+}
+
+function getTilePattern(tileDef) {
+    return tileDef.pattern ?? tileDef.kind;
+}
+
+function getRecipeCount(entry) {
+    return Math.max(0, Math.floor(entry.count ?? 1));
+}
+
+function findRecipeTile(tiles, entry, color = null) {
+    if (entry.id) {
+        return tiles.find((tileDef) => tileDef.id === entry.id);
+    }
+
+    return tiles.find((tileDef) => (
+        tileDef.color === color
+        && getTilePattern(tileDef) === entry.pattern
+    ));
+}
+
+export function createStartingDeckIds(tiles, settings = {}) {
+    const recipe = settings.startingDeckRecipe;
+
+    if (!Array.isArray(recipe) || recipe.length === 0) {
+        return tiles.map((tileDef) => tileDef.id);
+    }
+
+    const deckIds = [];
+
+    for (const entry of recipe) {
+        const count = getRecipeCount(entry);
+
+        if (count === 0) {
+            continue;
+        }
+
+        if (entry.id) {
+            const tileDef = findRecipeTile(tiles, entry);
+
+            if (!tileDef) {
+                throw new Error(`Unknown startingDeckRecipe tile id: ${entry.id}`);
+            }
+
+            for (let index = 0; index < count; index += 1) {
+                deckIds.push(tileDef.id);
+            }
+            continue;
+        }
+
+        const colors = entry.colors ?? [entry.color];
+
+        if (!entry.pattern || !colors.every(Boolean)) {
+            throw new Error('startingDeckRecipe entries need id or pattern + color/colors');
+        }
+
+        for (const color of colors) {
+            const tileDef = findRecipeTile(tiles, entry, color);
+
+            if (!tileDef) {
+                throw new Error(`Unknown startingDeckRecipe tile: ${color}:${entry.pattern}`);
+            }
+
+            for (let index = 0; index < count; index += 1) {
+                deckIds.push(tileDef.id);
+            }
+        }
+    }
+
+    return deckIds;
 }
 
 export function createTileBattleState({ battle, run, settings, tiles }) {
