@@ -1,6 +1,14 @@
 # Tilebreaker
 
-Стартовый проект Tilebreaker.
+Tilebreaker — быстрый roguelite tile-placement battler. Игрок выкладывает тайлы-границы, замыкает территории, захватывает землю цветом границы и отбивает цветовые атаки врага.
+
+Текущий MVP строится вокруг v2 capture-fill модели:
+
+- тайлы: `assets/tiles_v2/tile_manifest.json`;
+- поле: 6x6 macro-тайлов, каждый тайл — 3x3 micro-cells;
+- легальность: соседние края должны совпадать по 3-cell edge signature;
+- scoring: замкнутая цветная граница захватывает пустую или заполненную внутренность;
+- урон сейчас считается от площади захвата, но баланс еще сглаживается.
 
 ## Запуск
 
@@ -41,4 +49,4 @@ techspec/  — технические спецификации
 todo/      — задачи и баги
 ```
 
-Перед началом работы читай `CLAUDE.md`, `todo/tasks.md`, `todo/bugs.md` и `design/decisions.md`.
+Перед началом работы читай `CLAUDE.md`, `todo/tasks.md`, `todo/current.md`, `todo/bugs.md` и `design/decisions.md`. Порядок задач и next-step есть только в `todo/tasks.md`.

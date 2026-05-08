@@ -1,0 +1,663 @@
+{
+  "source": "scripts/generate-tile-art-v2.js",
+  "brief": "design/tile-art-brief.md",
+  "tileSetVersion": "v2_capture_boundary",
+  "tileSize": 256,
+  "columnsInSpriteSheet": 6,
+  "semantics": {
+    "red": "combat boundary; captures enclosed area",
+    "blue": "combat boundary; captures enclosed area",
+    "green": "combat boundary; captures enclosed area",
+    "gray": "neutral land; matches edges but deals no damage"
+  },
+  "tiles": [
+    {
+      "id": "tile_red_plus",
+      "file": "tile_red_plus.png",
+      "spriteIndex": 0,
+      "color": "red",
+      "pattern": "plus",
+      "matrix": [
+        ".X.",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "grg",
+        "bottom": "grg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_line_h",
+      "file": "tile_red_line_h.png",
+      "spriteIndex": 1,
+      "color": "red",
+      "pattern": "line_h",
+      "matrix": [
+        "...",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "grg",
+        "bottom": "ggg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_line_v",
+      "file": "tile_red_line_v.png",
+      "spriteIndex": 2,
+      "color": "red",
+      "pattern": "line_v",
+      "matrix": [
+        ".X.",
+        ".X.",
+        ".X."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "ggg",
+        "bottom": "grg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_red_corner_ur",
+      "file": "tile_red_corner_ur.png",
+      "spriteIndex": 3,
+      "color": "red",
+      "pattern": "corner_ur",
+      "matrix": [
+        ".X.",
+        ".XX",
+        "..."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "grg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_red_corner_rd",
+      "file": "tile_red_corner_rd.png",
+      "spriteIndex": 4,
+      "color": "red",
+      "pattern": "corner_rd",
+      "matrix": [
+        "...",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "grg",
+        "bottom": "grg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_red_corner_dl",
+      "file": "tile_red_corner_dl.png",
+      "spriteIndex": 5,
+      "color": "red",
+      "pattern": "corner_dl",
+      "matrix": [
+        "...",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "grg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_corner_lu",
+      "file": "tile_red_corner_lu.png",
+      "spriteIndex": 6,
+      "color": "red",
+      "pattern": "corner_lu",
+      "matrix": [
+        ".X.",
+        "XX.",
+        "..."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_tee_u",
+      "file": "tile_red_tee_u.png",
+      "spriteIndex": 7,
+      "color": "red",
+      "pattern": "tee_u",
+      "matrix": [
+        ".X.",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "grg",
+        "bottom": "ggg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_tee_r",
+      "file": "tile_red_tee_r.png",
+      "spriteIndex": 8,
+      "color": "red",
+      "pattern": "tee_r",
+      "matrix": [
+        ".X.",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "grg",
+        "bottom": "grg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_red_tee_d",
+      "file": "tile_red_tee_d.png",
+      "spriteIndex": 9,
+      "color": "red",
+      "pattern": "tee_d",
+      "matrix": [
+        "...",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "grg",
+        "bottom": "grg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_red_tee_l",
+      "file": "tile_red_tee_l.png",
+      "spriteIndex": 10,
+      "color": "red",
+      "pattern": "tee_l",
+      "matrix": [
+        ".X.",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "grg",
+        "right": "ggg",
+        "bottom": "grg",
+        "left": "grg"
+      }
+    },
+    {
+      "id": "tile_blue_plus",
+      "file": "tile_blue_plus.png",
+      "spriteIndex": 11,
+      "color": "blue",
+      "pattern": "plus",
+      "matrix": [
+        ".X.",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "gbg",
+        "bottom": "gbg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_line_h",
+      "file": "tile_blue_line_h.png",
+      "spriteIndex": 12,
+      "color": "blue",
+      "pattern": "line_h",
+      "matrix": [
+        "...",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "gbg",
+        "bottom": "ggg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_line_v",
+      "file": "tile_blue_line_v.png",
+      "spriteIndex": 13,
+      "color": "blue",
+      "pattern": "line_v",
+      "matrix": [
+        ".X.",
+        ".X.",
+        ".X."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "ggg",
+        "bottom": "gbg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_blue_corner_ur",
+      "file": "tile_blue_corner_ur.png",
+      "spriteIndex": 14,
+      "color": "blue",
+      "pattern": "corner_ur",
+      "matrix": [
+        ".X.",
+        ".XX",
+        "..."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "gbg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_blue_corner_rd",
+      "file": "tile_blue_corner_rd.png",
+      "spriteIndex": 15,
+      "color": "blue",
+      "pattern": "corner_rd",
+      "matrix": [
+        "...",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "gbg",
+        "bottom": "gbg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_blue_corner_dl",
+      "file": "tile_blue_corner_dl.png",
+      "spriteIndex": 16,
+      "color": "blue",
+      "pattern": "corner_dl",
+      "matrix": [
+        "...",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "gbg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_corner_lu",
+      "file": "tile_blue_corner_lu.png",
+      "spriteIndex": 17,
+      "color": "blue",
+      "pattern": "corner_lu",
+      "matrix": [
+        ".X.",
+        "XX.",
+        "..."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_tee_u",
+      "file": "tile_blue_tee_u.png",
+      "spriteIndex": 18,
+      "color": "blue",
+      "pattern": "tee_u",
+      "matrix": [
+        ".X.",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "gbg",
+        "bottom": "ggg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_tee_r",
+      "file": "tile_blue_tee_r.png",
+      "spriteIndex": 19,
+      "color": "blue",
+      "pattern": "tee_r",
+      "matrix": [
+        ".X.",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "gbg",
+        "bottom": "gbg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_blue_tee_d",
+      "file": "tile_blue_tee_d.png",
+      "spriteIndex": 20,
+      "color": "blue",
+      "pattern": "tee_d",
+      "matrix": [
+        "...",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "gbg",
+        "bottom": "gbg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_blue_tee_l",
+      "file": "tile_blue_tee_l.png",
+      "spriteIndex": 21,
+      "color": "blue",
+      "pattern": "tee_l",
+      "matrix": [
+        ".X.",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "gbg",
+        "right": "ggg",
+        "bottom": "gbg",
+        "left": "gbg"
+      }
+    },
+    {
+      "id": "tile_green_plus",
+      "file": "tile_green_plus.png",
+      "spriteIndex": 22,
+      "color": "green",
+      "pattern": "plus",
+      "matrix": [
+        ".X.",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_line_h",
+      "file": "tile_green_line_h.png",
+      "spriteIndex": 23,
+      "color": "green",
+      "pattern": "line_h",
+      "matrix": [
+        "...",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_line_v",
+      "file": "tile_green_line_v.png",
+      "spriteIndex": 24,
+      "color": "green",
+      "pattern": "line_v",
+      "matrix": [
+        ".X.",
+        ".X.",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_corner_ur",
+      "file": "tile_green_corner_ur.png",
+      "spriteIndex": 25,
+      "color": "green",
+      "pattern": "corner_ur",
+      "matrix": [
+        ".X.",
+        ".XX",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_corner_rd",
+      "file": "tile_green_corner_rd.png",
+      "spriteIndex": 26,
+      "color": "green",
+      "pattern": "corner_rd",
+      "matrix": [
+        "...",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_corner_dl",
+      "file": "tile_green_corner_dl.png",
+      "spriteIndex": 27,
+      "color": "green",
+      "pattern": "corner_dl",
+      "matrix": [
+        "...",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_corner_lu",
+      "file": "tile_green_corner_lu.png",
+      "spriteIndex": 28,
+      "color": "green",
+      "pattern": "corner_lu",
+      "matrix": [
+        ".X.",
+        "XX.",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_tee_u",
+      "file": "tile_green_tee_u.png",
+      "spriteIndex": 29,
+      "color": "green",
+      "pattern": "tee_u",
+      "matrix": [
+        ".X.",
+        "XXX",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_tee_r",
+      "file": "tile_green_tee_r.png",
+      "spriteIndex": 30,
+      "color": "green",
+      "pattern": "tee_r",
+      "matrix": [
+        ".X.",
+        ".XX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_tee_d",
+      "file": "tile_green_tee_d.png",
+      "spriteIndex": 31,
+      "color": "green",
+      "pattern": "tee_d",
+      "matrix": [
+        "...",
+        "XXX",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_green_tee_l",
+      "file": "tile_green_tee_l.png",
+      "spriteIndex": 32,
+      "color": "green",
+      "pattern": "tee_l",
+      "matrix": [
+        ".X.",
+        "XX.",
+        ".X."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_gray_blank_01",
+      "file": "tile_gray_blank_01.png",
+      "spriteIndex": 33,
+      "color": "gray",
+      "pattern": "blank_01",
+      "matrix": [
+        "...",
+        "...",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_gray_blank_02",
+      "file": "tile_gray_blank_02.png",
+      "spriteIndex": 34,
+      "color": "gray",
+      "pattern": "blank_02",
+      "matrix": [
+        "...",
+        "...",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    },
+    {
+      "id": "tile_gray_blank_03",
+      "file": "tile_gray_blank_03.png",
+      "spriteIndex": 35,
+      "color": "gray",
+      "pattern": "blank_03",
+      "matrix": [
+        "...",
+        "...",
+        "..."
+      ],
+      "edges": {
+        "top": "ggg",
+        "right": "ggg",
+        "bottom": "ggg",
+        "left": "ggg"
+      }
+    }
+  ]
+}

@@ -4,29 +4,14 @@
 
 **Goal:** Replace the battle placeholder with a playable tile-placement combat prototype.
 
-**Active task:** Build the first 3-minute MVP loop: enemy color attacks -> tile placement -> closed-zone scoring -> HP result -> next round.
+**Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
-## Acceptance
+**Current design truth:**
 
-- Player opens the Vite dev URL.
-- Player sees the main menu.
-- Player can move through `menu -> battle -> result -> upgrades -> next battle`.
-- During battle, player sees enemy HP, player HP, three color attacks, a fixed field, and a hand of tiles.
-- Player places tiles, ends the round, and sees closed-zone scoring.
-- If a color beats enemy attack, the full closed sum of that color damages the enemy.
-- If a color fails enemy attack, the missing amount damages the player.
-- After 5 victories, player sees final run victory.
-- UI is rendered through Pixi.js inside canvas, not DOM.
-- Numeric balance lives in configs.
-
-## Tasks
-
-- [ ] Define tile-battle config shape.
-- [ ] Implement tile deck, hand, discard, and shuffle.
-- [ ] Implement fixed field placement.
-- [ ] Implement color-edge matching.
-- [ ] Implement closed-zone detection.
-- [ ] Implement color attack resolution and HP.
-- [ ] Implement battle UI and result summary.
-- [ ] Connect victory/defeat to existing run flow.
-- [ ] Verify playable loop with smoke test.
+- Tile assets come from `assets/tiles_v2/tile_manifest.json`.
+- The starting MVP tile set has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blanks.
+- `dot` and base `cap` tiles are not in the MVP deck.
+- A combat color's micro-cells are territory boundaries.
+- A fully enclosed empty or filled interior becomes captured land for that color.
+- Scoring for the first prototype uses `capture area * 2`.
+- The first prototype smooths early hands by selecting the best of 3 candidate draws and discarding the rest.

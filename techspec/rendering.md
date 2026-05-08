@@ -39,12 +39,23 @@ menu -> battle -> result -> upgrades -> next battle -> final
 
 Будущие спрайты, тайлы, частицы и эффекты должны добавляться через Pixi assets/sprites. Не возвращаться к ручному WebGL для игровых визуалов без отдельного архитектурного решения.
 
+Актуальный набор тайлов для боевого MVP лежит в:
+
+```text
+assets/tiles_v2/
+assets/tiles_v2/tile_manifest.json
+```
+
+Боевой код должен читать матрицы и edge signatures из manifest, а не дублировать список тайлов в JS. `assets/tiles/` — архив первого арт-пакета.
+
 ## Конвенция именования ассетов
 
 Все файлы ассетов именуются в нижнем регистре с подчёркиваниями:
 
 ```text
-tile_blue.png
+tile_blue_plus.png
+tile_red_corner_ur.png
+tile_green_tee_l.png
 ball_default.png
 button_start.png
 ```
