@@ -1,5 +1,8 @@
 import fs from 'node:fs';
-import { createStartingDeckIds } from '../src/entities/tileBattle.js';
+import {
+    applyOpeningDrawBag,
+    createStartingDeckIds,
+} from '../src/entities/tileBattle.js';
 
 const COLORS = ['red', 'blue', 'green', 'gray'];
 const DAMAGE_COLORS = ['red', 'blue', 'green'];
@@ -19,7 +22,8 @@ const HAND_SIZE = TILE_SETTINGS.handSize ?? 7;
 const HAND_RUNS = Number(process.env.HAND_RUNS ?? 40);
 const FIGHT_RUNS = Number(process.env.FIGHT_RUNS ?? 40);
 const PLACEMENT_ATTEMPTS = Number(process.env.PLACEMENT_ATTEMPTS ?? 40);
-const OPENING_DRAW_COUNT = Number(process.env.OPENING_DRAW_COUNT ?? 12);
+const DRAW_BAG = TILE_SETTINGS.drawBag ?? {};
+const OPENING_DRAW_COUNT = Number(process.env.OPENING_DRAW_COUNT ?? DRAW_BAG.openingDraws ?? 12);
 const HAND_SAMPLE_COUNT = Number(process.env.HAND_SAMPLE_COUNT ?? 12);
 const GUARANTEED_LOOP_HANDS = TILE_SETTINGS.guaranteedLoopHands === true;
 const HAND_SELECTION_DRAWS = GUARANTEED_LOOP_HANDS
@@ -784,11 +788,26 @@ function drawBestCandidateHand(rng, deck, count, strictEdges, attack = null, str
     return bestCandidate;
 }
 
-function createDrawState(rng, deck) {
-    return {
+function createDrawState(rng, deck, useOpeningBag = false) {
+    const state = {
         drawPile: shuffle(rng, deck),
         discardPile: [],
     };
+
+    if (useOpeningBag) {
+        const tileMap = new Map(deck.map((tileDef) => [tileDef.id, tileDef]));
+        const run = {
+            currentBattle: 1,
+            drawPile: state.drawPile.map((tileDef) => tileDef.id),
+            openingBagBattles: [],
+        };
+
+        applyOpeningDrawBag(run, deck, TILE_SETTINGS);
+        state.drawPile = run.drawPile.map((tileId) => tileMap.get(tileId)).filter(Boolean);
+        state.openingBag = run.lastOpeningBag ?? null;
+    }
+
+    return state;
 }
 
 function drawFromState(rng, state, count) {
@@ -868,11 +887,20 @@ function formatSummary(summary) {
     return `min ${summary.min.toFixed(1)} | p25 ${summary.p25.toFixed(1)} | avg ${summary.avg.toFixed(1)} | p75 ${summary.p75.toFixed(1)} | max ${summary.max.toFixed(1)}`;
 }
 
-function analyzeHands(rng, deck, strictEdges) {
+function analyzeHands(rng, deck, strictEdges, useOpeningBag) {
     const reports = [];
 
     for (let run = 0; run < HAND_RUNS; run += 1) {
-        const candidate = drawBestCandidateHand(rng, deck, HAND_SIZE, strictEdges, null, 'payoff');
+        const drawState = createDrawState(rng, deck, useOpeningBag);
+        const candidate = drawBestCandidateHandFromState(
+            rng,
+            drawState,
+            HAND_SIZE,
+            strictEdges,
+            null,
+            new Map(),
+            'payoff',
+        );
         const hand = candidate.hand;
         const best = candidate.best;
         reports.push({
@@ -895,11 +923,12 @@ function analyzeHands(rng, deck, strictEdges) {
     return reports;
 }
 
-function analyzeStrategyComparison(rng, deck, strictEdges) {
+function analyzeStrategyComparison(rng, deck, strictEdges, useOpeningBag) {
     const reports = [];
 
     for (let run = 0; run < HAND_RUNS; run += 1) {
-        const hand = drawHand(rng, deck, HAND_SIZE);
+        const drawState = createDrawState(rng, deck, useOpeningBag);
+        const hand = drawFromState(rng, drawState, HAND_SIZE);
         const closeASAP = findBestPlacement(rng, hand, null, strictEdges, new Map(), 'closeASAP');
         const payoff = findBestPlacement(rng, hand, null, strictEdges, new Map(), 'payoff');
 
@@ -913,8 +942,8 @@ function analyzeStrategyComparison(rng, deck, strictEdges) {
     return reports;
 }
 
-function simulateFight(rng, deck, battle, strictEdges) {
-    const drawState = createDrawState(rng, deck);
+function simulateFight(rng, deck, battle, strictEdges, useOpeningBag) {
+    const drawState = createDrawState(rng, deck, useOpeningBag);
     let placements = new Map();
     let enemyHp = battle.enemyHp;
     let playerHp = STARTING_PLAYER_HP;
@@ -927,6 +956,9 @@ function simulateFight(rng, deck, battle, strictEdges) {
     let minimalZones = 0;
     let captureAreaTotal = 0;
     let zeroDamageRounds = 0;
+    let currentZeroDamageStreak = 0;
+    let maxZeroDamageStreak = 0;
+    let capturesWithin3Rounds = 0;
 
     while (rounds < MAX_ROUNDS && enemyHp > 0 && playerHp > 0) {
         const attack = battle.attacks[rounds % battle.attacks.length];
@@ -966,6 +998,13 @@ function simulateFight(rng, deck, battle, strictEdges) {
         captureAreaTotal += best.score.zones.reduce((sum, zone) => sum + zone.size, 0);
         if (best.score.totalDamage === 0) {
             zeroDamageRounds += 1;
+            currentZeroDamageStreak += 1;
+            maxZeroDamageStreak = Math.max(maxZeroDamageStreak, currentZeroDamageStreak);
+        } else {
+            currentZeroDamageStreak = 0;
+        }
+        if (rounds < 3) {
+            capturesWithin3Rounds += best.score.zones.length;
         }
         placements = cleanupPlacementsAfterRound(best.placements, best.score);
         drawState.discardPile.push(...hand);
@@ -985,16 +1024,18 @@ function simulateFight(rng, deck, battle, strictEdges) {
         minimalZones,
         captureAreaTotal,
         zeroDamageRounds,
+        maxZeroDamageStreak,
+        capturesWithin3Rounds,
         retainedTiles: placements.size,
     };
 }
 
-function analyzeBattles(rng, deck, strictEdges) {
+function analyzeBattles(rng, deck, strictEdges, useOpeningBag) {
     return THEORETICAL_BATTLES.map((battle) => {
         const fights = [];
 
         for (let run = 0; run < FIGHT_RUNS; run += 1) {
-            fights.push(simulateFight(rng, deck, battle, strictEdges));
+            fights.push(simulateFight(rng, deck, battle, strictEdges, useOpeningBag));
         }
 
         return {
@@ -1109,12 +1150,13 @@ function formatPercent(numerator, denominator) {
     return `${((numerator / denominator) * 100).toFixed(0)}%`;
 }
 
-function printOpeningDrawReport(label, rng, deck) {
-    const drawState = createDrawState(rng, deck);
+function printOpeningDrawReport(label, rng, deck, useOpeningBag) {
+    const drawState = createDrawState(rng, deck, useOpeningBag);
     const draw = drawFromState(rng, drawState, OPENING_DRAW_COUNT);
     const sequence = draw.map((tileDef) => `${tileDef.color}:${tileDef.kind}`).join(' | ');
 
     console.log(`\n=== ${label}: first ${draw.length} draws ===`);
+    console.log(`  opening bag: ${useOpeningBag ? 'on' : 'off'}`);
     console.log(`  sequence: ${sequence}`);
     console.log(`  colors:   ${countBy(draw, (tileDef) => tileDef.color)}`);
     console.log(`  shapes:   ${countBy(draw, shapeGroup)}`);
@@ -1247,6 +1289,7 @@ function printBattleReport(label, reports) {
         const captureAreaTotal = fights.reduce((sum, fight) => sum + fight.captureAreaTotal, 0);
         const zeroDamageRounds = fights.reduce((sum, fight) => sum + fight.zeroDamageRounds, 0);
         const totalRounds = fights.reduce((sum, fight) => sum + fight.rounds, 0);
+        const earlyCaptureFights = fights.filter((fight) => fight.capturesWithin3Rounds > 0).length;
         console.log(
             `  ${report.battle.id} ${report.battle.name.padEnd(15)} `
             + `wins ${report.wins}/${fights.length} (${(winRate * 100).toFixed(0)}%) | `
@@ -1255,6 +1298,8 @@ function printBattleReport(label, reports) {
             + `player dmg ${formatSummary(summarize(fights.map((fight) => fight.totalPlayerDamage)))} | `
             + `captures ${capturedZones}, min ${minimalZones} (${formatPercent(minimalZones, capturedZones)}), avg area ${(captureAreaTotal / Math.max(1, capturedZones)).toFixed(1)} | `
             + `zero ${zeroDamageRounds}/${totalRounds} rounds | `
+            + `zero streak ${formatSummary(summarize(fights.map((fight) => fight.maxZeroDamageStreak)))} | `
+            + `captures in 3r ${earlyCaptureFights}/${fights.length} | `
             + `dead-end ${fights.reduce((sum, fight) => sum + fight.deadEndRounds, 0)}`
             + `/${totalRounds} rounds`
         );
@@ -1277,11 +1322,16 @@ function run() {
     console.log(`Round board cleanup: ${ROUND_BOARD_CLEANUP}, dead-end recovery: ${DEAD_END_RECOVERY}`);
     console.log(`Gray wildcard placement: ${GRAY_WILDCARD_PLACEMENT}`);
     console.log(`Off-color leap: ${OFF_COLOR_LEAP_PLACEMENT}, distance: ${OFF_COLOR_LEAP_DISTANCE}, only blocked: ${OFF_COLOR_LEAP_ONLY_WHEN_BLOCKED}`);
+    console.log(`Opening draw bag: ${DRAW_BAG.enabled ? 'on' : 'off'}, window: ${OPENING_DRAW_COUNT}`);
     printDeck(deck);
     printPayoffScenarioComparison(deck);
 
     const modes = process.argv.includes('--with-loose') ? [true, false] : [true];
     const presets = ['current', 'fewer corners', 'fewer plus', 'fewer both'];
+    const bagModes = [
+        { label: 'current recipe', useOpeningBag: false },
+        { label: 'opening bag', useOpeningBag: DRAW_BAG.enabled === true },
+    ];
 
     for (const strictEdges of modes) {
         const modeLabel = strictEdges
@@ -1291,15 +1341,39 @@ function run() {
         for (const preset of presets) {
             const presetDeck = createDeckPreset(deck, preset);
             const presetSeedOffset = presets.indexOf(preset) * 100000 + (strictEdges ? 0 : 9999);
-            const handReports = analyzeHands(createRng(seed + presetSeedOffset), presetDeck, strictEdges);
-            const strategyReports = analyzeStrategyComparison(createRng(seed + presetSeedOffset + 33333), presetDeck, strictEdges);
-            const battleReports = analyzeBattles(createRng(seed + presetSeedOffset + 66666), presetDeck, strictEdges);
-            const presetLabel = `${modeLabel} / ${preset} deck (${presetDeck.length} tiles)`;
 
-            printOpeningDrawReport(presetLabel, createRng(seed + presetSeedOffset + 11111), presetDeck);
-            printHandReport(`\n=== ${presetLabel}: ${HAND_RUNS} ${GUARANTEED_LOOP_HANDS ? 'smoothed' : 'honest'} hands ===`, handReports);
-            printStrategyComparison(`=== ${presetLabel}: close ASAP vs payoff ===`, strategyReports);
-            printBattleReport(`\n=== ${presetLabel}: theoretical battles, ${FIGHT_RUNS} fights each ===`, battleReports);
+            for (const bagMode of bagModes) {
+                const bagSeedOffset = bagMode.useOpeningBag ? 444444 : 0;
+                const handReports = analyzeHands(
+                    createRng(seed + presetSeedOffset + bagSeedOffset),
+                    presetDeck,
+                    strictEdges,
+                    bagMode.useOpeningBag,
+                );
+                const strategyReports = analyzeStrategyComparison(
+                    createRng(seed + presetSeedOffset + bagSeedOffset + 33333),
+                    presetDeck,
+                    strictEdges,
+                    bagMode.useOpeningBag,
+                );
+                const battleReports = analyzeBattles(
+                    createRng(seed + presetSeedOffset + bagSeedOffset + 66666),
+                    presetDeck,
+                    strictEdges,
+                    bagMode.useOpeningBag,
+                );
+                const presetLabel = `${modeLabel} / ${preset} deck / ${bagMode.label} (${presetDeck.length} tiles)`;
+
+                printOpeningDrawReport(
+                    presetLabel,
+                    createRng(seed + presetSeedOffset + bagSeedOffset + 11111),
+                    presetDeck,
+                    bagMode.useOpeningBag,
+                );
+                printHandReport(`\n=== ${presetLabel}: ${HAND_RUNS} ${GUARANTEED_LOOP_HANDS ? 'smoothed' : 'honest'} hands ===`, handReports);
+                printStrategyComparison(`=== ${presetLabel}: close ASAP vs payoff ===`, strategyReports);
+                printBattleReport(`\n=== ${presetLabel}: theoretical battles, ${FIGHT_RUNS} fights each ===`, battleReports);
+            }
         }
     }
 }

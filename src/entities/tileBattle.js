@@ -310,6 +310,180 @@ function completeLoopFromDraw(run, tileIds, tiles, tileMap, attack) {
     return tileIds;
 }
 
+function getShapeGroup(tileDef) {
+    const patternName = getTilePattern(tileDef);
+
+    if (tileDef?.color === 'gray') {
+        return 'gray';
+    }
+
+    if (patternName?.startsWith('corner_')) {
+        return 'corner';
+    }
+
+    if (patternName === 'plus') {
+        return 'plus';
+    }
+
+    if (patternName?.startsWith('line_')) {
+        return 'line';
+    }
+
+    if (patternName?.startsWith('tee_')) {
+        return 'tee';
+    }
+
+    return patternName ?? 'unknown';
+}
+
+function countOpeningGroups(entries, getGroup) {
+    const counts = {};
+
+    for (const entry of entries) {
+        const group = getGroup(entry);
+        counts[group] = (counts[group] ?? 0) + 1;
+    }
+
+    return counts;
+}
+
+function selectOpeningDrawEntries(drawOrder, tileMap, drawBag) {
+    const openingDraws = Math.max(0, Math.floor(drawBag.openingDraws ?? 0));
+    const targetCount = Math.min(openingDraws, drawOrder.length);
+    const patternCaps = drawBag.patternCaps ?? {};
+    const patternMinimums = drawBag.patternMinimums ?? {};
+    const colorMinimums = drawBag.combatColorMinimums ?? {};
+    const grayMax = Number.isFinite(drawBag.grayMax) ? drawBag.grayMax : Infinity;
+    const entries = drawOrder.map((tileId, index) => ({
+        tileId,
+        index,
+        tileDef: tileMap.get(tileId),
+    }));
+    const selected = [];
+    const selectedIndexes = new Set();
+
+    const canSelect = (entry) => {
+        if (!entry.tileDef || selectedIndexes.has(entry.index)) {
+            return false;
+        }
+
+        const group = getShapeGroup(entry.tileDef);
+        const groupCount = selected.filter((selectedEntry) => (
+            getShapeGroup(selectedEntry.tileDef) === group
+        )).length;
+
+        if (group === 'gray' && groupCount >= grayMax) {
+            return false;
+        }
+
+        if (Number.isFinite(patternCaps[group]) && groupCount >= patternCaps[group]) {
+            return false;
+        }
+
+        return true;
+    };
+
+    const selectFirst = (predicate) => {
+        if (selected.length >= targetCount) {
+            return false;
+        }
+
+        const entry = entries.find((candidate) => predicate(candidate) && canSelect(candidate));
+
+        if (!entry) {
+            return false;
+        }
+
+        selected.push(entry);
+        selectedIndexes.add(entry.index);
+        return true;
+    };
+
+    for (const [group, minimum] of Object.entries(patternMinimums)) {
+        for (let count = 0; count < minimum; count += 1) {
+            selectFirst((entry) => getShapeGroup(entry.tileDef) === group);
+        }
+    }
+
+    for (const [color, minimum] of Object.entries(colorMinimums)) {
+        for (let count = selected.filter((entry) => entry.tileDef?.color === color).length;
+            count < minimum;
+            count += 1) {
+            if (!selectFirst((entry) => entry.tileDef?.color === color)) {
+                break;
+            }
+        }
+    }
+
+    for (const entry of entries) {
+        if (selected.length >= targetCount) {
+            break;
+        }
+
+        if (canSelect(entry)) {
+            selected.push(entry);
+            selectedIndexes.add(entry.index);
+        }
+    }
+
+    for (const entry of entries) {
+        if (selected.length >= targetCount) {
+            break;
+        }
+
+        if (!selectedIndexes.has(entry.index)) {
+            selected.push(entry);
+            selectedIndexes.add(entry.index);
+        }
+    }
+
+    return selected.sort((left, right) => left.index - right.index);
+}
+
+export function applyOpeningDrawBag(run, tiles, settings = {}) {
+    const drawBag = settings.drawBag;
+
+    if (!drawBag?.enabled || run.drawPile.length === 0) {
+        return null;
+    }
+
+    const battleKey = String(run.currentBattle ?? 1);
+    run.openingBagBattles ??= [];
+
+    if (run.openingBagBattles.includes(battleKey)) {
+        return null;
+    }
+
+    const tileMap = createTileMap(tiles);
+    const drawOrder = [...run.drawPile].reverse();
+    const selected = selectOpeningDrawEntries(drawOrder, tileMap, drawBag);
+
+    if (selected.length === 0) {
+        return null;
+    }
+
+    const selectedIndexes = new Set(selected.map((entry) => entry.index));
+    const rest = drawOrder
+        .map((tileId, index) => ({ tileId, index }))
+        .filter((entry) => !selectedIndexes.has(entry.index));
+    const openingDrawIds = selected.map((entry) => entry.tileId);
+    const nextDrawOrder = [
+        ...openingDrawIds,
+        ...rest.map((entry) => entry.tileId),
+    ];
+
+    run.drawPile = [...nextDrawOrder].reverse();
+    run.openingBagBattles.push(battleKey);
+    run.lastOpeningBag = {
+        battle: run.currentBattle ?? 1,
+        openingDraws: openingDrawIds.length,
+        colors: countOpeningGroups(selected, (entry) => entry.tileDef?.color ?? 'unknown'),
+        shapes: countOpeningGroups(selected, (entry) => getShapeGroup(entry.tileDef)),
+    };
+
+    return run.lastOpeningBag;
+}
+
 function hasAnyValidPlacement(board, hand, settings) {
     return hand.some((tileDef) => {
         if (!tileDef) {
@@ -699,6 +873,7 @@ export function createStartingDeckIds(tiles, settings = {}) {
 
 export function createTileBattleState({ battle, run, settings, tiles }) {
     const round = 1;
+    applyOpeningDrawBag(run, tiles, settings);
     const hand = drawRoundHand({
         run,
         tiles,

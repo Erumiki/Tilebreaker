@@ -23,6 +23,24 @@
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
         "handSelectionDraws": 3,
         "guaranteedLoopHands": false,
+        "drawBag": {
+            "enabled": true,
+            "openingDraws": 12,
+            "patternCaps": {
+                "corner": 3,
+                "plus": 1
+            },
+            "patternMinimums": {
+                "line": 3,
+                "tee": 4
+            },
+            "combatColorMinimums": {
+                "red": 2,
+                "blue": 2,
+                "green": 2
+            },
+            "grayMax": 2
+        },
         "startingDeckRecipe": [
             { "pattern": "line_h", "colors": ["red", "blue", "green"], "count": 1 },
             { "pattern": "line_v", "colors": ["red", "blue", "green"], "count": 1 },
