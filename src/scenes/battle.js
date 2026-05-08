@@ -23,6 +23,20 @@ const COLOR_LABELS = {
     green: 'Зеленый',
 };
 
+function getCaptureAreaByColor(result) {
+    const areaByColor = Object.fromEntries(COMBAT_COLORS.map((color) => [color, 0]));
+
+    if (!result) {
+        return areaByColor;
+    }
+
+    for (const zone of result.score.zones) {
+        areaByColor[zone.color] += zone.area;
+    }
+
+    return areaByColor;
+}
+
 function insetRect(rect, amount) {
     return {
         x: rect.x + amount,
@@ -74,7 +88,7 @@ function getLayout(screen, settings) {
             x: sideX,
             y: boardY,
             width: sideWidth,
-            height: Math.min(390, boardSize),
+            height: boardSize,
         },
     };
 }
@@ -129,22 +143,33 @@ function drawAttackRow(ui, rect, color, attack, result) {
         size: 16,
         color: '#ecf6ff',
     });
-    ui.drawText(`Атака ${attack[color] ?? 0}`, rect.x + rect.width - 92, rect.y + 9, {
+    ui.drawText(`Атака ${attack[color] ?? 0}`, rect.x + rect.width - 94, rect.y + 9, {
         size: 15,
         color: '#afc4d7',
     });
 
     if (!result) {
+        ui.drawText('Ждет твоего захвата', rect.x + 18, rect.y + 34, {
+            size: 14,
+            color: '#7f9aad',
+        });
         return;
     }
 
     const colorResult = result.byColor[color];
-    const label = colorResult.enemyDamage > 0
-        ? `Захват ${colorResult.closedDamage} -> враг`
-        : `Захват ${colorResult.closedDamage}, недобор ${colorResult.playerDamage}`;
-    ui.drawText(label, rect.x + 18, rect.y + 34, {
+    const areaByColor = getCaptureAreaByColor(result);
+    const outcomeLabel = colorResult.enemyDamage > 0
+        ? `Урон врагу +${colorResult.enemyDamage}`
+        : `Урон игроку +${colorResult.playerDamage}`;
+    const outcomeColor = colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
+
+    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${colorResult.closedDamage}`, rect.x + 18, rect.y + 31, {
         size: 14,
-        color: colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7',
+        color: '#d8e7f2',
+    });
+    ui.drawText(outcomeLabel, rect.x + 18, rect.y + 52, {
+        size: 14,
+        color: outcomeColor,
     });
 }
 
@@ -207,6 +232,9 @@ function drawHand(ui, layout, state, mouse) {
 function drawSidePanel(ui, layout, battle, state) {
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round);
+    const totalCaptureArea = state.lastResult
+        ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
+        : 0;
 
     ui.drawRect(panel, '#0f1d2b', 0.94);
     drawBorder(ui, panel, '#28445c', 2, 0.9);
@@ -227,20 +255,29 @@ function drawSidePanel(ui, layout, battle, state) {
         color: '#ffd4d8',
     });
 
+    ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 148, {
+        size: 16,
+        color: '#8fb1cb',
+    });
+
     COMBAT_COLORS.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
-            y: panel.y + 164 + index * 66,
+            y: panel.y + 174 + index * 72,
             width: panel.width - 32,
-            height: 56,
+            height: 64,
         }, color, attack, state.lastResult);
     });
 
     if (state.lastResult) {
         const zones = state.lastResult.score.zones.length;
-        ui.drawText(`Замкнуто зон: ${zones}`, panel.x + 18, panel.y + 364, {
+        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}`, panel.x + 18, panel.y + 396, {
             size: 16,
             color: '#d8e7f2',
+        });
+        ui.drawText(`Врагу -${state.lastResult.enemyDamage}  |  Игроку -${state.lastResult.playerDamage}`, panel.x + 18, panel.y + 420, {
+            size: 16,
+            color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
     }
 }
@@ -441,6 +478,8 @@ export function createBattleScene({
                     enemyDamage: state.lastResult.enemyDamage,
                     playerDamage: state.lastResult.playerDamage,
                     zones: state.lastResult.score.zones.length,
+                    areaByColor: getCaptureAreaByColor(state.lastResult),
+                    byColor: state.lastResult.byColor,
                     damageByColor: state.lastResult.score.damageByColor,
                 } : null,
                 layout: this.layout,

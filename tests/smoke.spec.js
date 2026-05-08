@@ -78,6 +78,19 @@ async function playClosureRound(page) {
   expect(debug.lastResult.zones).toBeGreaterThan(0);
   expect(debug.lastResult.enemyDamage).toBeGreaterThan(0);
   expect(debug.enemyHp).toBeLessThan(enemyHpBefore);
+  for (const color of ['red', 'blue', 'green']) {
+    expect(debug.lastResult.byColor[color]).toEqual(expect.objectContaining({
+      threat: expect.any(Number),
+      closedDamage: expect.any(Number),
+      enemyDamage: expect.any(Number),
+      playerDamage: expect.any(Number),
+    }));
+    expect(debug.lastResult.areaByColor[color]).toEqual(expect.any(Number));
+  }
+  const capturedArea = ['red', 'blue', 'green'].reduce((sum, color) => (
+    sum + debug.lastResult.areaByColor[color]
+  ), 0);
+  expect(capturedArea).toBeGreaterThan(0);
 
   await clickRect(page, debug.layout.endRoundButton);
   await expect.poll(() => page.evaluate(() => {

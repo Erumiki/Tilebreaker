@@ -18,3 +18,4 @@
 - A fully enclosed empty or filled interior becomes captured land for that color.
 - Scoring for the first prototype uses configured `damageFormula.type = areaMultiplier` with `areaMultiplier = 2`.
 - The first prototype smooths early hands by selecting the best of 3 candidate draws and discarding the rest.
+- Combat UI shows player HP, enemy HP, round number, enemy attacks, board, hand, and per-color round results: enemy attack, captured area, capture sum, enemy damage or player damage.
