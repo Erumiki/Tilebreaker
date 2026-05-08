@@ -272,3 +272,42 @@ test('player can choose the first experiment from the temporary variant picker',
   expect(battleDebug.drawMode).toBe('queue');
   await expect(placeCurrentQueueTile(page)).resolves.toBe(true);
 });
+
+test('one-color chain variant is playable through the first two battles', async ({ page }) => {
+  await page.goto('/?seed=20260508&variant=b');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('one_color_chain');
+  await clickRect(page, menuDebug.layout.startButton);
+  await expectScene(page, 'battle');
+
+  let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+  let battleDebug = await getBattleDebug(page);
+  expect(run.gameplayVariant).toBe('one_color_chain');
+  expect(run.activeCombatColors).toEqual(['red']);
+  expect(battleDebug.gameplayVariantLabel).toBe('B');
+  expect(battleDebug.chainMeter).toEqual(expect.any(Number));
+
+  for (let battle = 1; battle <= 2; battle += 1) {
+    await playUntilBattleResult(page);
+    await expectScene(page, 'result');
+
+    run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+    expect(run.completedBattles).toBe(battle);
+
+    await clickCanvas(page, 0.5, 0.73);
+
+    if (battle < 2) {
+      await expectScene(page, 'upgrades');
+      const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
+      await clickRect(page, upgradeDebug.layout.choices[2]);
+      await expectScene(page, 'battle');
+
+      battleDebug = await getBattleDebug(page);
+      expect(battleDebug.gameplayVariant).toBe('one_color_chain');
+    }
+  }
+});

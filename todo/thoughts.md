@@ -11,6 +11,8 @@
 
 ## Inbox
 
+- [2026-05-09] Tooling: `scripts/simulate-tiles.js` умеет печатать active `GAMEPLAY_VARIANT=one_color_chain`, но не моделирует Chain-накопление и Chain-бонус. Для оценки Variant B пока использовать real playable/debug и smoke; при сравнении вариантов доработать симулятор: считать connected region continuity, `chainSpent/chainBonus` и single-lane threat рядом с обычными capture-метриками.
+
 - [2026-05-09] Tooling: `scripts/simulate-tiles.js` печатает active `GAMEPLAY_VARIANT=placement_payoff`, но текущая теоретическая battle-модель не применяет Focus. Для баланса Variant A пока использовать real playable/debug или доработать симулятор: считать Focus gain по placement sequence, cap, conversion on closure и выводить `focus spent/bonus` рядом с damage.
 
 - [2026-05-09] Playtest: игра все еще наказывает за попытки делать землю больше 4 клеток. Текущие recipe/bag/queue и бонусы за крупную зону не дают игроку достаточно понятной причины растить участок вместо быстрого малого закрытия. Сырые направления:

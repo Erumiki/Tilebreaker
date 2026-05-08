@@ -137,6 +137,71 @@ test('placement payoff focus charges setup and boosts the next capture', () => {
     assert.equal(state.placementFocus, 0);
 });
 
+test('one color chain treats combat colors as one land and pays chain bonus', () => {
+    const chainSettings = {
+        ...settings,
+        gameplayVariant: 'one_color_chain',
+        activeCombatColors: ['red', 'blue'],
+        oneColorChain: {
+            maxChain: 5,
+            bonusPerChain: 4,
+        },
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+    };
+    const chainTiles = createTilesFromManifest(manifest, chainSettings);
+    const chainTile = (id) => chainTiles.find((tileDef) => tileDef.id === id);
+    const state = {
+        round: 1,
+        playerHp: 30,
+        enemyHp: 80,
+        board: emptyBoard(),
+        hand: [chainTile('tile_red_line_h')],
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+        chainMeter: 0,
+        chainRegionKeys: [],
+    };
+
+    assert.equal(placeTile(state, chainSettings, 1, 1), true);
+    assert.equal(state.chainMeter, 1);
+
+    state.hand = [chainTile('tile_blue_line_h')];
+    state.selectedHandIndex = 0;
+
+    assert.equal(placeTile(state, chainSettings, 2, 1), true);
+    assert.equal(state.chainMeter, 2);
+    assert.equal(state.lastChainDelta, 1);
+
+    state.chainMeter = 4;
+    state.board = emptyBoard();
+    state.board[2][2] = chainTile('tile_blue_corner_rd');
+    state.board[2][3] = chainTile('tile_red_corner_dl');
+    state.board[3][2] = chainTile('tile_red_corner_ur');
+    state.board[3][3] = chainTile('tile_blue_corner_lu');
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 1, blue: 2, green: 5 }],
+    }, chainSettings);
+
+    assert.equal(state.lastResult.attack.red, 3);
+    assert.equal(state.lastResult.attack.blue, 0);
+    assert.equal(state.lastResult.chainSpent, 4);
+    assert.equal(state.lastResult.chainBonus, 12);
+    assert.equal(state.lastResult.score.zones[0].color, 'red');
+    assert.equal(state.lastResult.score.zones[0].chainBonus, 12);
+    assert.equal(state.lastResult.byColor.blue.playerDamage, 0);
+    assert.equal(state.chainMeter, 1);
+});
+
 test('opening draw bag caps early closers and keeps continuations', () => {
     const deckIds = createStartingDeckIds(tiles, {
         startingDeckRecipe: [

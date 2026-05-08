@@ -42,7 +42,7 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `legacy` |  |  |  |  |  |  |  |
 | `placement_payoff` | 4 | 4 | 3 | 4 | 4 | 4 | Seed `20260508`: Focus набрался до cap за setup-раунды и дал +12 к первому closure; это заметно, но не ломает closure. |
-| `one_color_chain` |  |  |  |  |  |  |  |
+| `one_color_chain` |  |  |  |  |  |  | Реализован MVP: один land-color, `Chain xN`, single-lane threat; smoke seed `20260508` проходит первые 2 боя. Нужен ручной scorecard. |
 | `connect_targets` |  |  |  |  |  |  |  |
 | `road_mode` |  |  |  |  |  |  |  |
 
@@ -64,6 +64,24 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 - вывод: `bonusPerFocus = 3` оставлен без изменения, потому что max Focus дает половину минимального closure damage и не заменяет сам closure;
 - риск для следующей проверки: если ручной игрок начнет фармить Focus "лапшой" без желания закрывать землю, первым коротким tuning будет `bonusPerFocus: 2`.
 
+## Variant B: One-Color Chain
+
+`one_color_chain` проверяет гипотезу: убрать цветовое само-наказание и оставить интерес в форме, связности и росте одного участка.
+
+- все combat-тайлы в этом варианте считаются одной землей для edge-match и capture-fill;
+- оригинальные tile id/color сохраняются для deck recipe, draw bag и наград, но scoring идет в одну land-линию;
+- атаки активных цветов складываются в `red` threat, а `blue/green` threat становятся 0, чтобы игрок не получал unavoidable damage за выключенные цвета;
+- Chain растет, когда новый combat-тайл продолжает тот же connected region;
+- Chain имеет cap из `configs/game.json` (`oneColorChain.maxChain`);
+- при capture следующий захват получает flat bonus `(Chain - 1) * oneColorChain.bonusPerChain`, затем Chain возвращается к базовому состоянию;
+- UI показывает `Chain current/max`, `Chain xN` после роста и включает chain bonus в итоговый bonus.
+
+Авто-проверка `2026-05-09`, seed `20260508`, real playable/debug:
+
+- unit-тест проверяет смешанную красно-синюю землю как один land-color, рост chain и chain bonus на захвате;
+- smoke-тест проходит первые две битвы через `?variant=b`;
+- вывод: MVP технически playable, но ручной scorecard еще нужен, потому что smoke подтверждает проходимость, а не ощущение "хочется растить 5+ клеток".
+
 ## Симуляционные Метрики
 
 Для каждого варианта записывать рядом с ручными наблюдениями:
@@ -79,4 +97,4 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 
 ## Текущий Статус
 
-Каркас переключения и протокол сравнения готовы. `placement_payoff` реализован как Focus-эксперимент без прямого урона за placement. `one_color_chain`, `connect_targets` и `road_mode` пока используют legacy-правила, пока их отдельные задачи не добавят механику.
+Каркас переключения и протокол сравнения готовы. `placement_payoff` реализован как Focus-эксперимент без прямого урона за placement. `one_color_chain` реализован как one-land-color + Chain MVP. `connect_targets` и `road_mode` пока используют legacy-правила, пока их отдельные задачи не добавят механику.

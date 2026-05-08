@@ -28,6 +28,10 @@
             "maxFocus": 4,
             "bonusPerFocus": 3
         },
+        "oneColorChain": {
+            "maxChain": 5,
+            "bonusPerChain": 4
+        },
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
         "handSelectionDraws": 3,
         "guaranteedLoopHands": false,

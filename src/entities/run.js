@@ -9,6 +9,10 @@ const COMBAT_COLORS = ['red', 'blue', 'green'];
 const LOOP_PATTERNS = ['corner_rd', 'corner_dl', 'corner_ur', 'corner_lu'];
 
 function getActiveCombatColors(settings = {}) {
+    if (getGameplayVariant(settings).id === 'one_color_chain') {
+        return ['red'];
+    }
+
     const colors = Array.isArray(settings.activeCombatColors)
         ? settings.activeCombatColors.filter((color) => COMBAT_COLORS.includes(color))
         : [];

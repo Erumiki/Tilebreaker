@@ -19,6 +19,7 @@ const COLOR_HEX = {
     blue: '#4f8cff',
     green: '#55c978',
     gray: '#7d8790',
+    land: '#d6b95f',
 };
 
 const COLOR_LABELS = {
@@ -53,7 +54,10 @@ function getCaptureBonusByColor(result) {
     }
 
     for (const zone of result.score.zones) {
-        bonusByColor[zone.color] += (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0) + (zone.focusBonus ?? 0);
+        bonusByColor[zone.color] += (zone.areaBonus ?? 0)
+            + (zone.grayBonus ?? 0)
+            + (zone.focusBonus ?? 0)
+            + (zone.chainBonus ?? 0);
     }
 
     return bonusByColor;
@@ -63,8 +67,30 @@ function isPlacementPayoffVariant(settings) {
     return getGameplayVariant(settings).id === 'placement_payoff';
 }
 
+function isOneColorChainVariant(settings) {
+    return getGameplayVariant(settings).id === 'one_color_chain';
+}
+
 function getPlacementFocusMax(settings) {
     return settings.placementPayoff?.maxFocus ?? 4;
+}
+
+function getOneColorChainMax(settings) {
+    return settings.oneColorChain?.maxChain ?? 5;
+}
+
+function getColorHex(color, settings) {
+    return isOneColorChainVariant(settings) && color !== 'gray'
+        ? COLOR_HEX.land
+        : COLOR_HEX[color];
+}
+
+function getColorLabel(color, settings) {
+    if (isOneColorChainVariant(settings) && color === 'red') {
+        return 'Земля';
+    }
+
+    return COLOR_LABELS[color];
 }
 
 function formatDamage(value) {
@@ -172,7 +198,9 @@ function drawTile(ui, tileDef, rect, options = {}) {
     for (let y = 0; y < 3; y += 1) {
         for (let x = 0; x < 3; x += 1) {
             const symbol = tileDef.cells[y][x];
-            const color = symbol === 'R'
+            const color = options.oneColorLand && symbol !== '.'
+                ? COLOR_HEX.land
+                : symbol === 'R'
                 ? COLOR_HEX.red
                 : symbol === 'B'
                     ? COLOR_HEX.blue
@@ -189,10 +217,10 @@ function drawTile(ui, tileDef, rect, options = {}) {
     }
 }
 
-function drawAttackRow(ui, rect, color, attack, result) {
+function drawAttackRow(ui, rect, color, attack, result, settings) {
     ui.drawRect(rect, '#132334', 0.96);
-    ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, COLOR_HEX[color], 1);
-    ui.drawText(COLOR_LABELS[color], rect.x + 18, rect.y + 9, {
+    ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, getColorHex(color, settings), 1);
+    ui.drawText(getColorLabel(color, settings), rect.x + 18, rect.y + 9, {
         size: 16,
         color: '#ecf6ff',
     });
@@ -251,7 +279,9 @@ function drawBoard(ui, layout, settings, state, mouse) {
 
             ui.drawRect(rect, fill, 1);
             drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
-            drawTile(ui, state.board[y][x], insetRect(rect, 5));
+            drawTile(ui, state.board[y][x], insetRect(rect, 5), {
+                oneColorLand: isOneColorChainVariant(settings),
+            });
         }
     }
 
@@ -267,7 +297,7 @@ function drawBoard(ui, layout, settings, state, mouse) {
                 y: layout.board.y + cell.y * microSize,
                 width: microSize,
                 height: microSize,
-            }, COLOR_HEX[zone.color], 0.42);
+            }, getColorHex(zone.color, settings), 0.42);
         }
     }
 }
@@ -285,7 +315,9 @@ function drawHand(ui, layout, settings, state, mouse) {
 
         ui.drawRect(rect, hovered && (!isQueue || index === 0) ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
-        drawTile(ui, tileDef, insetRect(rect, 8));
+        drawTile(ui, tileDef, insetRect(rect, 8), {
+            oneColorLand: isOneColorChainVariant(settings),
+        });
 
         if (label) {
             ui.drawText(label, rect.x, rect.y - 24, {
@@ -298,7 +330,7 @@ function drawHand(ui, layout, settings, state, mouse) {
 
 function drawSidePanel(ui, layout, battle, run, settings, state) {
     const panel = layout.sidePanel;
-    const attack = getRoundAttack(battle, state.round);
+    const attack = getRoundAttack(battle, state.round, settings);
     const deck = getRunDeckStats(run);
     const variant = getGameplayVariant(settings);
     const totalCaptureArea = state.lastResult
@@ -339,6 +371,12 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             color: '#f3d991',
         });
     }
+    if (isOneColorChainVariant(settings)) {
+        ui.drawText(`Chain x${state.chainMeter ?? 0}/${getOneColorChainMax(settings)}`, panel.x + panel.width - 118, panel.y + 144, {
+            size: 15,
+            color: '#f3d991',
+        });
+    }
 
     ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
@@ -351,13 +389,16 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             y: panel.y + 190 + index * 68,
             width: panel.width - 32,
             height: 62,
-        }, color, attack, state.lastResult);
+        }, color, attack, state.lastResult, settings);
     });
 
     if (state.lastResult) {
         const zones = state.lastResult.score.zones.length;
         const totalBonus = state.lastResult.score.zones.reduce((sum, zone) => (
-            sum + (zone.areaBonus ?? 0) + (zone.grayBonus ?? 0) + (zone.focusBonus ?? 0)
+            sum + (zone.areaBonus ?? 0)
+                + (zone.grayBonus ?? 0)
+                + (zone.focusBonus ?? 0)
+                + (zone.chainBonus ?? 0)
         ), 0);
         ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`, panel.x + 18, panel.y + 400, {
             size: 15,
@@ -390,6 +431,16 @@ function getPlacedFeedback(state, settings) {
 
         if ((state.lastPlacementClosedZones ?? 0) > 0 && (state.placementFocus ?? 0) > 0) {
             return `Захват готов: Focus ${state.placementFocus} усилит итог раунда`;
+        }
+    }
+
+    if (isOneColorChainVariant(settings)) {
+        if ((state.lastChainDelta ?? 0) > 0) {
+            return `Chain x${state.chainMeter} (+${state.lastChainDelta})`;
+        }
+
+        if ((state.lastPlacementClosedZones ?? 0) > 0 && (state.chainMeter ?? 0) > 1) {
+            return `Захват готов: Chain x${state.chainMeter} усилит удар`;
         }
     }
 
@@ -461,7 +512,7 @@ function getValidCells(state, settings, run, battle) {
 
     const tileDef = state.hand[state.selectedHandIndex];
     const previewTile = isQueueDrawMode(settings) ? state.hand[1] : null;
-    const attack = getRoundAttack(battle, state.round);
+    const attack = getRoundAttack(battle, state.round, settings);
     const cells = [];
 
     for (let y = 0; y < settings.boardSize; y += 1) {
@@ -488,7 +539,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}`
         : '-';
 
     return [
@@ -504,6 +555,8 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.queueReserve?.map((tileDef) => tileDef?.id ?? '-').join(',') ?? '-',
         state.placementFocus ?? 0,
         state.lastPlacementFocusDelta ?? 0,
+        state.chainMeter ?? 0,
+        state.lastChainDelta ?? 0,
         getGameplayVariant(settings).id,
         boardKey,
         handKey,
@@ -549,7 +602,7 @@ export function createBattleScene({
                 && state.hand[handIndex]
                 && (!isQueueDrawMode(settings) || handIndex === 0)) {
                 state.selectedHandIndex = handIndex;
-                state.feedback = `Выбран ${COLOR_LABELS[state.hand[handIndex].color] ?? 'Серый'} ${state.hand[handIndex].pattern}`;
+                state.feedback = `Выбран ${getColorLabel(state.hand[handIndex].color, settings) ?? 'Серый'} ${state.hand[handIndex].pattern}`;
                 return;
             }
 
@@ -688,14 +741,21 @@ export function createBattleScene({
                         grayBonus: zone.grayBonus,
                         grayInteriorCells: zone.grayInteriorCells,
                         focusBonus: zone.focusBonus ?? 0,
+                        chainBonus: zone.chainBonus ?? 0,
                     })),
                     placementFocusSpent: state.lastResult.placementFocusSpent,
                     placementFocusBonus: state.lastResult.placementFocusBonus,
                     placementFocusRemaining: state.lastResult.placementFocusRemaining,
+                    chainSpent: state.lastResult.chainSpent,
+                    chainBonus: state.lastResult.chainBonus,
+                    chainRemaining: state.lastResult.chainRemaining,
                 } : null,
                 placementFocus: state.placementFocus ?? 0,
                 lastPlacementFocusDelta: state.lastPlacementFocusDelta ?? 0,
                 lastPlacementClosedZones: state.lastPlacementClosedZones ?? 0,
+                chainMeter: state.chainMeter ?? 0,
+                lastChainDelta: state.lastChainDelta ?? 0,
+                chainRegionKeys: [...state.chainRegionKeys ?? []],
                 deck: getRunDeckStats(run),
                 colorMultipliers: { ...run.colorMultipliers },
                 layout: this.layout,

@@ -25,6 +25,24 @@ function colorSymbol(color) {
     return COLOR_SYMBOLS[color] ?? '.';
 }
 
+function isCombatSymbol(symbol) {
+    return Object.values(COLOR_SYMBOLS)
+        .filter((value) => value !== COLOR_SYMBOLS.gray)
+        .includes(symbol);
+}
+
+function isOneColorChainVariant(settings = {}) {
+    return settings.gameplayVariant === 'one_color_chain';
+}
+
+function normalizeRuleSymbol(symbol, settings = {}) {
+    if (isOneColorChainVariant(settings) && isCombatSymbol(symbol)) {
+        return COLOR_SYMBOLS.red;
+    }
+
+    return symbol;
+}
+
 function symbolToColor(symbol) {
     const match = Object.entries(COLOR_SYMBOLS)
         .find(([, value]) => value === symbol);
@@ -46,6 +64,13 @@ function edge(tileDef, direction) {
     }
 
     return `${tileDef.cells[0][2]}${tileDef.cells[1][2]}${tileDef.cells[2][2]}`;
+}
+
+function ruleEdge(tileDef, direction, settings) {
+    return edge(tileDef, direction)
+        .split('')
+        .map((symbol) => normalizeRuleSymbol(symbol, settings))
+        .join('');
 }
 
 function boardKey(x, y) {
@@ -91,7 +116,7 @@ function edgesMatch(tileDef, neighbor, direction, settings) {
         return isBlankEdge(tileDef, direction.name);
     }
 
-    return edge(tileDef, direction.name) === edge(neighbor, direction.opposite);
+    return ruleEdge(tileDef, direction.name, settings) === ruleEdge(neighbor, direction.opposite, settings);
 }
 
 function canPlaceAdjacentTile(board, tileDef, x, y, settings) {
@@ -516,7 +541,7 @@ function drawTileDefs(run, tiles, count) {
 }
 
 function drawRoundHand({ run, tiles, battle, settings, round, board = null }) {
-    const attack = getRoundAttack(battle, round);
+    const attack = getRoundAttack(battle, round, settings);
     const tileMap = createTileMap(tiles);
     const shouldGuaranteeLoop = settings.guaranteedLoopHands === true;
     const candidateCount = shouldGuaranteeLoop ? settings.handSelectionDraws ?? 3 : 1;
@@ -589,12 +614,12 @@ function drawRoundTiles({ run, tiles, battle, settings, round, board = null }) {
     });
 }
 
-function buildMicroGrid(board, boardSize) {
-    const size = boardSize * 3;
+function buildMicroGrid(board, settings) {
+    const size = settings.boardSize * 3;
     const cells = Array.from({ length: size }, () => Array(size).fill(null));
 
-    for (let tileY = 0; tileY < boardSize; tileY += 1) {
-        for (let tileX = 0; tileX < boardSize; tileX += 1) {
+    for (let tileY = 0; tileY < settings.boardSize; tileY += 1) {
+        for (let tileX = 0; tileX < settings.boardSize; tileX += 1) {
             const tileDef = board[tileY][tileX];
 
             if (!tileDef) {
@@ -603,7 +628,7 @@ function buildMicroGrid(board, boardSize) {
 
             for (let y = 0; y < 3; y += 1) {
                 for (let x = 0; x < 3; x += 1) {
-                    cells[tileY * 3 + y][tileX * 3 + x] = tileDef.cells[y][x];
+                    cells[tileY * 3 + y][tileX * 3 + x] = normalizeRuleSymbol(tileDef.cells[y][x], settings);
                 }
             }
         }
@@ -714,10 +739,11 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
 }
 
 function findCapturedAreas(board, settings) {
-    const grid = buildMicroGrid(board, settings.boardSize);
+    const grid = buildMicroGrid(board, settings);
     const zones = [];
+    const scoringColors = isOneColorChainVariant(settings) ? ['red'] : COMBAT_COLORS;
 
-    for (const color of COMBAT_COLORS) {
+    for (const color of scoringColors) {
         const colorSymbolValue = colorSymbol(color);
         const reachable = floodOutsideForColor(grid, colorSymbolValue);
         const visited = new Uint8Array(grid.length * grid.length);
@@ -827,12 +853,90 @@ function isPlacementPayoffVariant(settings) {
     return settings.gameplayVariant === 'placement_payoff';
 }
 
+function getOneColorChainRules(settings) {
+    return {
+        maxChain: settings.oneColorChain?.maxChain ?? 5,
+        bonusPerChain: settings.oneColorChain?.bonusPerChain ?? 4,
+    };
+}
+
 function getPlacementPayoffRules(settings) {
     return {
         focusPerUsefulPlacement: settings.placementPayoff?.focusPerUsefulPlacement ?? 1,
         maxFocus: settings.placementPayoff?.maxFocus ?? 4,
         bonusPerFocus: settings.placementPayoff?.bonusPerFocus ?? 3,
     };
+}
+
+function getConnectedCombatTileKeys(board, startX, startY, settings) {
+    const startTile = board[startY]?.[startX];
+
+    if (!isCombatTile(startTile)) {
+        return [];
+    }
+
+    const queue = [{ x: startX, y: startY }];
+    const visited = new Set([boardKey(startX, startY)]);
+    let cursor = 0;
+
+    while (cursor < queue.length) {
+        const cell = queue[cursor];
+        cursor += 1;
+        const tileDef = board[cell.y][cell.x];
+
+        for (const direction of DIRECTIONS) {
+            const nextX = cell.x + direction.dx;
+            const nextY = cell.y + direction.dy;
+
+            if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+                continue;
+            }
+
+            const neighbor = board[nextY][nextX];
+            const key = boardKey(nextX, nextY);
+
+            if (!isCombatTile(neighbor) || visited.has(key)) {
+                continue;
+            }
+
+            if (!edgesMatch(tileDef, neighbor, direction, settings)) {
+                continue;
+            }
+
+            visited.add(key);
+            queue.push({ x: nextX, y: nextY });
+        }
+    }
+
+    return [...visited];
+}
+
+function updateOneColorChainForPlacement(state, settings, x, y) {
+    if (!isOneColorChainVariant(settings)) {
+        return;
+    }
+
+    const rules = getOneColorChainRules(settings);
+    const componentKeys = getConnectedCombatTileKeys(state.board, x, y, settings);
+    const activeRegionKeys = new Set(state.chainRegionKeys ?? []);
+    const continuesActiveRegion = componentKeys.some((key) => activeRegionKeys.has(key));
+    state.lastChainDelta = 0;
+
+    if (componentKeys.length === 0) {
+        state.chainMeter = 0;
+        state.chainRegionKeys = [];
+        return;
+    }
+
+    if (continuesActiveRegion) {
+        const before = Math.max(1, state.chainMeter ?? 1);
+        state.chainMeter = Math.min(rules.maxChain, before + 1);
+        state.lastChainDelta = state.chainMeter - before;
+    } else {
+        state.chainMeter = 1;
+    }
+
+    state.chainRegionKeys = componentKeys;
 }
 
 function addPlacementFocus(state, settings, amount) {
@@ -877,11 +981,47 @@ function applyPlacementFocusToScore(state, score, settings) {
     };
 }
 
+function applyOneColorChainToScore(state, score, settings) {
+    if (!isOneColorChainVariant(settings) || score.zones.length === 0) {
+        return {
+            chainSpent: 0,
+            chainBonus: 0,
+        };
+    }
+
+    const rules = getOneColorChainRules(settings);
+    const chainSpent = Math.min(state.chainMeter ?? 0, rules.maxChain);
+    const chainSteps = Math.max(0, chainSpent - 1);
+    const chainBonus = chainSteps * rules.bonusPerChain;
+
+    if (chainBonus > 0) {
+        const targetZone = score.zones.reduce((best, zone) => (
+            zone.area > best.area ? zone : best
+        ), score.zones[0]);
+
+        targetZone.chainBonus = (targetZone.chainBonus ?? 0) + chainBonus;
+        targetZone.damage += chainBonus;
+        score.damageByColor[targetZone.color] += chainBonus;
+        score.totalDamage += chainBonus;
+    }
+
+    state.chainMeter = 1;
+    state.chainRegionKeys = [];
+
+    return {
+        chainSpent,
+        chainBonus,
+    };
+}
+
 export function createTilesFromManifest(manifest, settings = {}) {
     const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
+    const oneColorLand = isOneColorChainVariant(settings);
 
     return manifest.tiles.slice(0, deckSize).map((entry) => {
-        const symbol = colorSymbol(entry.color);
+        const symbol = oneColorLand && COMBAT_COLORS.includes(entry.color)
+            ? colorSymbol('red')
+            : colorSymbol(entry.color);
         const rows = entry.matrix.map((row) => row.replaceAll('X', symbol));
 
         return {
@@ -993,12 +1133,30 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         placementFocus: 0,
         lastPlacementFocusDelta: 0,
         lastPlacementClosedZones: 0,
+        chainMeter: isOneColorChainVariant(settings) ? 0 : null,
+        lastChainDelta: 0,
+        chainRegionKeys: [],
     };
 }
 
-export function getRoundAttack(battle, round) {
+export function getRoundAttack(battle, round, settings = {}) {
     const attacks = battle.attacks ?? [{ red: 1, blue: 1, green: 1 }];
-    return attacks[(round - 1) % attacks.length];
+    const attack = attacks[(round - 1) % attacks.length];
+
+    if (!isOneColorChainVariant(settings)) {
+        return attack;
+    }
+
+    const colors = Array.isArray(settings.activeCombatColors)
+        ? settings.activeCombatColors
+        : COMBAT_COLORS;
+    const totalThreat = colors.reduce((sum, color) => sum + (attack[color] ?? 0), 0);
+
+    return {
+        red: totalThreat,
+        blue: 0,
+        green: 0,
+    };
 }
 
 export function canPlaceTile(board, tileDef, x, y, settings) {
@@ -1034,6 +1192,7 @@ export function placeTile(state, settings, x, y) {
     const postPlacementScore = scoreTileBoard(state.board, settings);
     state.lastPlacementClosedZones = postPlacementScore.zones.length;
     state.lastPlacementFocusDelta = 0;
+    state.lastChainDelta = 0;
 
     if (isPlacementPayoffVariant(settings)
         && placedBefore > 0
@@ -1045,6 +1204,8 @@ export function placeTile(state, settings, x, y) {
             getPlacementPayoffRules(settings).focusPerUsefulPlacement,
         );
     }
+
+    updateOneColorChainForPlacement(state, settings, x, y);
 
     state.playedThisRound.push(tileDef.id);
     state.queuePlayedThisRound += isQueueDrawMode(settings) ? 1 : 0;
@@ -1076,9 +1237,10 @@ export function scoreTileBoard(board, settings, run = null) {
 }
 
 export function resolveTileRound(state, battle, settings, run = null) {
-    const attack = getRoundAttack(battle, state.round);
+    const attack = getRoundAttack(battle, state.round, settings);
     const score = scoreTileBoard(state.board, settings, run);
     const placementPayoff = applyPlacementFocusToScore(state, score, settings);
+    const oneColorChain = applyOneColorChainToScore(state, score, settings);
     let enemyDamage = 0;
     let playerDamage = 0;
     const byColor = {};
@@ -1119,6 +1281,9 @@ export function resolveTileRound(state, battle, settings, run = null) {
         placementFocusSpent: placementPayoff.focusSpent,
         placementFocusBonus: placementPayoff.focusBonus,
         placementFocusRemaining: state.placementFocus ?? 0,
+        chainSpent: oneColorChain.chainSpent,
+        chainBonus: oneColorChain.chainBonus,
+        chainRemaining: state.chainMeter ?? 0,
         scoredTileKeys: [...getScoredTileKeys({ score })],
     };
 
@@ -1205,6 +1370,7 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.queuePlayedThisRound = 0;
     state.lastPlacementFocusDelta = 0;
     state.lastPlacementClosedZones = 0;
+    state.lastChainDelta = 0;
     state.phase = 'placing';
     state.lastResult = null;
     state.outcome = null;
