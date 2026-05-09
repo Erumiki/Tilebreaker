@@ -1,0 +1,738 @@
+{
+    "version": "mvp_art_contract_v1",
+    "source": "scripts/generate-art-mvp-placeholders.js",
+    "brief": "design/art-mvp-brief.md",
+    "root": "assets/art_mvp",
+    "format": "png",
+    "naming": {
+        "files": "lowercase_underscore_png",
+        "ids": "lowercase_underscore",
+        "states": "lowercase_underscore"
+    },
+    "gameplayLocks": {
+        "tileTopologySources": [
+            "assets/tiles_v2/tile_manifest.json",
+            "configs/game.json:tileBattle.specialTiles"
+        ],
+        "note": "Art may replace PNG pixels, but must not change tile matrix, edges, color, pattern, wildcard rules or scoring semantics."
+    },
+    "states": {
+        "screen_background": ["menu", "battle_intro", "battle", "shop", "result"],
+        "level_backdrop": ["battle_01", "battle_02", "battle_03", "battle_04", "battle_05"],
+        "board_cell": ["empty", "hover", "valid", "invalid", "scored"],
+        "tile_state": ["unclosed", "closed", "scored_fade"],
+        "slot": ["empty", "hover", "selected", "filled"],
+        "card_frame": ["common", "uncommon", "rare", "disabled", "bought"],
+        "button": ["default", "hover", "pressed", "disabled"],
+        "monster_portrait": ["battle_01", "battle_02", "battle_03", "battle_04", "battle_05"],
+        "monster_icon": ["battle_01", "battle_02", "battle_03", "battle_04", "battle_05"],
+        "icon": ["heart_full", "heart_empty", "heart_lost", "gold", "strike", "deck", "discard", "hold", "multiplier", "submit", "lock"],
+        "overlay": ["capture_red", "capture_blue", "valid_cell", "invalid_cell", "selected_tile", "hover_tile", "target_a", "target_b", "gate_start", "gate_end"],
+        "effect": ["capture_flash", "gold_pickup", "heart_heal", "strike_burst", "submit_damage"],
+        "shop_card": ["offer", "affordable", "unaffordable", "bought"]
+    },
+    "assets": [
+        {
+            "id": "screen_background_menu",
+            "file": "screen_background_menu.png",
+            "category": "screen_background",
+            "state": "menu",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Main menu full-screen background."
+        },
+        {
+            "id": "screen_background_battle_intro",
+            "file": "screen_background_battle_intro.png",
+            "category": "screen_background",
+            "state": "battle_intro",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Pre-battle monster intro background."
+        },
+        {
+            "id": "screen_background_battle",
+            "file": "screen_background_battle.png",
+            "category": "screen_background",
+            "state": "battle",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle scene background behind board, HUD, hand and monster panel."
+        },
+        {
+            "id": "screen_background_shop",
+            "file": "screen_background_shop.png",
+            "category": "screen_background",
+            "state": "shop",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Between-battle card shop background."
+        },
+        {
+            "id": "screen_background_result",
+            "file": "screen_background_result.png",
+            "category": "screen_background",
+            "state": "result",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Victory, defeat and run result background."
+        },
+        {
+            "id": "level_backdrop_battle_01",
+            "file": "level_backdrop_battle_01.png",
+            "category": "level_backdrop",
+            "state": "battle_01",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle 1 underlay and monster-intro backdrop."
+        },
+        {
+            "id": "level_backdrop_battle_02",
+            "file": "level_backdrop_battle_02.png",
+            "category": "level_backdrop",
+            "state": "battle_02",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle 2 underlay and monster-intro backdrop."
+        },
+        {
+            "id": "level_backdrop_battle_03",
+            "file": "level_backdrop_battle_03.png",
+            "category": "level_backdrop",
+            "state": "battle_03",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle 3 underlay and monster-intro backdrop."
+        },
+        {
+            "id": "level_backdrop_battle_04",
+            "file": "level_backdrop_battle_04.png",
+            "category": "level_backdrop",
+            "state": "battle_04",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle 4 underlay and monster-intro backdrop."
+        },
+        {
+            "id": "level_backdrop_battle_05",
+            "file": "level_backdrop_battle_05.png",
+            "category": "level_backdrop",
+            "state": "battle_05",
+            "size": [1280, 720],
+            "alpha": false,
+            "usage": "Battle 5 underlay and monster-intro backdrop."
+        },
+        {
+            "id": "panel_dark",
+            "file": "panel_dark.png",
+            "category": "ui_chrome",
+            "state": "default",
+            "size": [512, 256],
+            "alpha": true,
+            "usage": "Default readable panel surface for HUD, feedback and debug blocks."
+        },
+        {
+            "id": "panel_light",
+            "file": "panel_light.png",
+            "category": "ui_chrome",
+            "state": "default",
+            "size": [512, 256],
+            "alpha": true,
+            "usage": "Light panel variant for shop cards and result summaries."
+        },
+        {
+            "id": "button_primary_default",
+            "file": "button_primary_default.png",
+            "category": "button",
+            "state": "default",
+            "size": [384, 112],
+            "alpha": true,
+            "usage": "Primary action button in normal state."
+        },
+        {
+            "id": "button_primary_hover",
+            "file": "button_primary_hover.png",
+            "category": "button",
+            "state": "hover",
+            "size": [384, 112],
+            "alpha": true,
+            "usage": "Primary action button on hover or focused touch state."
+        },
+        {
+            "id": "button_primary_pressed",
+            "file": "button_primary_pressed.png",
+            "category": "button",
+            "state": "pressed",
+            "size": [384, 112],
+            "alpha": true,
+            "usage": "Primary action button while pressed."
+        },
+        {
+            "id": "button_primary_disabled",
+            "file": "button_primary_disabled.png",
+            "category": "button",
+            "state": "disabled",
+            "size": [384, 112],
+            "alpha": true,
+            "usage": "Primary action button when blocked."
+        },
+        {
+            "id": "button_secondary_default",
+            "file": "button_secondary_default.png",
+            "category": "button",
+            "state": "default",
+            "size": [320, 96],
+            "alpha": true,
+            "usage": "Secondary action button in normal state."
+        },
+        {
+            "id": "button_secondary_hover",
+            "file": "button_secondary_hover.png",
+            "category": "button",
+            "state": "hover",
+            "size": [320, 96],
+            "alpha": true,
+            "usage": "Secondary action button on hover or focused touch state."
+        },
+        {
+            "id": "button_secondary_disabled",
+            "file": "button_secondary_disabled.png",
+            "category": "button",
+            "state": "disabled",
+            "size": [320, 96],
+            "alpha": true,
+            "usage": "Secondary action button when blocked."
+        },
+        {
+            "id": "board_cell_empty",
+            "file": "board_cell_empty.png",
+            "category": "board_cell",
+            "state": "empty",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Empty 7x7 board cell base."
+        },
+        {
+            "id": "board_cell_hover",
+            "file": "board_cell_hover.png",
+            "category": "board_cell",
+            "state": "hover",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Board cell hover highlight."
+        },
+        {
+            "id": "board_cell_valid",
+            "file": "board_cell_valid.png",
+            "category": "board_cell",
+            "state": "valid",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Valid placement cell highlight."
+        },
+        {
+            "id": "board_cell_invalid",
+            "file": "board_cell_invalid.png",
+            "category": "board_cell",
+            "state": "invalid",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Invalid placement cell highlight."
+        },
+        {
+            "id": "board_cell_scored",
+            "file": "board_cell_scored.png",
+            "category": "board_cell",
+            "state": "scored",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Cell under scored or fading closure tiles."
+        },
+        {
+            "id": "tile_state_unclosed",
+            "file": "tile_state_unclosed.png",
+            "category": "tile_state",
+            "state": "unclosed",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Overlay for normal placed but unscored tiles."
+        },
+        {
+            "id": "tile_state_closed",
+            "file": "tile_state_closed.png",
+            "category": "tile_state",
+            "state": "closed",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Overlay for newly closed tile zones."
+        },
+        {
+            "id": "tile_state_scored_fade",
+            "file": "tile_state_scored_fade.png",
+            "category": "tile_state",
+            "state": "scored_fade",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Overlay for scored tiles before cleanup."
+        },
+        {
+            "id": "slot_hand_empty",
+            "file": "slot_hand_empty.png",
+            "category": "slot",
+            "state": "empty",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Empty hand slot."
+        },
+        {
+            "id": "slot_hand_hover",
+            "file": "slot_hand_hover.png",
+            "category": "slot",
+            "state": "hover",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Hovered hand slot."
+        },
+        {
+            "id": "slot_hand_selected",
+            "file": "slot_hand_selected.png",
+            "category": "slot",
+            "state": "selected",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Selected hand slot."
+        },
+        {
+            "id": "slot_hold_empty",
+            "file": "slot_hold_empty.png",
+            "category": "slot",
+            "state": "empty",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Empty hold slot."
+        },
+        {
+            "id": "slot_hold_filled",
+            "file": "slot_hold_filled.png",
+            "category": "slot",
+            "state": "filled",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Hold slot containing a saved tile."
+        },
+        {
+            "id": "slot_hold_selected",
+            "file": "slot_hold_selected.png",
+            "category": "slot",
+            "state": "selected",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Selected or swappable hold slot."
+        },
+        {
+            "id": "card_frame_common",
+            "file": "card_frame_common.png",
+            "category": "card_frame",
+            "state": "common",
+            "size": [256, 320],
+            "alpha": true,
+            "usage": "Common shop or deck card frame."
+        },
+        {
+            "id": "card_frame_uncommon",
+            "file": "card_frame_uncommon.png",
+            "category": "card_frame",
+            "state": "uncommon",
+            "size": [256, 320],
+            "alpha": true,
+            "usage": "Uncommon shop or deck card frame."
+        },
+        {
+            "id": "card_frame_rare",
+            "file": "card_frame_rare.png",
+            "category": "card_frame",
+            "state": "rare",
+            "size": [256, 320],
+            "alpha": true,
+            "usage": "Rare shop or deck card frame."
+        },
+        {
+            "id": "card_frame_disabled",
+            "file": "card_frame_disabled.png",
+            "category": "card_frame",
+            "state": "disabled",
+            "size": [256, 320],
+            "alpha": true,
+            "usage": "Disabled or unaffordable card frame."
+        },
+        {
+            "id": "card_frame_bought",
+            "file": "card_frame_bought.png",
+            "category": "card_frame",
+            "state": "bought",
+            "size": [256, 320],
+            "alpha": true,
+            "usage": "Bought card frame."
+        },
+        {
+            "id": "monster_portrait_battle_01",
+            "file": "monster_portrait_battle_01.png",
+            "category": "monster_portrait",
+            "state": "battle_01",
+            "size": [512, 512],
+            "alpha": true,
+            "usage": "Monster portrait for battle_01."
+        },
+        {
+            "id": "monster_portrait_battle_02",
+            "file": "monster_portrait_battle_02.png",
+            "category": "monster_portrait",
+            "state": "battle_02",
+            "size": [512, 512],
+            "alpha": true,
+            "usage": "Monster portrait for battle_02."
+        },
+        {
+            "id": "monster_portrait_battle_03",
+            "file": "monster_portrait_battle_03.png",
+            "category": "monster_portrait",
+            "state": "battle_03",
+            "size": [512, 512],
+            "alpha": true,
+            "usage": "Monster portrait for battle_03."
+        },
+        {
+            "id": "monster_portrait_battle_04",
+            "file": "monster_portrait_battle_04.png",
+            "category": "monster_portrait",
+            "state": "battle_04",
+            "size": [512, 512],
+            "alpha": true,
+            "usage": "Monster portrait for battle_04."
+        },
+        {
+            "id": "monster_portrait_battle_05",
+            "file": "monster_portrait_battle_05.png",
+            "category": "monster_portrait",
+            "state": "battle_05",
+            "size": [512, 512],
+            "alpha": true,
+            "usage": "Monster portrait for battle_05."
+        },
+        {
+            "id": "monster_icon_battle_01",
+            "file": "monster_icon_battle_01.png",
+            "category": "monster_icon",
+            "state": "battle_01",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Compact monster icon for battle_01 HUD and intro summaries."
+        },
+        {
+            "id": "monster_icon_battle_02",
+            "file": "monster_icon_battle_02.png",
+            "category": "monster_icon",
+            "state": "battle_02",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Compact monster icon for battle_02 HUD and intro summaries."
+        },
+        {
+            "id": "monster_icon_battle_03",
+            "file": "monster_icon_battle_03.png",
+            "category": "monster_icon",
+            "state": "battle_03",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Compact monster icon for battle_03 HUD and intro summaries."
+        },
+        {
+            "id": "monster_icon_battle_04",
+            "file": "monster_icon_battle_04.png",
+            "category": "monster_icon",
+            "state": "battle_04",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Compact monster icon for battle_04 HUD and intro summaries."
+        },
+        {
+            "id": "monster_icon_battle_05",
+            "file": "monster_icon_battle_05.png",
+            "category": "monster_icon",
+            "state": "battle_05",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Compact monster icon for battle_05 HUD and intro summaries."
+        },
+        {
+            "id": "icon_heart_full",
+            "file": "icon_heart_full.png",
+            "category": "icon",
+            "state": "heart_full",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Full player or monster heart."
+        },
+        {
+            "id": "icon_heart_empty",
+            "file": "icon_heart_empty.png",
+            "category": "icon",
+            "state": "heart_empty",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Empty heart slot."
+        },
+        {
+            "id": "icon_heart_lost",
+            "file": "icon_heart_lost.png",
+            "category": "icon",
+            "state": "heart_lost",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Heart loss feedback."
+        },
+        {
+            "id": "icon_gold",
+            "file": "icon_gold.png",
+            "category": "icon",
+            "state": "gold",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Gold currency and board gold pickup."
+        },
+        {
+            "id": "icon_strike",
+            "file": "icon_strike.png",
+            "category": "icon",
+            "state": "strike",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Strike streak indicator."
+        },
+        {
+            "id": "icon_deck",
+            "file": "icon_deck.png",
+            "category": "icon",
+            "state": "deck",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Draw pile icon."
+        },
+        {
+            "id": "icon_discard",
+            "file": "icon_discard.png",
+            "category": "icon",
+            "state": "discard",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Discard pile icon."
+        },
+        {
+            "id": "icon_hold",
+            "file": "icon_hold.png",
+            "category": "icon",
+            "state": "hold",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Hold slot label or tooltip icon."
+        },
+        {
+            "id": "icon_multiplier",
+            "file": "icon_multiplier.png",
+            "category": "icon",
+            "state": "multiplier",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Damage multiplier or upgraded color indicator."
+        },
+        {
+            "id": "icon_submit",
+            "file": "icon_submit.png",
+            "category": "icon",
+            "state": "submit",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Submit-hand cost and action icon."
+        },
+        {
+            "id": "icon_lock",
+            "file": "icon_lock.png",
+            "category": "icon",
+            "state": "lock",
+            "size": [128, 128],
+            "alpha": true,
+            "usage": "Blocked or unaffordable state icon."
+        },
+        {
+            "id": "overlay_capture_red",
+            "file": "overlay_capture_red.png",
+            "category": "overlay",
+            "state": "capture_red",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Red captured-area overlay."
+        },
+        {
+            "id": "overlay_capture_blue",
+            "file": "overlay_capture_blue.png",
+            "category": "overlay",
+            "state": "capture_blue",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Blue captured-area overlay."
+        },
+        {
+            "id": "overlay_valid_cell",
+            "file": "overlay_valid_cell.png",
+            "category": "overlay",
+            "state": "valid_cell",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Valid target overlay."
+        },
+        {
+            "id": "overlay_invalid_cell",
+            "file": "overlay_invalid_cell.png",
+            "category": "overlay",
+            "state": "invalid_cell",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Invalid target overlay."
+        },
+        {
+            "id": "overlay_selected_tile",
+            "file": "overlay_selected_tile.png",
+            "category": "overlay",
+            "state": "selected_tile",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Selected tile overlay."
+        },
+        {
+            "id": "overlay_hover_tile",
+            "file": "overlay_hover_tile.png",
+            "category": "overlay",
+            "state": "hover_tile",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Tile hover overlay."
+        },
+        {
+            "id": "overlay_target_a",
+            "file": "overlay_target_a.png",
+            "category": "overlay",
+            "state": "target_a",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Variant C target A marker."
+        },
+        {
+            "id": "overlay_target_b",
+            "file": "overlay_target_b.png",
+            "category": "overlay",
+            "state": "target_b",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Variant C target B marker."
+        },
+        {
+            "id": "overlay_gate_start",
+            "file": "overlay_gate_start.png",
+            "category": "overlay",
+            "state": "gate_start",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Variant D start gate marker."
+        },
+        {
+            "id": "overlay_gate_end",
+            "file": "overlay_gate_end.png",
+            "category": "overlay",
+            "state": "gate_end",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Variant D end gate marker."
+        },
+        {
+            "id": "effect_capture_flash",
+            "file": "effect_capture_flash.png",
+            "category": "effect",
+            "state": "capture_flash",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Closure/capture flash."
+        },
+        {
+            "id": "effect_gold_pickup",
+            "file": "effect_gold_pickup.png",
+            "category": "effect",
+            "state": "gold_pickup",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Gold pickup burst."
+        },
+        {
+            "id": "effect_heart_heal",
+            "file": "effect_heart_heal.png",
+            "category": "effect",
+            "state": "heart_heal",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Heart restore burst."
+        },
+        {
+            "id": "effect_strike_burst",
+            "file": "effect_strike_burst.png",
+            "category": "effect",
+            "state": "strike_burst",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Strike streak burst."
+        },
+        {
+            "id": "effect_submit_damage",
+            "file": "effect_submit_damage.png",
+            "category": "effect",
+            "state": "submit_damage",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Player heart loss from submitting a hand."
+        },
+        {
+            "id": "shop_card_offer",
+            "file": "shop_card_offer.png",
+            "category": "shop_card",
+            "state": "offer",
+            "size": [280, 384],
+            "alpha": true,
+            "usage": "Default shop offer surface."
+        },
+        {
+            "id": "shop_card_affordable",
+            "file": "shop_card_affordable.png",
+            "category": "shop_card",
+            "state": "affordable",
+            "size": [280, 384],
+            "alpha": true,
+            "usage": "Affordable shop offer state."
+        },
+        {
+            "id": "shop_card_unaffordable",
+            "file": "shop_card_unaffordable.png",
+            "category": "shop_card",
+            "state": "unaffordable",
+            "size": [280, 384],
+            "alpha": true,
+            "usage": "Unaffordable shop offer state."
+        },
+        {
+            "id": "shop_card_bought",
+            "file": "shop_card_bought.png",
+            "category": "shop_card",
+            "state": "bought",
+            "size": [280, 384],
+            "alpha": true,
+            "usage": "Already bought shop offer state."
+        }
+    ]
+}

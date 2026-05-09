@@ -256,7 +256,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Art Track 1: asset contract, placeholder pack and artist tech brief
+### ~~[2026-05-09] MVP Art Track 1: asset contract, placeholder pack and artist tech brief~~ DONE
 
 **Idea:** start the art lane before the rest of the MVP work so mechanics and UI can attach to stable asset ids while the actual art is improved in parallel.
 
@@ -274,6 +274,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** a developer and an artist can open one art manifest and one technical brief, see every MVP asset id/file/state needed, replace placeholder files without touching gameplay code, and know which visual changes are safe versus gameplay-breaking.
 
 **Parallelization:** after this task, artists can replace files while battle economy, shop logic and UIX layout continue. Mechanics own `matrix/edges/rules`; art owns PNG/state visuals.
+
+**Status:** added `assets/art_mvp/art_manifest.json` with stable ids, states and file names for 78 MVP presentation assets; generated the placeholder PNG pack through `scripts/generate-art-mvp-placeholders.js`; and wrote `design/art-mvp-brief.md` with artist-safe replacement rules, topology locks, required categories, export checklist and the future `loadArtAssets` loading plan. `./scripts/npm.sh run check` passes.
 
 **Priority:** must
 

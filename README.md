@@ -6,6 +6,7 @@ The current MVP after the manual playtest pass is built around the `legacy` resc
 
 - active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + universal starter + two-color capture-fill + hearts + hand-submit economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
 - tiles: `assets/tiles_v2/tile_manifest.json`;
+- MVP art contract: `assets/art_mvp/art_manifest.json`, with placeholder PNGs and artist instructions in `design/art-mvp-brief.md`;
 - active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
 - board: 7x7 macro tiles, each tile is 3x3 micro-cells;
 - legacy battles start with one board-only `starter_universal_line_v` at `(3,3)`: a vertical `*` boundary with matrix `.*. / .*. / .*.` that red or blue vertical continuations can attach to;
@@ -34,6 +35,8 @@ The current MVP after the manual playtest pass is built around the `legacy` resc
 - `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
 - `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
+- `assets/art_mvp/art_manifest.json` - stable presentation asset ids, states, filenames and placeholder PNG contract for the beautiful MVP track.
+- `design/art-mvp-brief.md` - technical artist brief: safe replacement rules, topology locks, required asset categories and future art-loading plan.
 - `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.
 - `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.
 - `todo/tasks.md` - the only backlog, work order, next-step, acceptance and status list.
@@ -58,6 +61,12 @@ http://127.0.0.1:5173
 ```sh
 ./scripts/npm.sh run check
 ./scripts/npm.sh run test:e2e
+```
+
+Regenerate and validate MVP placeholder art:
+
+```sh
+./scripts/node.sh scripts/generate-art-mvp-placeholders.js
 ```
 
 A normal run creates a new seed for every run. For a stable debug/smoke run, open:
