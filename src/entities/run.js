@@ -130,6 +130,7 @@ export function createRunState({
         currentBattle: 1,
         completedBattles: 0,
         playerHp,
+        gold: 0,
         gameplayVariant: gameplayVariant.id,
         upgrades: [],
         deck: [...startingDeck],

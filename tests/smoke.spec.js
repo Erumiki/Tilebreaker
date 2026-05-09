@@ -63,7 +63,11 @@ async function placeHandIndex(page, handIndex, cellX, cellY) {
   await page.waitForTimeout(50);
 
   debug = await getBattleDebug(page);
-  expect(debug.placedCount).toBe(placedBefore + 1);
+  if (debug.lastResult?.lastClosureImmediate) {
+    expect(debug.lastResult.closedZones).toBeGreaterThan(0);
+  } else {
+    expect(debug.placedCount).toBe(placedBefore + 1);
+  }
 }
 
 async function placeCurrentQueueTile(page) {
@@ -83,7 +87,11 @@ async function placeCurrentQueueTile(page) {
   await page.waitForTimeout(50);
 
   debug = await getBattleDebug(page);
-  expect(debug.placedCount).toBe(placedBefore + 1);
+  if (debug.lastResult?.lastClosureImmediate) {
+    expect(debug.lastResult.closedZones).toBeGreaterThan(0);
+  } else {
+    expect(debug.placedCount).toBe(placedBefore + 1);
+  }
   return true;
 }
 
@@ -108,7 +116,11 @@ async function placeFirstValidHandTile(page) {
   await page.waitForTimeout(50);
 
   debug = await getBattleDebug(page);
-  expect(debug.placedCount).toBe(placedBefore + 1);
+  if (debug.lastResult?.lastClosureImmediate) {
+    expect(debug.lastResult.closedZones).toBeGreaterThan(0);
+  } else {
+    expect(debug.placedCount).toBe(placedBefore + 1);
+  }
   return true;
 }
 
@@ -234,11 +246,96 @@ async function finishRound(page, expectedDamage = false) {
   return enemyDamage;
 }
 
+async function submitLegacyHand(page) {
+  const before = await getBattleDebug(page);
+
+  expect(before.gameplayVariant).toBe('legacy');
+  expect(before.phase).toBe('placing');
+  expect(before.outcome).toBeFalsy();
+  expect(before.submitCost).toEqual(expect.objectContaining({
+    totalDamage: expect.any(Number),
+    unplayedHandCards: expect.any(Number),
+    handSubmitsThisBattle: expect.any(Number),
+    canPay: true,
+  }));
+
+  await clickRect(page, before.layout.endRoundButton);
+  await expect.poll(() => page.evaluate((submitCount) => (
+    window.__tilebreakerDebug.getBattleDebug()?.handSubmitsThisBattle
+  ), before.handSubmitsThisBattle)).toBe(before.handSubmitsThisBattle + 1);
+
+  const after = await getBattleDebug(page);
+  expect(after.phase).toBe('placing');
+  expect(after.playerHp).toBe(before.playerHp - before.submitCost.totalDamage);
+  expect(after.lastSubmitResult).toEqual(expect.objectContaining({
+    submitted: true,
+    totalDamage: before.submitCost.totalDamage,
+    playerHeartsBefore: before.playerHp,
+    playerHeartsAfter: after.playerHp,
+  }));
+  expect(after.strikeCount).toBe(0);
+  expect(after.strikeWindowOpen).toBe(false);
+  expect(after.battleLog.some((entry) => entry.startsWith('Hand submitted'))).toBe(true);
+}
+
+async function playLegacyUntilBattleResult(page) {
+  let sawDamage = false;
+  let sawSubmit = false;
+
+  for (let turn = 0; turn < 48; turn += 1) {
+    let debug = await getBattleDebug(page);
+
+    if (debug.outcome) {
+      expect(sawDamage).toBe(true);
+      await clickRect(page, debug.layout.endRoundButton);
+      await expectScene(page, 'result');
+      return { sawDamage, sawSubmit };
+    }
+
+    const playedClosure = await playClosureIfAvailable(page);
+
+    debug = await getBattleDebug(page);
+    if (playedClosure) {
+      expect(debug.lastResult).toEqual(expect.objectContaining({
+        lastClosureImmediate: true,
+        enemyDamage: expect.any(Number),
+        playerDamage: 0,
+        goldEarned: expect.any(Number),
+      }));
+      expect(debug.lastResult.enemyDamage).toBeGreaterThan(0);
+      expect(debug.lastResult.goldEarned).toBeGreaterThan(0);
+      expect(debug.gold).toBe(debug.lastResult.goldAfter);
+      sawDamage = true;
+
+      if (debug.outcome) {
+        continue;
+      }
+    } else {
+      await placeFirstValidHandTile(page);
+      debug = await getBattleDebug(page);
+
+      if (debug.outcome) {
+        continue;
+      }
+    }
+
+    await submitLegacyHand(page);
+    sawSubmit = true;
+  }
+
+  throw new Error('Legacy battle did not finish within 48 turns');
+}
+
 async function playUntilBattleResult(page) {
   let sawDamage = false;
 
   for (let round = 0; round < 36; round += 1) {
     const debug = await getBattleDebug(page);
+
+    if (debug.gameplayVariant === 'legacy') {
+      return playLegacyUntilBattleResult(page);
+    }
+
     let expectedDamage = false;
 
     if (debug.drawMode === 'queue') {
@@ -281,6 +378,14 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   await expect.poll(() => page.evaluate(() => window.__tilebreakerDebug.getRunSeed())).toBe(20260508);
   expect(run.gameplayVariant).toBe('legacy');
   expect(battleDebug.gameplayVariant).toBe('legacy');
+  expect(run.gold).toBe(0);
+  expect(battleDebug.gold).toBe(0);
+  expect(battleDebug.submitCost).toEqual(expect.objectContaining({
+    totalDamage: 2,
+    unplayedHandCards: 7,
+    handSubmitsThisBattle: 0,
+    canPay: true,
+  }));
   expect(run.activeCombatColors).toEqual(['red', 'blue']);
   expect(battleDebug.visibleCombatColors).toEqual(['red', 'blue']);
   expect(battleDebug.enemyHp).toBe(3);
@@ -315,6 +420,7 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
 
     run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
     expect(run.completedBattles).toBe(battle);
+    expect(run.gold).toBeGreaterThanOrEqual(battle);
 
     await clickCanvas(page, 0.5, 0.73);
 

@@ -1,35 +1,39 @@
 # Tilebreaker
 
-Tilebreaker is a fast roguelite tile-placement battler. The player places boundary tiles, closes territories, captures land with the boundary color and counters enemy color attacks.
+Tilebreaker is a fast roguelite tile-placement battler. The player places boundary tiles, closes territories, captures land with the boundary color and turns those closures into monster damage, gold and tempo.
 
-The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, two colored center anchors and one hold slot.
+The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, two colored center anchors, one hold slot and accepted design for the future universal starter/shop cards.
 
-- active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + two-color capture-fill + hearts/pick-pressure`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
+- active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + two-color capture-fill + hearts + hand-submit economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
 - tiles: `assets/tiles_v2/tile_manifest.json`;
 - active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
 - board: 7x7 macro tiles, each tile is 3x3 micro-cells;
-- legacy battles start with two regular center anchors from the existing tile set: red vertical line at `(3,3)` and blue vertical line at `(4,3)`; the future universal red/blue card is deliberately postponed;
+- legacy battles still start with two regular center anchors from the existing tile set: red vertical line at `(3,3)` and blue vertical line at `(4,3)`; the accepted universal replacement is a board-only `starter_universal_line_v` wildcard starter documented in `design/card-pool.md`, but it is not implemented yet;
 - legality: if a cell has direct neighbors, adjacent edges must match by 3-cell edge signature; an empty cell with no direct neighbors is valid as a new island;
 - gray blank tiles remain in the manifest as technical/future material, but are removed from the active starting deck and opening tests;
 - scoring: a closed colored boundary captures the empty or filled interior;
 - legacy damage is shown as hearts: the first monster has 3 hearts, a minimal 2x2 capture deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`;
-- a new hand pick in `legacy` has an explicit cost: before confirmation, the UI shows incoming damage from the base cost and unplayed tiles;
-- active hand mode has one hold slot: the selected card can be set aside, swapped with another card later and carried across a new pick; it returns to discard when the battle ends;
+- active `legacy` scores closures immediately after placement: monster hearts, gold and strike feedback update before the next placement or hand submit;
+- `Сдать руку` in `legacy` has an explicit cost: `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, paid immediately before the hand is redealt;
+- an unaffordable dealt hand is a last-chance hand: if the monster survives and the player cannot pay for another hand, the battle ends instead of redealing for free;
+- active hand mode has one hold slot: the selected card can be set aside, swapped with another card later and carried across a hand submit; it returns to discard when the battle ends;
 - active MVP draw mode is `drawMode: "hand"`: the player sees the full hand because queue/playtest too often turned planning into waiting for the right card;
 - battle start uses `drawBag`: the early draw window is reordered from the current draw pile to cap `corner` at 2, prevent early `plus`, provide more `line`/`tee` continuation pieces and avoid becoming a hidden loop guarantee;
 - queue mode remains available as debug/comparison through `?drawMode=queue`;
-- between rounds, closed/scored tiles are cleared and unclosed territory stays for future completion;
+- after immediate scoring, closed/scored tiles are cleared and unclosed territory stays for future completion;
 - in Variant A, a useful placement without closure next to existing land gives `Focus +1`; Focus does not deal direct damage, accumulates to a cap and is spent as a bonus on the next capture;
 - in Variant B, all combat tiles count as one land color for placement/capture rules, attacks are merged into one land lane, and continuing the same connected region increases `Chain xN`; chain is spent as bonus damage on the next capture;
 - in Variant C, all combat tiles also count as one land color, but the board has A/B targets instead of Chain: if connected land links both cells, the round gains one-time `connectTargets.bonusDamage`, and a new pair appears next round;
 - in Variant D, all combat tiles count as one land color, the board has S/E gates, area-capture payoff is disabled, a short bridge gives a weak finish bonus, and a completed road deals its main damage from extra route length: `roadMode.completeBonus + min(extraLength, roadMode.maxScoredExtraLength) * roadMode.damagePerTile`;
-- the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile and rewards between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank.
+- the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile, persistent gold and rewards between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank;
+- buyable card design is recorded but not implemented: common red/blue line/tee/corner buys, an uncommon joker line, and later split/joker/payoff cards are staged in `design/card-pool.md`.
 
 ## Where Things Live
 
-- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion and pick-pressure settings, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
+- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
 - `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
+- `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.
 - `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.
 - `todo/tasks.md` - the only backlog, work order, next-step, acceptance and status list.
 - `todo/current.md` - current version snapshot and design context without a task list.

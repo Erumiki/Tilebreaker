@@ -44,6 +44,10 @@ function isRoadModeVariant(settings = {}) {
     return settings.gameplayVariant === 'road_mode';
 }
 
+function isLegacyVariant(settings = {}) {
+    return getGameplayVariant(settings).id === 'legacy';
+}
+
 function isRouteGateVariant(settings = {}) {
     return isConnectTargetsVariant(settings) || isRoadModeVariant(settings);
 }
@@ -296,6 +300,93 @@ function countUnplayedHandTiles(state) {
     return state.hand
         ?.filter(Boolean)
         .length ?? 0;
+}
+
+function getHandSubmitRules(settings) {
+    return {
+        baseDamage: settings.handSubmit?.baseDamage
+            ?? settings.hearts?.newPickBaseDamage
+            ?? 0,
+        unplayedTilesPerDamage: settings.handSubmit?.unplayedTilesPerDamage
+            ?? settings.hearts?.unplayedTilesPerDamage
+            ?? 0,
+        submitsPerExtraDamage: settings.handSubmit?.submitsPerExtraDamage ?? 2,
+    };
+}
+
+function getGoldRules(settings) {
+    return {
+        closureGold: settings.gold?.closureGold ?? 1,
+        strikeGoldPerCount: settings.gold?.strikeGoldPerCount ?? 1,
+    };
+}
+
+function addBattleLog(state, message) {
+    state.battleLog ??= [];
+    state.battleLog.push(message);
+
+    if (state.battleLog.length > 6) {
+        state.battleLog.splice(0, state.battleLog.length - 6);
+    }
+}
+
+function computeHandSubmitCostPreview(state, settings, options = {}) {
+    if (!isLegacyVariant(settings)) {
+        return {
+            baseDamage: 0,
+            unplayedHandCards: countUnplayedHandTiles(state),
+            unplayedTiles: countUnplayedHandTiles(state),
+            unplayedDamage: 0,
+            handSubmitsThisBattle: state.handSubmitsThisBattle ?? 0,
+            submitDamage: 0,
+            totalDamage: 0,
+            handSubmitLocked: false,
+            canPay: true,
+        };
+    }
+
+    const rules = getHandSubmitRules(settings);
+    const unplayedHandCards = countUnplayedHandTiles(state);
+    const handSubmitsThisBattle = state.handSubmitsThisBattle ?? 0;
+    const unplayedDamage = rules.unplayedTilesPerDamage > 0
+        ? Math.floor(unplayedHandCards / rules.unplayedTilesPerDamage)
+        : 0;
+    const submitDamage = rules.submitsPerExtraDamage > 0
+        ? Math.floor(handSubmitsThisBattle / rules.submitsPerExtraDamage)
+        : 0;
+    const totalDamage = Math.max(0, rules.baseDamage + unplayedDamage + submitDamage);
+    const handSubmitLocked = options.ignoreLock ? false : state.handSubmitLocked === true;
+    const lockedDamage = handSubmitLocked
+        ? Math.max(totalDamage, state.lockedSubmitCost ?? totalDamage)
+        : totalDamage;
+
+    return {
+        baseDamage: rules.baseDamage,
+        unplayedHandCards,
+        unplayedTiles: unplayedHandCards,
+        unplayedDamage,
+        handSubmitsThisBattle,
+        submitDamage,
+        totalDamage: lockedDamage,
+        handSubmitLocked,
+        canPay: !handSubmitLocked && (state.playerHp ?? 0) > totalDamage,
+    };
+}
+
+export function getHandSubmitCostPreview(state, settings) {
+    return computeHandSubmitCostPreview(state, settings);
+}
+
+function updateHandSubmitLock(state, settings) {
+    if (!isLegacyVariant(settings)) {
+        state.handSubmitLocked = false;
+        state.lockedSubmitCost = null;
+        return;
+    }
+
+    const preview = computeHandSubmitCostPreview(state, settings, { ignoreLock: true });
+    state.handSubmitLocked = preview.canPay === false;
+    state.lockedSubmitCost = state.handSubmitLocked ? preview.totalDamage : null;
 }
 
 export function getNewPickDamagePreview(state, settings) {
@@ -1539,7 +1630,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
     });
     const hand = isQueueDrawMode(settings) ? roundTiles.slice(0, 2) : roundTiles;
 
-    return {
+    const state = {
         round,
         playerHp: run.playerHp,
         enemyHp: battle.enemyHp,
@@ -1550,8 +1641,16 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         queueReserve: isQueueDrawMode(settings) ? roundTiles.slice(2) : [],
         playedThisRound: [],
         queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        strikeCount: 0,
+        strikeWindowOpen: false,
+        lastPlacementClosedZone: false,
         phase: 'placing',
         lastResult: null,
+        lastSubmitResult: null,
+        battleLog: [],
+        handSubmitLocked: false,
+        lockedSubmitCost: null,
         outcome: null,
         placementFocus: 0,
         lastPlacementFocusDelta: 0,
@@ -1561,6 +1660,10 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         chainRegionKeys: [],
         connectTargets: createConnectTargetPair(startingBoard, settings, round),
     };
+
+    updateHandSubmitLock(state, settings);
+
+    return state;
 }
 
 export function getRoundAttack(battle, round, settings = {}) {
@@ -1783,6 +1886,240 @@ export function resolveTileRound(state, battle, settings, run = null) {
     return state.lastResult;
 }
 
+function createDamageOnlyColorResults(score, attack) {
+    const byColor = {};
+
+    for (const color of COMBAT_COLORS) {
+        const closedDamage = score.damageByColor[color] || 0;
+
+        byColor[color] = {
+            threat: attack[color] || 0,
+            closedDamage,
+            enemyDamage: closedDamage,
+            playerDamage: 0,
+        };
+    }
+
+    return byColor;
+}
+
+function summarizeClosedColors(score) {
+    const summaries = Object.fromEntries(COMBAT_COLORS.map((color) => [color, {
+        color,
+        damage: 0,
+        zones: 0,
+    }]));
+
+    for (const zone of score.zones) {
+        const summary = summaries[zone.color];
+
+        if (!summary) {
+            continue;
+        }
+
+        summary.damage += zone.damage;
+        summary.zones += 1;
+    }
+
+    return Object.values(summaries).filter((entry) => entry.damage > 0);
+}
+
+export function resolveImmediatePlacement(state, battle, settings, run = null) {
+    if (!isLegacyVariant(settings) || state.phase !== 'placing' || state.outcome) {
+        return null;
+    }
+
+    const attack = getRoundAttack(battle, state.round, settings);
+    const score = scoreTileBoard(state.board, settings, run);
+    state.lastPlacementClosedZones = score.zones.length;
+
+    if (score.zones.length === 0) {
+        state.strikeCount = 0;
+        state.strikeWindowOpen = false;
+        state.lastPlacementClosedZone = false;
+
+        if (state.lastResult?.lastClosureImmediate) {
+            state.lastResult = null;
+        }
+
+        return null;
+    }
+
+    const goldRules = getGoldRules(settings);
+    const monsterHeartsBefore = state.enemyHp;
+    const goldBefore = run?.gold ?? 0;
+    const enemyDamage = score.totalDamage;
+    const wasStrikeWindowOpen = state.strikeWindowOpen === true;
+
+    state.strikeCount = wasStrikeWindowOpen
+        ? (state.strikeCount ?? 0) + 1
+        : 0;
+    state.strikeWindowOpen = true;
+    state.lastPlacementClosedZone = true;
+
+    const closureGold = score.zones.length * goldRules.closureGold;
+    const strikeGold = wasStrikeWindowOpen
+        ? state.strikeCount * goldRules.strikeGoldPerCount
+        : 0;
+    const goldEarned = closureGold + strikeGold;
+
+    if (run) {
+        run.gold = (run.gold ?? 0) + goldEarned;
+    }
+
+    state.enemyHp = Math.max(0, state.enemyHp - enemyDamage);
+
+    state.lastResult = {
+        attack,
+        score,
+        byColor: createDamageOnlyColorResults(score, attack),
+        enemyDamage,
+        playerDamage: 0,
+        placementFocusSpent: 0,
+        placementFocusBonus: 0,
+        placementFocusRemaining: state.placementFocus ?? 0,
+        chainSpent: 0,
+        chainBonus: 0,
+        chainRemaining: state.chainMeter ?? 0,
+        connectTargets: null,
+        connectTargetBonus: 0,
+        connectTargetConnected: false,
+        roadConnected: false,
+        roadLength: 0,
+        roadShortestLength: 0,
+        roadExtraLength: 0,
+        roadScoredExtraLength: 0,
+        roadBaseDamage: 0,
+        roadDamage: 0,
+        roadTileKeys: [],
+        scoredTileKeys: [...getScoredTileKeys({ score })],
+        newPickDamage: getNewPickDamagePreview(state, settings),
+        newPickDamageApplied: false,
+        submitCost: getHandSubmitCostPreview(state, settings),
+        lastClosureImmediate: true,
+        closedZones: score.zones.length,
+        monsterHeartsBefore,
+        monsterHeartsAfter: state.enemyHp,
+        closureGold,
+        strikeGold,
+        goldEarned,
+        goldBefore,
+        goldAfter: run?.gold ?? goldBefore,
+        strikeCount: state.strikeCount,
+        strikeWindowOpen: state.strikeWindowOpen,
+    };
+
+    const closedColors = summarizeClosedColors(score);
+    for (const entry of closedColors) {
+        const colorClosureGold = entry.zones * goldRules.closureGold;
+        addBattleLog(
+            state,
+            `Closed ${entry.color} zone: -${entry.damage} monster hearts, +${colorClosureGold} gold.`,
+        );
+    }
+
+    if (strikeGold > 0) {
+        addBattleLog(state, `Strike x${state.strikeCount}: +${strikeGold} gold.`);
+    }
+
+    if (state.enemyHp <= 0) {
+        state.outcome = 'victory';
+    }
+
+    state.board = prepareNextRoundBoard(state, settings);
+
+    return state.lastResult;
+}
+
+export function submitTileHand(state, { run, battle, settings, tiles }) {
+    if (!isLegacyVariant(settings) || state.phase !== 'placing' || state.outcome) {
+        return {
+            submitted: false,
+            reason: 'inactive',
+            preview: getHandSubmitCostPreview(state, settings),
+        };
+    }
+
+    const preview = getHandSubmitCostPreview(state, settings);
+
+    if (!preview.canPay) {
+        const playerHeartsBefore = state.playerHp;
+        state.outcome = state.enemyHp > 0 ? 'defeat' : state.outcome;
+        state.lastSubmitResult = {
+            submitted: false,
+            reason: 'not_enough_hearts',
+            ...preview,
+            playerHeartsBefore,
+            playerHeartsAfter: state.playerHp,
+        };
+        addBattleLog(state, `No hearts for a new hand: defeat.`);
+        return {
+            submitted: false,
+            reason: 'not_enough_hearts',
+            preview,
+        };
+    }
+
+    const playerHeartsBefore = state.playerHp;
+    state.playerHp = Math.max(0, state.playerHp - preview.totalDamage);
+    run.playerHp = state.playerHp;
+    state.handSubmitsThisBattle = (state.handSubmitsThisBattle ?? 0) + 1;
+    state.strikeCount = 0;
+    state.strikeWindowOpen = false;
+    state.lastPlacementClosedZone = false;
+
+    const result = {
+        submitted: true,
+        ...preview,
+        handSubmitsThisBattle: state.handSubmitsThisBattle,
+        playerHeartsBefore,
+        playerHeartsAfter: state.playerHp,
+    };
+
+    state.lastSubmitResult = result;
+    addBattleLog(state, `Hand submitted: -${preview.totalDamage} hearts.`);
+
+    discardRoundHand(run, state);
+    startNextTileRound(state, {
+        run,
+        battle,
+        settings,
+        tiles,
+    });
+    state.lastSubmitResult = result;
+
+    return result;
+}
+
+export function resolveHandSubmitDefeatIfNeeded(state, settings) {
+    if (!isLegacyVariant(settings)
+        || state.phase !== 'placing'
+        || state.outcome
+        || state.enemyHp <= 0
+        || countUnplayedHandTiles(state) > 0
+        || state.heldTile) {
+        return null;
+    }
+
+    const preview = getHandSubmitCostPreview(state, settings);
+
+    if (preview.canPay) {
+        return null;
+    }
+
+    state.outcome = 'defeat';
+    state.lastSubmitResult = {
+        submitted: false,
+        reason: 'not_enough_hearts',
+        ...preview,
+        playerHeartsBefore: state.playerHp,
+        playerHeartsAfter: state.playerHp,
+    };
+    addBattleLog(state, `No hearts for a new hand: defeat.`);
+
+    return state.lastSubmitResult;
+}
+
 export function discardRoundHand(run, state) {
     const unplayedTileIds = state.hand
         .filter(Boolean)
@@ -1873,6 +2210,7 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.lastPlacementFocusDelta = 0;
     state.lastPlacementClosedZones = 0;
     state.lastChainDelta = 0;
+    updateHandSubmitLock(state, settings);
     state.phase = 'placing';
     state.lastResult = null;
     state.outcome = null;

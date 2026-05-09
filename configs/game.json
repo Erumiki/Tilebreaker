@@ -23,6 +23,15 @@
             "newPickBaseDamage": 1,
             "unplayedTilesPerDamage": 4
         },
+        "handSubmit": {
+            "baseDamage": 1,
+            "unplayedTilesPerDamage": 4,
+            "submitsPerExtraDamage": 2
+        },
+        "gold": {
+            "closureGold": 1,
+            "strikeGoldPerCount": 1
+        },
         "damageFormula": {
             "type": "areaMultiplier",
             "areaMultiplier": 2,

@@ -14,6 +14,12 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Card GD pass defines universal starter and buyable controls
+
+**Context:** Core 1 Rescue now has full-hand planning, hold, heart-scale hand submit, immediate closure scoring and visible gold. The remaining problem is control: the temporary two-tile center bridge communicates poorly, and gold will not matter until the between-battle card pool gives the player meaningful purchases.
+**Decision:** Record the card design in `design/card-pool.md`. The first implementation target is a board-only `starter_universal_line_v`: a vertical wildcard boundary with rule matrix `.*. / .*. / .*.` that can match active combat colors, blocks flood-fill for the evaluated color and does not make red and blue match directly. The later shop pool should begin with ordinary red-blue line/tee/corner buys plus an uncommon `joker_line`; stronger red-blue split corners, joker corners, joker tees and gold-seal cards are staged as later tests with rough prices from 5 to 7 gold.
+**Rationale:** The starter solves the opening communication problem without adding a full shop at the same time. Keeping wildcard power narrow protects the closure puzzle from becoming automatic, while the priced card list gives gold a planning role once the starter has been checked.
+
 ### 2026-05-09 - Core 1 Rescue replaces round end with hand submit and immediate closure
 
 **Context:** The latest playable Core 1 Rescue build already plays better with full hand, center anchors, hold and hearts, but the old round-end model still mixes delayed scoring, monster attack damage and unclear new-pick language. The next implementation needs one clear tempo rule instead of old combat leftovers.

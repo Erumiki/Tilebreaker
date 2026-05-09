@@ -15,11 +15,15 @@ import {
     createTileBattleState,
     createTilesFromManifest,
     discardRoundHand,
+    getHandSubmitCostPreview,
     getNewPickDamagePreview,
     holdSelectedTile,
     placeTile,
+    resolveHandSubmitDefeatIfNeeded,
+    resolveImmediatePlacement,
     resolveTileRound,
     scoreTileBoard,
+    submitTileHand,
 } from '../src/entities/tileBattle.js';
 
 const settings = {
@@ -42,6 +46,18 @@ test('gameplay variants keep one comparison order and URL aliases', () => {
     assert.equal(normalizeGameplayVariantId('B'), 'one_color_chain');
     assert.equal(normalizeGameplayVariantId('unknown'), 'legacy');
     assert.equal(getGameplayVariant({ gameplayVariant: 'road-mode' }).shortLabel, 'D');
+});
+
+test('new runs start with zero gold for the hand-submit economy', () => {
+    const run = createRunState({
+        totalBattles: 1,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h'],
+        seed: 20260508,
+        settings: { gameplayVariant: 'legacy' },
+    });
+
+    assert.equal(run.gold, 0);
 });
 
 function emptyBoard() {
@@ -265,6 +281,214 @@ test('new pick damage previews base cost plus unplayed hand penalty', () => {
     });
 });
 
+test('hand submit preview includes unplayed cards and repeated-submit pressure', () => {
+    const state = {
+        playerHp: 9,
+        handSubmitsThisBattle: 3,
+        hand: [
+            tile('tile_red_line_h'),
+            null,
+            tile('tile_blue_line_v'),
+            tile('tile_red_tee_u'),
+            tile('tile_blue_corner_lu'),
+        ],
+    };
+    const preview = getHandSubmitCostPreview(state, {
+        gameplayVariant: 'legacy',
+        handSubmit: {
+            baseDamage: 1,
+            unplayedTilesPerDamage: 4,
+            submitsPerExtraDamage: 2,
+        },
+    });
+
+    assert.deepEqual(preview, {
+        baseDamage: 1,
+        unplayedHandCards: 4,
+        unplayedTiles: 4,
+        unplayedDamage: 1,
+        handSubmitsThisBattle: 3,
+        submitDamage: 1,
+        totalDamage: 3,
+        handSubmitLocked: false,
+        canPay: true,
+    });
+});
+
+test('locked last-chance hand keeps submit unaffordable after cards are played', () => {
+    const state = {
+        playerHp: 2,
+        handSubmitLocked: true,
+        lockedSubmitCost: 2,
+        handSubmitsThisBattle: 0,
+        hand: [
+            null,
+            null,
+            tile('tile_blue_corner_lu'),
+        ],
+    };
+    const preview = getHandSubmitCostPreview(state, {
+        gameplayVariant: 'legacy',
+        handSubmit: {
+            baseDamage: 1,
+            unplayedTilesPerDamage: 4,
+            submitsPerExtraDamage: 2,
+        },
+    });
+
+    assert.equal(preview.unplayedHandCards, 1);
+    assert.equal(preview.totalDamage, 2);
+    assert.equal(preview.handSubmitLocked, true);
+    assert.equal(preview.canPay, false);
+});
+
+test('submitting a legacy hand pays hearts, redeals, resets strike and keeps hold', () => {
+    const submitSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        handSize: 4,
+        drawMode: 'hand',
+        handSubmit: {
+            baseDamage: 1,
+            unplayedTilesPerDamage: 4,
+            submitsPerExtraDamage: 2,
+        },
+    };
+    const run = {
+        currentBattle: 1,
+        playerHp: 10,
+        gold: 0,
+        drawPile: [
+            'tile_red_line_v',
+            'tile_blue_line_v',
+            'tile_red_tee_u',
+            'tile_blue_tee_u',
+        ],
+        discardPile: [],
+        reshuffles: 0,
+        rngState: 20260508,
+    };
+    const state = {
+        round: 1,
+        playerHp: 10,
+        enemyHp: 3,
+        board: emptyBoard(),
+        hand: [
+            tile('tile_red_line_h'),
+            tile('tile_blue_line_h'),
+            null,
+            tile('tile_red_line_v'),
+        ],
+        heldTile: tile('tile_blue_corner_lu'),
+        selectedHandIndex: 0,
+        playedThisRound: ['tile_red_corner_rd'],
+        queueReserve: [],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 2,
+        strikeCount: 2,
+        strikeWindowOpen: true,
+        phase: 'placing',
+        lastResult: null,
+        lastSubmitResult: null,
+        battleLog: [],
+        outcome: null,
+    };
+
+    const result = submitTileHand(state, {
+        run,
+        battle: {
+            enemyHp: 3,
+            attacks: [{ red: 1, blue: 1 }],
+        },
+        settings: submitSettings,
+        tiles,
+    });
+
+    assert.equal(result.submitted, true);
+    assert.equal(result.totalDamage, 2);
+    assert.equal(result.playerHeartsBefore, 10);
+    assert.equal(result.playerHeartsAfter, 8);
+    assert.equal(state.playerHp, 8);
+    assert.equal(run.playerHp, 8);
+    assert.equal(state.handSubmitsThisBattle, 3);
+    assert.equal(state.strikeCount, 0);
+    assert.equal(state.strikeWindowOpen, false);
+    assert.equal(state.round, 2);
+    assert.equal(state.heldTile.id, 'tile_blue_corner_lu');
+    assert.equal(run.discardPile.includes('tile_blue_corner_lu'), false);
+    assert.equal(run.discardPile.includes('tile_red_corner_rd'), true);
+    assert.equal(run.discardPile.includes('tile_red_line_h'), true);
+    assert.equal(state.hand.filter(Boolean).length, 4);
+    assert.equal(state.battleLog.at(-1), 'Hand submitted: -2 hearts.');
+});
+
+test('submitting without enough hearts ends the battle instead of redealing', () => {
+    const submitSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        handSize: 4,
+        drawMode: 'hand',
+        handSubmit: {
+            baseDamage: 1,
+            unplayedTilesPerDamage: 4,
+            submitsPerExtraDamage: 2,
+        },
+    };
+    const run = {
+        currentBattle: 1,
+        playerHp: 2,
+        gold: 0,
+        drawPile: ['tile_red_line_v', 'tile_blue_line_v'],
+        discardPile: [],
+        reshuffles: 0,
+        rngState: 20260508,
+    };
+    const state = {
+        round: 1,
+        playerHp: 2,
+        enemyHp: 3,
+        board: emptyBoard(),
+        hand: [
+            tile('tile_red_line_h'),
+            tile('tile_blue_line_h'),
+            tile('tile_red_line_v'),
+            tile('tile_blue_line_v'),
+        ],
+        heldTile: null,
+        selectedHandIndex: 0,
+        playedThisRound: [],
+        queueReserve: [],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        handSubmitLocked: true,
+        lockedSubmitCost: 2,
+        strikeCount: 0,
+        strikeWindowOpen: false,
+        phase: 'placing',
+        lastResult: null,
+        lastSubmitResult: null,
+        battleLog: [],
+        outcome: null,
+    };
+
+    const result = submitTileHand(state, {
+        run,
+        battle: {
+            enemyHp: 3,
+            attacks: [{ red: 1, blue: 1 }],
+        },
+        settings: submitSettings,
+        tiles,
+    });
+
+    assert.equal(result.submitted, false);
+    assert.equal(result.reason, 'not_enough_hearts');
+    assert.equal(state.outcome, 'defeat');
+    assert.equal(state.hand.filter(Boolean).length, 4);
+    assert.equal(run.drawPile.length, 2);
+    assert.equal(state.battleLog.at(-1), 'No hearts for a new hand: defeat.');
+});
+
 test('heart combat lets a minimal matching capture damage the monster', () => {
     const heartSettings = {
         ...settings,
@@ -305,6 +529,174 @@ test('heart combat lets a minimal matching capture damage the monster', () => {
     assert.equal(state.lastResult.enemyDamage, 1);
     assert.equal(state.lastResult.playerDamage, 0);
     assert.equal(state.enemyHp, 2);
+});
+
+test('legacy placement scores closure immediately, pays gold, and skips monster damage', () => {
+    const heartSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        roundBoardCleanup: 'clearScoredTiles',
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+        gold: {
+            closureGold: 1,
+            strikeGoldPerCount: 1,
+        },
+    };
+    const run = {
+        gold: 0,
+        colorMultipliers: { red: 1, blue: 1, green: 1 },
+    };
+    const state = {
+        round: 1,
+        playerHp: 12,
+        enemyHp: 3,
+        board: emptyBoard(),
+        hand: [tile('tile_red_corner_lu')],
+        heldTile: null,
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        strikeCount: 0,
+        strikeWindowOpen: false,
+        phase: 'placing',
+        lastResult: null,
+        battleLog: [],
+        outcome: null,
+    };
+
+    state.board[2][2] = tile('tile_red_corner_rd');
+    state.board[2][3] = tile('tile_red_corner_dl');
+    state.board[3][2] = tile('tile_red_corner_ur');
+
+    assert.equal(placeTile(state, heartSettings, 3, 3), true);
+    const result = resolveImmediatePlacement(state, {
+        enemyHp: 3,
+        attacks: [{ red: 99, blue: 99 }],
+    }, heartSettings, run);
+
+    assert.equal(result.lastClosureImmediate, true);
+    assert.equal(result.enemyDamage, 1);
+    assert.equal(result.playerDamage, 0);
+    assert.equal(result.closedZones, 1);
+    assert.equal(result.goldEarned, 1);
+    assert.equal(result.monsterHeartsBefore, 3);
+    assert.equal(result.monsterHeartsAfter, 2);
+    assert.equal(state.enemyHp, 2);
+    assert.equal(state.playerHp, 12);
+    assert.equal(run.gold, 1);
+    assert.equal(state.phase, 'placing');
+    assert.equal(state.strikeWindowOpen, true);
+    assert.equal(state.board.flat().filter(Boolean).length, 0);
+});
+
+test('empty locked last-chance hand loses if the monster survived', () => {
+    const heartSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        handSubmit: {
+            baseDamage: 1,
+            unplayedTilesPerDamage: 4,
+            submitsPerExtraDamage: 2,
+        },
+    };
+    const state = {
+        round: 1,
+        playerHp: 2,
+        enemyHp: 1,
+        board: emptyBoard(),
+        hand: [null, null, null],
+        heldTile: null,
+        selectedHandIndex: -1,
+        queueReserve: [],
+        playedThisRound: ['tile_red_line_h'],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        handSubmitLocked: true,
+        lockedSubmitCost: 2,
+        strikeCount: 0,
+        strikeWindowOpen: false,
+        phase: 'placing',
+        lastResult: null,
+        lastSubmitResult: null,
+        battleLog: [],
+        outcome: null,
+    };
+
+    const result = resolveHandSubmitDefeatIfNeeded(state, heartSettings);
+
+    assert.equal(result.reason, 'not_enough_hearts');
+    assert.equal(state.outcome, 'defeat');
+    assert.equal(state.lastSubmitResult.totalDamage, 2);
+    assert.equal(state.battleLog.at(-1), 'No hearts for a new hand: defeat.');
+});
+
+test('legacy consecutive closing placement awards strike gold', () => {
+    const heartSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        roundBoardCleanup: 'clearScoredTiles',
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+        gold: {
+            closureGold: 1,
+            strikeGoldPerCount: 1,
+        },
+    };
+    const run = {
+        gold: 5,
+        colorMultipliers: { red: 1, blue: 1, green: 1 },
+    };
+    const state = {
+        round: 1,
+        playerHp: 12,
+        enemyHp: 3,
+        board: emptyBoard(),
+        hand: [tile('tile_red_corner_lu')],
+        heldTile: null,
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        strikeCount: 0,
+        strikeWindowOpen: true,
+        phase: 'placing',
+        lastResult: null,
+        battleLog: [],
+        outcome: null,
+    };
+
+    state.board[2][2] = tile('tile_red_corner_rd');
+    state.board[2][3] = tile('tile_red_corner_dl');
+    state.board[3][2] = tile('tile_red_corner_ur');
+
+    assert.equal(placeTile(state, heartSettings, 3, 3), true);
+    const result = resolveImmediatePlacement(state, {
+        enemyHp: 3,
+        attacks: [{ red: 0, blue: 0 }],
+    }, heartSettings, run);
+
+    assert.equal(result.strikeCount, 1);
+    assert.equal(result.closureGold, 1);
+    assert.equal(result.strikeGold, 1);
+    assert.equal(result.goldEarned, 2);
+    assert.equal(run.gold, 7);
+    assert.equal(state.battleLog.at(-1), 'Strike x1: +1 gold.');
 });
 
 test('placement payoff focus charges setup and boosts the next capture', () => {

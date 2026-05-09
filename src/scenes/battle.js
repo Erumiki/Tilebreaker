@@ -7,14 +7,18 @@ import {
     createTileBattleState,
     createTilesFromManifest,
     discardRoundHand,
+    getHandSubmitCostPreview,
     getRoundAttack,
     getConnectedCombatTileKeys,
     getShortestCombatPathKeys,
     holdSelectedTile,
     placeTile,
+    resolveHandSubmitDefeatIfNeeded,
+    resolveImmediatePlacement,
     resolveTileRound,
     scoreTileBoard,
     startNextTileRound,
+    submitTileHand,
 } from '../entities/tileBattle.js';
 
 const COLOR_HEX = {
@@ -87,6 +91,14 @@ function isConnectTargetsVariant(settings) {
 
 function isRoadModeVariant(settings) {
     return getGameplayVariant(settings).id === 'road_mode';
+}
+
+function isLegacyVariant(settings) {
+    return getGameplayVariant(settings).id === 'legacy';
+}
+
+function usesHandSubmitEconomy(settings) {
+    return isLegacyVariant(settings);
 }
 
 function isOneColorLandVariant(settings) {
@@ -285,19 +297,21 @@ function drawTile(ui, tileDef, rect, options = {}) {
 }
 
 function drawAttackRow(ui, rect, color, attack, result, settings) {
+    const handSubmitEconomy = usesHandSubmitEconomy(settings);
+
     ui.drawRect(rect, '#132334', 0.96);
     ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, getColorHex(color, settings), 1);
     ui.drawText(getColorLabel(color, settings), rect.x + 18, rect.y + 9, {
         size: 16,
         color: '#ecf6ff',
     });
-    ui.drawText(`Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - 124, rect.y + 9, {
+    ui.drawText(handSubmitEconomy ? 'Захват' : `Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - 124, rect.y + 9, {
         size: 15,
         color: '#afc4d7',
     });
 
     if (!result) {
-        ui.drawText('Ждет твоего захвата', rect.x + 18, rect.y + 34, {
+        ui.drawText(handSubmitEconomy ? 'Замкни границу, чтобы ударить' : 'Ждет твоего захвата', rect.x + 18, rect.y + 34, {
             size: 14,
             color: '#7f9aad',
         });
@@ -307,10 +321,12 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     const colorResult = result.byColor[color];
     const areaByColor = getCaptureAreaByColor(result);
     const bonusByColor = getCaptureBonusByColor(result);
-    const outcomeLabel = colorResult.enemyDamage > 0
-        ? `Бонус ${formatHearts(bonusByColor[color])}  |  Врагу ${formatHeartDelta(colorResult.enemyDamage)}`
-        : `Бонус ${formatHearts(bonusByColor[color])}  |  Игроку ${formatHeartDelta(colorResult.playerDamage)}`;
-    const outcomeColor = colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
+    const outcomeLabel = handSubmitEconomy
+        ? `Бонус ${formatHearts(bonusByColor[color])}  |  Монстру ${formatHeartDelta(colorResult.enemyDamage)}`
+        : colorResult.enemyDamage > 0
+            ? `Бонус ${formatHearts(bonusByColor[color])}  |  Врагу ${formatHeartDelta(colorResult.enemyDamage)}`
+            : `Бонус ${formatHearts(bonusByColor[color])}  |  Игроку ${formatHeartDelta(colorResult.playerDamage)}`;
+    const outcomeColor = handSubmitEconomy || colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
 
     const multiplier = result.score.zones.find((zone) => zone.color === color)?.multiplier ?? 1;
     ui.drawText(`Площадь ${areaByColor[color]}  |  Удар ${formatHearts(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, rect.y + 29, {
@@ -336,6 +352,7 @@ function drawBoard(ui, layout, settings, state, mouse) {
             };
             const isHovered = ui.contains(rect, mouse);
             const isValid = state.phase === 'placing'
+                && !state.outcome
                 && canPlaceTile(state.board, selectedTile, x, y, settings);
             const fill = isValid
                 ? isHovered ? '#31566b' : '#203748'
@@ -369,7 +386,7 @@ function drawBoard(ui, layout, settings, state, mouse) {
         }
     }
 
-    if (state.phase !== 'result' || !state.lastResult) {
+    if (!state.lastResult) {
         return;
     }
 
@@ -438,6 +455,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
     const deck = getRunDeckStats(run);
     const variant = getGameplayVariant(settings);
     const visibleColors = getVisibleCombatColors(settings);
+    const handSubmitEconomy = usesHandSubmitEconomy(settings);
     const totalCaptureArea = state.lastResult
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
@@ -460,7 +478,11 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         size: 20,
         color: '#ffd4d8',
     });
-    ui.drawText(`Колода ${deck.drawPile}  |  Сброс ${deck.discardPile}`, panel.x + 18, panel.y + 144, {
+    ui.drawText(`Золото ${run.gold ?? 0}`, panel.x + 18, panel.y + 144, {
+        size: 16,
+        color: '#f3d991',
+    });
+    ui.drawText(`Колода ${deck.drawPile}  |  Сброс ${deck.discardPile}`, panel.x + 18, panel.y + 166, {
         size: 15,
         color: '#8fb1cb',
     });
@@ -471,13 +493,13 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         });
     }
     if (isPlacementPayoffVariant(settings)) {
-        ui.drawText(`Focus ${state.placementFocus ?? 0}/${getPlacementFocusMax(settings)}`, panel.x + panel.width - 112, panel.y + 144, {
+        ui.drawText(`Focus ${state.placementFocus ?? 0}/${getPlacementFocusMax(settings)}`, panel.x + panel.width - 112, panel.y + 166, {
             size: 15,
             color: '#f3d991',
         });
     }
     if (isOneColorChainVariant(settings)) {
-        ui.drawText(`Chain x${state.chainMeter ?? 0}/${getOneColorChainMax(settings)}`, panel.x + panel.width - 118, panel.y + 144, {
+        ui.drawText(`Chain x${state.chainMeter ?? 0}/${getOneColorChainMax(settings)}`, panel.x + panel.width - 118, panel.y + 166, {
             size: 15,
             color: '#f3d991',
         });
@@ -486,7 +508,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         const targetStatus = state.connectTargets.connected
             ? `Targets +${settings.connectTargets?.bonusDamage ?? 30}`
             : `Targets ${state.connectTargets.distance}`;
-        ui.drawText(targetStatus, panel.x + panel.width - 128, panel.y + 144, {
+        ui.drawText(targetStatus, panel.x + panel.width - 128, panel.y + 166, {
             size: 15,
             color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
         });
@@ -495,13 +517,15 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         const roadStatus = state.connectTargets.connected
             ? `Road +${state.lastResult?.roadDamage ?? 0}`
             : `Road ${state.connectTargets.distance}`;
-        ui.drawText(roadStatus, panel.x + panel.width - 128, panel.y + 144, {
+        ui.drawText(roadStatus, panel.x + panel.width - 128, panel.y + 166, {
             size: 15,
             color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
         });
     }
 
-    ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
+    ui.drawText(handSubmitEconomy
+        ? state.lastResult ? 'Последний захват' : 'Цель хода'
+        : state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 190, {
         size: 16,
         color: '#8fb1cb',
     });
@@ -509,7 +533,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
     visibleColors.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
-            y: panel.y + 190 + index * 68,
+            y: panel.y + 212 + index * 68,
             width: panel.width - 32,
             height: 62,
         }, color, attack, state.lastResult, settings);
@@ -525,16 +549,20 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         ), 0) + (state.lastResult.connectTargetBonus ?? 0) + (state.lastResult.roadDamage ?? 0);
         const summary = isRoadModeVariant(settings)
             ? `Дорога ${state.lastResult.roadLength ?? 0}  |  Лишних +${state.lastResult.roadExtraLength ?? 0}  |  Урон +${state.lastResult.roadDamage ?? 0}`
-            : `Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`;
+            : handSubmitEconomy
+                ? `Зон ${zones}  |  Золото +${state.lastResult.goldEarned ?? 0}  |  Strike x${state.lastResult.strikeCount ?? 0}`
+                : `Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`;
         ui.drawText(summary, panel.x + 18, panel.y + 400, {
             size: 15,
             color: '#d8e7f2',
         });
-        ui.drawText(`Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
+        ui.drawText(handSubmitEconomy
+            ? `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку 0`
+            : `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
             size: 15,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
-        if (!state.outcome && (state.lastResult.newPickDamage?.totalDamage ?? 0) > 0) {
+        if (!handSubmitEconomy && !state.outcome && (state.lastResult.newPickDamage?.totalDamage ?? 0) > 0) {
             const pickDamage = state.lastResult.newPickDamage;
             ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, panel.y + 444, {
                 size: 15,
@@ -542,15 +570,37 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             });
         }
     }
+
+    if (handSubmitEconomy) {
+        const submitCost = getHandSubmitCostPreview(state, settings);
+        ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: невыставлено ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}`, panel.x + 18, panel.y + 444, {
+            size: 15,
+            color: submitCost.canPay ? '#ffd0d7' : '#ff8b9c',
+        });
+
+        (state.battleLog ?? []).slice(-3).forEach((entry, index) => {
+            ui.drawText(entry, panel.x + 18, panel.y + 468 + index * 18, {
+                size: 13,
+                color: '#9fb8ca',
+            });
+        });
+    }
 }
 
-function getButtonLabel(state) {
-    if (state.phase === 'placing') {
-        return 'Закончить раунд';
-    }
-
+function getButtonLabel(state, settings) {
     if (state.outcome) {
         return 'К результату битвы';
+    }
+
+    if (state.phase === 'placing') {
+        if (usesHandSubmitEconomy(settings)) {
+            const submitCost = getHandSubmitCostPreview(state, settings);
+            return submitCost.canPay
+                ? `Сдать руку (${formatHeartDelta(submitCost.totalDamage)})`
+                : `Сдать руку (${formatHeartDelta(submitCost.totalDamage)} не хватит)`;
+        }
+
+        return 'Закончить раунд';
     }
 
     if ((state.lastResult?.newPickDamage?.totalDamage ?? 0) > 0) {
@@ -561,6 +611,20 @@ function getButtonLabel(state) {
 }
 
 function getPlacedFeedback(state, settings) {
+    if (usesHandSubmitEconomy(settings)) {
+        if (state.outcome === 'defeat') {
+            return 'Сердец на новую руку не хватает: поражение';
+        }
+
+        if ((state.lastPlacementClosedZones ?? 0) > 0) {
+            return `Зона закрыта: монстру ${formatHeartDelta(state.lastResult?.enemyDamage ?? 0)}, золото +${state.lastResult?.goldEarned ?? 0}`;
+        }
+
+        return state.selectedHandIndex >= 0
+            ? 'Тайл поставлен, закрытие считается сразу'
+            : 'Рука пуста, сдавай руку';
+    }
+
     if (isPlacementPayoffVariant(settings)) {
         if ((state.lastPlacementFocusDelta ?? 0) > 0) {
             return `Focus +${state.lastPlacementFocusDelta} (${state.placementFocus}/${getPlacementFocusMax(settings)})`;
@@ -731,7 +795,7 @@ function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewT
 }
 
 function getValidCells(state, settings, run, battle) {
-    if (state.phase !== 'placing') {
+    if (state.phase !== 'placing' || state.outcome) {
         return [];
     }
 
@@ -775,7 +839,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const heldKey = state.heldTile?.id ?? '-';
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}:${state.lastResult.roadDamage ?? 0}:${state.lastResult.newPickDamage?.totalDamage ?? 0}:${state.lastResult.newPickDamageApplied ?? false}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}:${state.lastResult.roadDamage ?? 0}:${state.lastResult.newPickDamage?.totalDamage ?? 0}:${state.lastResult.newPickDamageApplied ?? false}:${state.lastResult.goldEarned ?? 0}:${state.lastResult.strikeCount ?? 0}:${state.lastResult.lastClosureImmediate ?? false}`
         : '-';
     const connectTargetKey = state.connectTargets
         ? `${state.connectTargets.a.x},${state.connectTargets.a.y}:${state.connectTargets.b.x},${state.connectTargets.b.y}:${state.connectTargets.connected}:${state.connectTargets.scored}`
@@ -796,14 +860,22 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.lastPlacementFocusDelta ?? 0,
         state.chainMeter ?? 0,
         state.lastChainDelta ?? 0,
+        state.handSubmitsThisBattle ?? 0,
+        state.handSubmitLocked ?? false,
+        state.lockedSubmitCost ?? '-',
+        state.strikeCount ?? 0,
+        state.strikeWindowOpen ?? false,
+        state.lastPlacementClosedZone ?? false,
+        state.lastSubmitResult?.totalDamage ?? '-',
         connectTargetKey,
         getGameplayVariant(settings).id,
         boardKey,
         handKey,
         heldKey,
-        `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}`,
+        `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}:${run.gold ?? 0}`,
         COMBAT_COLORS.map((color) => run.colorMultipliers[color]).join(','),
         resultKey,
+        (state.battleLog ?? []).join('~'),
         getHoverKey(ui, layout, settings, mouse),
         state.feedback ?? '-',
     ].join('/');
@@ -838,6 +910,7 @@ export function createBattleScene({
             }
 
             if (state.phase === 'placing'
+                && !state.outcome
                 && this.layout.hold
                 && ui.contains(this.layout.hold, click)) {
                 const hadHeldTile = Boolean(state.heldTile);
@@ -855,6 +928,7 @@ export function createBattleScene({
 
             const handIndex = this.layout.hand.findIndex((rect) => ui.contains(rect, click));
             if (state.phase === 'placing'
+                && !state.outcome
                 && handIndex >= 0
                 && state.hand[handIndex]
                 && (!isQueueDrawMode(settings) || handIndex === 0)) {
@@ -864,10 +938,12 @@ export function createBattleScene({
             }
 
             const boardCell = getBoardCell(this.layout, settings, click);
-            if (state.phase === 'placing' && boardCell) {
+            if (state.phase === 'placing' && !state.outcome && boardCell) {
                 const placed = placeTile(state, settings, boardCell.x, boardCell.y);
                 if (placed) {
                     advanceTileQueue(run, state, settings, tiles);
+                    resolveImmediatePlacement(state, battle, settings, run);
+                    resolveHandSubmitDefeatIfNeeded(state, settings);
                 }
                 state.feedback = placed
                     ? getPlacedFeedback(state, settings)
@@ -879,21 +955,38 @@ export function createBattleScene({
                 return;
             }
 
-            if (state.phase === 'placing') {
-                resolveTileRound(state, battle, settings, run);
+            if (state.outcome === 'victory') {
                 discardRoundHand(run, state);
                 run.playerHp = state.playerHp;
-                state.feedback = null;
-                return;
-            }
-
-            if (state.outcome === 'victory') {
                 onFinish(BattleOutcome.Victory);
                 return;
             }
 
             if (state.outcome === 'defeat') {
+                discardRoundHand(run, state);
+                run.playerHp = state.playerHp;
                 onFinish(BattleOutcome.Defeat);
+                return;
+            }
+
+            if (state.phase === 'placing') {
+                if (usesHandSubmitEconomy(settings)) {
+                    const submit = submitTileHand(state, {
+                        run,
+                        battle,
+                        settings,
+                        tiles,
+                    });
+                    state.feedback = submit.submitted
+                        ? `Рука сдана: ${formatHeartDelta(submit.totalDamage)}`
+                        : 'Не хватает сердец, чтобы сдать руку';
+                    return;
+                }
+
+                resolveTileRound(state, battle, settings, run);
+                discardRoundHand(run, state);
+                run.playerHp = state.playerHp;
+                state.feedback = null;
                 return;
             }
 
@@ -943,9 +1036,11 @@ export function createBattleScene({
                 size: 24,
                 color: '#eef8ff',
             });
-            ui.drawText(isRoadModeVariant(settings)
-                ? 'Проведи дорогу от S к E и перебей атаки'
-                : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
+            ui.drawText(usesHandSubmitEconomy(settings)
+                ? 'Замыкай зоны: закрытие бьет монстра, сдача руки стоит сердца'
+                : isRoadModeVariant(settings)
+                    ? 'Проведи дорогу от S к E и перебей атаки'
+                    : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
                 size: 17,
                 color: '#98b4c8',
             });
@@ -960,11 +1055,19 @@ export function createBattleScene({
                     color: '#f3d991',
                 });
             }
-            ui.drawButton(this.layout.endRoundButton, getButtonLabel(state), {
+            const submitBlocked = usesHandSubmitEconomy(settings)
+                && state.phase === 'placing'
+                && !state.outcome
+                && !getHandSubmitCostPreview(state, settings).canPay;
+            ui.drawButton(this.layout.endRoundButton, getButtonLabel(state, settings), {
                 mouse,
-                color: state.phase === 'placing' ? '#243f54' : '#1f4b3c',
-                hoverColor: state.phase === 'placing' ? '#66c7f4' : '#69d29d',
-                edgeColor: '#9fdfff',
+                color: submitBlocked
+                    ? '#2b323a'
+                    : state.phase === 'placing' && !state.outcome ? '#243f54' : '#1f4b3c',
+                hoverColor: submitBlocked
+                    ? '#3a434d'
+                    : state.phase === 'placing' && !state.outcome ? '#66c7f4' : '#69d29d',
+                edgeColor: submitBlocked ? '#5b6872' : '#9fdfff',
                 textSize: 20,
             });
         },
@@ -999,6 +1102,16 @@ export function createBattleScene({
                 gameplayVariant: getGameplayVariant(settings).id,
                 gameplayVariantLabel: getGameplayVariant(settings).shortLabel,
                 drawMode: settings.drawMode ?? 'hand',
+                gold: run.gold ?? 0,
+                submitCost: getHandSubmitCostPreview(state, settings),
+                handSubmitLocked: state.handSubmitLocked ?? false,
+                lockedSubmitCost: state.lockedSubmitCost ?? null,
+                handSubmitsThisBattle: state.handSubmitsThisBattle ?? 0,
+                lastSubmitResult: state.lastSubmitResult,
+                strikeCount: state.strikeCount ?? 0,
+                strikeWindowOpen: state.strikeWindowOpen ?? false,
+                lastPlacementClosedZone: state.lastPlacementClosedZone ?? false,
+                battleLog: [...state.battleLog ?? []],
                 queuePlayedThisRound: state.queuePlayedThisRound ?? 0,
                 queueReserve: state.queueReserve?.map((tileDef) => tileDef ? {
                     id: tileDef.id,
@@ -1035,6 +1148,18 @@ export function createBattleScene({
                     roadTileKeys: [...state.lastResult.roadTileKeys ?? []],
                     newPickDamage: state.lastResult.newPickDamage,
                     newPickDamageApplied: state.lastResult.newPickDamageApplied ?? false,
+                    submitCost: state.lastResult.submitCost,
+                    lastClosureImmediate: state.lastResult.lastClosureImmediate ?? false,
+                    closedZones: state.lastResult.closedZones ?? 0,
+                    monsterHeartsBefore: state.lastResult.monsterHeartsBefore,
+                    monsterHeartsAfter: state.lastResult.monsterHeartsAfter,
+                    closureGold: state.lastResult.closureGold ?? 0,
+                    strikeGold: state.lastResult.strikeGold ?? 0,
+                    goldEarned: state.lastResult.goldEarned ?? 0,
+                    goldBefore: state.lastResult.goldBefore,
+                    goldAfter: state.lastResult.goldAfter,
+                    strikeCount: state.lastResult.strikeCount ?? 0,
+                    strikeWindowOpen: state.lastResult.strikeWindowOpen ?? false,
                     placementFocusSpent: state.lastResult.placementFocusSpent,
                     placementFocusBonus: state.lastResult.placementFocusBonus,
                     placementFocusRemaining: state.lastResult.placementFocusRemaining,

@@ -188,7 +188,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Core 1 implementation: hand submit, immediate closure and gold
+### ~~[2026-05-09] Core 1 implementation: hand submit, immediate closure and gold~~ DONE
 
 **Idea:** implement the new active battle loop from the design pass.
 
@@ -212,32 +212,17 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Acceptance:** the active `legacy` battle can be played without the old round-end damage model: closing a zone immediately deals/logs damage, submitting the hand immediately costs hearts and redeals with animation, strikes give bonus gold, and the UI clearly explains the new economy.
 
+**Status:** implemented for active `legacy`: `run.gold = 0`, config-driven hand-submit and gold rules, live submit-cost preview, immediate closure scoring after placement, monster heart damage without old attack damage, closure/strike gold, battle log/debug fields, and `Сдать руку` payment/redeal preserving hold. Follow-up fix: an unaffordable dealt hand is now locked as a last-chance hand; if the monster survives and the player cannot pay for the next hand, the battle ends instead of redealing for free. Archived variants keep the old `resolveTileRound` path and remain URL-playable. Unit/check/e2e pass, including the 5-battle smoke path through hand submit.
+
 **Priority:** must
 
 **Layer:** MVP
 
 ---
 
-### [2026-05-09] GD pass: universal starter, jokers and purchasable cards
+### ~~[2026-05-09] GD pass: universal starter, jokers and purchasable cards~~ DONE
 
-**Idea:** design the next card set before adding new assets or shop content.
-
-**Why:** gold only matters if the between-round purchase pool creates real planning. The universal starter card should be considered together with later purchasable control cards, not as a one-off asset.
-
-**MVP:**
-
-- design the universal starter card that replaces the current two-card center bridge;
-- design purchasable card candidates for the between-round card economy;
-- include joker cards that can match all colors;
-- include two-color closer cards with two colored sides;
-- decide what other control/payoff cards are worth testing;
-- define a simulation/manual-test protocol for the GD pass before committing cards to the active deck.
-
-**Acceptance:** there is a candidate card list with intended roles, rough costs/rarities if relevant, and a test plan for validating the universal starter and buyable cards.
-
-**Priority:** must
-
-**Layer:** MVP
+**Status:** done as a design pass in `design/card-pool.md`, synced to `design/gameplay-variants.md`, `design/decisions.md`, `todo/current.md` and README. Accepted: board-only `starter_universal_line_v` wildcard center semantics, staged buyable card candidates with rough costs/rarities, joker/split-card rules, and a validation protocol that tests the universal starter before adding the shop pool.
 
 ---
 

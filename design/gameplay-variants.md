@@ -40,13 +40,13 @@ Lead position: do not fix all variants at once. The next work slice should be sm
 
 New playtest signal: with a full hand, `legacy` immediately became more playable. This confirms that the problem was not only scoring, but agency: the player needs to see options and plan instead of waiting for the next tile.
 
-Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`.
+Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`; the later hand-submit/immediate-closure/gold loop is also now implemented for active `legacy`.
 
 ### Next Loop Decision: Сдать Руку, Immediate Closure, Gold
 
 Latest playable feedback confirms that Core 1 Rescue should keep the active `legacy` foundation and replace the old round-end model rather than start a new core.
 
-Implementation-now decisions:
+Implemented decisions:
 
 - rename the old new-pick / end-round action to `Сдать руку`;
 - preview the exact heart cost on the button;
@@ -64,6 +64,8 @@ submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)
 ```
 
 This preserves the old readable unplayed-card pressure but makes repeated hand surrender get heavier over the battle. With a 7-card hand, submitting without playing costs 2 hearts; playing down to 3 cards makes the first submit cost 1 heart. The held card is intentionally excluded from `unplayedHandCards`, because hold is the player's explicit way to protect one future plan.
+
+Last-chance update after implementation: if the newly dealt hand is already unaffordable, it stays a last-chance hand. The player can still win with cards already dealt or saved in hold, but cannot make the next hand affordable by emptying the current hand. If a new hand is needed and the monster is still alive, the battle ends in defeat instead of dealing a free hand.
 
 Immediate closure timing:
 
@@ -96,6 +98,21 @@ Later card/shop pass:
 - define shop prices, reroll/remove costs and reward pacing after gold income is visible;
 - revisit card pool, universal red/blue card, rotate tools or double-color cards only after the new closure/submit loop is tested.
 
+Card GD pass status 2026-05-09: accepted design lives in `design/card-pool.md`.
+
+- The universal starter candidate is a board-only vertical wildcard boundary, `starter_universal_line_v`, with rule matrix `.*. / .*. / .*.`, placed at center instead of the two ordinary anchors.
+- The wildcard boundary matches active combat colors for edge legality and blocks flood-fill for the evaluated color, but is not itself red/blue scoring area and does not let red and blue match directly.
+- Buyable card candidates are priced as rough gold bands: common colored lines/tees/corners at 2-4 gold, joker line at 5, red-blue split corner at 5, joker corner at 6, joker tee at 7, with stronger cards capped or postponed.
+- Validation order is universal starter first, then a minimal shop pool of colored line/tee/corner plus joker line, then split/joker/payoff experiments one family at a time.
+
+Implementation status:
+
+- active `legacy` uses `Сдать руку` instead of old end-round damage;
+- closed zones score immediately after placement and use the existing scored-tile cleanup;
+- active `legacy` no longer applies separate monster attack damage;
+- run gold starts at 0 and closure/strike gold is visible in UI/debug;
+- archived variants remain URL-playable on the old `resolveTileRound` path.
+
 Previous implemented hearts slice, now superseded by the `Сдать руку` wording for the next implementation pass:
 
 - green removed from visible legacy combat rows: active combat shows red/blue;
@@ -109,21 +126,21 @@ Previous implemented hearts slice, now superseded by the `Сдать руку` w
 
 Desired new player question: "Should I submit this hand and pay hearts, or can I squeeze one more useful move out of it?"
 
-Accepted hearts MVP slice before this design pass:
+Accepted hearts MVP slice before the hand-submit implementation:
 
 1. Heart conversion and pick-pressure apply only to `legacy` so hidden variants do not inherit the new tempo rule.
-2. A new pick costs `1 + floor(unplayed / 4)` hearts, with preview shown before confirmation. The next pass replaces this with the full `Сдать руку` formula above.
+2. A new pick used to cost `1 + floor(unplayed / 4)` hearts, with preview shown before confirmation. The full `Сдать руку` formula above replaces it in active `legacy`.
 3. Minimal matching capture now really hits the monster for 1 heart: equal defense by color counts as enough, instead of requiring strictly beating the threat.
 4. Road-mode remains URL-playable, but its smoke is reduced to launch/gates/first placement because the mode was removed from active rescue comparison.
-5. The next manual playtest should decide whether hearts/pick-pressure creates clear battle tempo without starting center/hold/rotate.
+5. The next manual playtest should judge the implemented hand-submit/immediate-closure loop before adding shop cards, universal center, rotate or double-color tools.
 
 Risks:
 
-- if a new pick is too scary, the player will stop experimenting and feel system punishment;
+- if hand submit is too scary, the player will stop experimenting and feel system punishment;
 - if hearts are too discrete, large zones may stop feeling richer than a small square;
 - if the unplayed-tile penalty is not visible before the action, it will feel like a hidden trap.
 
-Next playtest criterion: the player understands how many hearts the monster has left, how many hearts they will lose on a new pick, and can explain victory/defeat by the number of extra picks.
+Next playtest criterion: the player understands how many hearts the monster has left, how many hearts they will lose on `Сдать руку`, how much gold closures/strikes earned and can explain victory/defeat by the number of hand submits.
 
 ## Launch
 
@@ -251,4 +268,4 @@ For each variant, record next to manual observations:
 
 ## Current Status
 
-The switching scaffold and comparison protocol are ready, but after the manual playtest pass the active choice is narrower. `legacy` as full-hand already feels better, and hearts/pick-pressure MVP is enabled to check battle tempo. Next decision: if tempo became clear, choose one next rescue lever from starting universal center, hold, limited rotate or double-color tiles; if not, move to the Kingdomino-like spike.
+The switching scaffold and comparison protocol are ready, but after the manual playtest pass the active choice is narrower. `legacy` as full-hand already feels better, and the hand-submit/immediate-closure/gold loop is implemented to check battle tempo. The card GD pass has chosen the first universal starter semantics and a later shop candidate pool. Core 1 should verify the starter before adding the shop/control-card pool; if the rescue loop still does not come alive, move to the Kingdomino-like spike.
