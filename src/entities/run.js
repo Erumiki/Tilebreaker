@@ -130,7 +130,9 @@ export function createRunState({
         currentBattle: 1,
         completedBattles: 0,
         playerHp,
+        maxPlayerHp: settings.hearts?.maxPlayerHp ?? settings.maxPlayerHp ?? playerHp,
         gold: 0,
+        bountiesClaimed: [],
         gameplayVariant: gameplayVariant.id,
         upgrades: [],
         deck: [...startingDeck],
@@ -153,16 +155,32 @@ export function getCurrentBattle(run, battles) {
     return battles[run.currentBattle - 1] ?? battles[battles.length - 1];
 }
 
-export function resolveBattle(run, outcome) {
+export function resolveBattle(run, outcome, battle = null) {
+    let bountyGold = 0;
+    const battleNumber = run.currentBattle;
+
     if (outcome === BattleOutcome.Victory) {
+        const bountyKey = battle?.id ?? `battle_${battleNumber}`;
+        bountyGold = Math.max(0, battle?.reward ?? 0);
+
+        if (bountyGold > 0 && !run.bountiesClaimed?.includes(bountyKey)) {
+            run.gold = (run.gold ?? 0) + bountyGold;
+            run.bountiesClaimed ??= [];
+            run.bountiesClaimed.push(bountyKey);
+        } else {
+            bountyGold = 0;
+        }
+
         run.completedBattles += 1;
     }
 
     return {
         outcome,
-        battleNumber: run.currentBattle,
+        battleNumber,
         completedBattles: run.completedBattles,
         totalBattles: run.totalBattles,
+        bountyGold,
+        gold: run.gold ?? 0,
         isRunVictory: outcome === BattleOutcome.Victory
             && run.completedBattles >= run.totalBattles,
     };

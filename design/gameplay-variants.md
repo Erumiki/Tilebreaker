@@ -40,7 +40,7 @@ Lead position: do not fix all variants at once. The next work slice should be sm
 
 New playtest signal: with a full hand, `legacy` immediately became more playable. This confirms that the problem was not only scoring, but agency: the player needs to see options and plan instead of waiting for the next tile.
 
-Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`; the later hand-submit/immediate-closure/gold loop is also now implemented for active `legacy`.
+Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`; the later hand-submit/immediate-closure/gold loop is implemented; field gold/hearts and monster kill bounty are now implemented for active `legacy`.
 
 ### Next Loop Decision: Сдать Руку, Immediate Closure, Gold
 
@@ -90,7 +90,10 @@ Gold rules for the first implementation pass:
 - run starts at 0 gold;
 - each closed zone gives `+1 gold`;
 - each strike gives extra `+strikeCount gold`;
-- battle win rewards and card buying are not part of this implementation pass.
+- field gold can be picked up by placing on it or by sealing it in a closed zone, and is consumed once;
+- field hearts heal only when sealed in a closed zone and respect `hearts.maxPlayerHp`;
+- battle win rewards now pay the configured `battle.reward` once as monster kill bounty;
+- card buying is not implemented yet.
 
 Later card/shop pass:
 
@@ -112,7 +115,7 @@ Implementation status:
 - active `legacy` starts from one universal red-blue center tile instead of two ordinary anchors;
 - closed zones score immediately after placement and use the existing scored-tile cleanup;
 - active `legacy` no longer applies separate monster attack damage;
-- run gold starts at 0 and closure/strike gold is visible in UI/debug;
+- run gold starts at 0, closure/strike/field/bounty gold is visible in UI/debug, and field heart healing is logged/debugged;
 - archived variants remain URL-playable on the old `resolveTileRound` path.
 
 Previous implemented hearts slice, now superseded by the `Сдать руку` wording for the next implementation pass:

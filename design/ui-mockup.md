@@ -88,7 +88,7 @@ Desktop order:
 
 Copy rules:
 
-- Keep reward copy as a preview until monster kill bounty is implemented.
+- Keep reward copy short: it previews the configured monster kill bounty paid on victory.
 - Do not add extra choices, deck previews, attack schedules or lore paragraphs to this screen.
 - Monster art guidance and names live in `design/monster-roster.md`; UIX should keep text/layout stable even if final monster names change later.
 

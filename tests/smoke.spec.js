@@ -366,6 +366,9 @@ async function playLegacyUntilBattleResult(page) {
         enemyDamage: expect.any(Number),
         playerDamage: 0,
         goldEarned: expect.any(Number),
+        fieldGold: expect.any(Number),
+        heartHeal: expect.any(Number),
+        closureResources: expect.any(Object),
       }));
       expect(debug.lastResult.enemyDamage).toBeGreaterThan(0);
       expect(debug.lastResult.goldEarned).toBeGreaterThan(0);
@@ -450,6 +453,14 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   expect(battleDebug.gameplayVariant).toBe('legacy');
   expect(run.gold).toBe(0);
   expect(battleDebug.gold).toBe(0);
+  expect(battleDebug.maxPlayerHp).toBe(18);
+  expect(battleDebug.activeBoardResources.map((resource) => resource.type).sort()).toEqual([
+    'gold',
+    'gold',
+    'gold',
+    'heart',
+  ]);
+  expect(battleDebug.activeBoardResources.every((resource) => !battleDebug.board[resource.y][resource.x])).toBe(true);
   expect(battleDebug.submitCost).toEqual(expect.objectContaining({
     totalDamage: 2,
     unplayedHandCards: 7,
@@ -474,6 +485,8 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     monsterIcon: 'monster_icon_battle_01',
     heart: 'icon_heart_full',
     gold: 'icon_gold',
+    fieldGold: 'icon_gold',
+    fieldHeart: 'icon_heart_full',
     hold: 'icon_hold',
     submit: 'icon_submit',
   }));
@@ -505,6 +518,7 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
 
     run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
     expect(run.completedBattles).toBe(battle);
+    expect(run.bountiesClaimed).toHaveLength(battle);
     expect(run.gold).toBeGreaterThanOrEqual(battle);
 
     await clickCanvas(page, 0.5, 0.73);

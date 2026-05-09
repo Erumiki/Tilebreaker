@@ -114,6 +114,13 @@ export function createBattleResultScene({
                 size: 22,
                 color: '#bca77e',
             });
+            if (!isDefeat && (result.bountyGold ?? 0) > 0) {
+                ui.drawText(`Награда за монстра: +${result.bountyGold} золота · всего ${result.gold}`, screen.width / 2, screen.height * 0.55, {
+                    align: 'center',
+                    size: 20,
+                    color: '#f3d991',
+                });
+            }
             drawArtButton(ui, artTextures, this.actionButton, label, {
                 mouse,
                 color: isDefeat ? '#4a2430' : '#1c3346',

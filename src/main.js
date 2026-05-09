@@ -218,7 +218,7 @@ function showBattleIntro() {
 }
 
 function showResult(outcome) {
-    const result = resolveBattle(run, outcome);
+    const result = resolveBattle(run, outcome, getCurrentBattle(run, battles));
     scene = createBattleResultScene({
         input,
         ui,

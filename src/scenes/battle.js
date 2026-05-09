@@ -438,6 +438,51 @@ function drawTile(ui, tileDef, rect, options = {}) {
     }
 }
 
+function getBoardResourcesAt(state, x, y) {
+    return (state.boardResources ?? []).filter((resource) => (
+        !resource.consumed
+        && resource.x === x
+        && resource.y === y
+    ));
+}
+
+function drawFieldResources(ui, artTextures, rect, resources, occupied) {
+    const visibleResources = resources.slice(0, 2);
+
+    visibleResources.forEach((resource, index) => {
+        const size = occupied
+            ? Math.max(16, rect.width * 0.32)
+            : Math.max(20, rect.width * 0.44);
+        const gap = Math.max(2, rect.width * 0.04);
+        const x = occupied
+            ? rect.x + rect.width - size - gap - index * (size + gap)
+            : rect.x + rect.width / 2 - size / 2 + (index - (visibleResources.length - 1) / 2) * (size + gap);
+        const y = occupied
+            ? rect.y + rect.height - size - gap
+            : rect.y + rect.height / 2 - size / 2;
+        const iconRect = {
+            x,
+            y,
+            width: size,
+            height: size,
+        };
+        const assetId = resource.type === 'heart' ? 'icon_heart_full' : 'icon_gold';
+        const fallback = resource.type === 'heart' ? '+' : 'G';
+        const backingColor = resource.type === 'heart' ? '#74314a' : '#6b4d20';
+
+        ui.drawRect(insetRect(iconRect, -Math.max(2, size * 0.08)), backingColor, occupied ? 0.72 : 0.56);
+
+        if (!drawArtImage(ui, artTextures, assetId, iconRect, { alpha: occupied ? 0.92 : 1 })) {
+            ui.drawText(fallback, x + size / 2, y + size * 0.18, {
+                align: 'center',
+                size: Math.max(13, size * 0.58),
+                color: resource.type === 'heart' ? '#ffd4d8' : '#f3d991',
+                weight: 700,
+            });
+        }
+    });
+}
+
 function drawAttackRow(ui, rect, color, attack, result, settings) {
     const handSubmitEconomy = usesHandSubmitEconomy(settings);
 
@@ -517,10 +562,17 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                 ui.drawRect(rect, fill, 1);
                 drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
             }
+            const resources = getBoardResourcesAt(state, x, y);
+            if (isEmpty && resources.length > 0) {
+                drawFieldResources(ui, artTextures, rect, resources, false);
+            }
             drawTile(ui, state.board[y][x], insetRect(rect, 5), {
                 oneColorLand: isOneColorLandVariant(settings),
                 tileTextures,
             });
+            if (!isEmpty && resources.length > 0) {
+                drawFieldResources(ui, artTextures, rect, resources, true);
+            }
 
         }
     }
@@ -1085,7 +1137,13 @@ function getPlacedFeedback(state, settings) {
         }
 
         if ((state.lastPlacementClosedZones ?? 0) > 0) {
-            return `Зона закрыта: монстру ${formatHeartDelta(state.lastResult?.enemyDamage ?? 0)}, золото +${state.lastResult?.goldEarned ?? 0}`;
+            const heal = state.lastResult?.heartHeal ?? 0;
+            const healText = heal > 0 ? `, сердца +${heal}` : '';
+            return `Зона закрыта: монстру ${formatHeartDelta(state.lastResult?.enemyDamage ?? 0)}, золото +${state.lastResult?.goldEarned ?? 0}${healText}`;
+        }
+
+        if ((state.lastPlacementResourceResult?.amount ?? 0) > 0) {
+            return `Золото поля +${state.lastPlacementResourceResult.amount}`;
         }
 
         return state.selectedHandIndex >= 0
@@ -1305,9 +1363,12 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     )).join(';');
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
     const heldKey = state.heldTile?.id ?? '-';
+    const resourcesKey = (state.boardResources ?? []).map((resource) => (
+        `${resource.id}:${resource.type}:${resource.x},${resource.y}:${resource.amount}:${resource.consumed ? resource.consumedBy ?? 1 : 0}`
+    )).join(',');
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}:${state.lastResult.roadDamage ?? 0}:${state.lastResult.newPickDamage?.totalDamage ?? 0}:${state.lastResult.newPickDamageApplied ?? false}:${state.lastResult.goldEarned ?? 0}:${state.lastResult.strikeCount ?? 0}:${state.lastResult.lastClosureImmediate ?? false}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}:${state.lastResult.roadDamage ?? 0}:${state.lastResult.newPickDamage?.totalDamage ?? 0}:${state.lastResult.newPickDamageApplied ?? false}:${state.lastResult.goldEarned ?? 0}:${state.lastResult.fieldGold ?? 0}:${state.lastResult.heartHeal ?? 0}:${state.lastResult.strikeCount ?? 0}:${state.lastResult.lastClosureImmediate ?? false}`
         : '-';
     const connectTargetKey = state.connectTargets
         ? `${state.connectTargets.a.x},${state.connectTargets.a.y}:${state.connectTargets.b.x},${state.connectTargets.b.y}:${state.connectTargets.connected}:${state.connectTargets.scored}`
@@ -1338,6 +1399,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         connectTargetKey,
         getGameplayVariant(settings).id,
         boardKey,
+        resourcesKey,
         handKey,
         heldKey,
         `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}:${run.gold ?? 0}`,
@@ -1409,7 +1471,7 @@ export function createBattleScene({
 
             const boardCell = getBoardCell(this.layout, settings, click);
             if (state.phase === 'placing' && !state.outcome && boardCell) {
-                const placed = placeTile(state, settings, boardCell.x, boardCell.y);
+                const placed = placeTile(state, settings, boardCell.x, boardCell.y, run);
                 if (placed) {
                     advanceTileQueue(run, state, settings, tiles);
                     resolveImmediatePlacement(state, battle, settings, run);
@@ -1595,8 +1657,21 @@ export function createBattleScene({
                     submit: 'icon_submit',
                     lock: 'icon_lock',
                     strike: 'icon_strike',
+                    fieldGold: 'icon_gold',
+                    fieldHeart: 'icon_heart_full',
                 },
                 gold: run.gold ?? 0,
+                maxPlayerHp: run.maxPlayerHp ?? settings.hearts?.maxPlayerHp ?? settings.startingPlayerHp ?? null,
+                boardResources: (state.boardResources ?? []).map((resource) => ({ ...resource })),
+                activeBoardResources: (state.boardResources ?? [])
+                    .filter((resource) => !resource.consumed)
+                    .map((resource) => ({ ...resource })),
+                consumedBoardResources: (state.boardResources ?? [])
+                    .filter((resource) => resource.consumed)
+                    .map((resource) => ({ ...resource })),
+                resourceEvents: [...state.resourceEvents ?? []],
+                lastPlacementResourceResult: state.lastPlacementResourceResult,
+                lastClosureResourceResult: state.lastClosureResourceResult,
                 submitCost: getHandSubmitCostPreview(state, settings),
                 handSubmitLocked: state.handSubmitLocked ?? false,
                 lockedSubmitCost: state.lockedSubmitCost ?? null,
@@ -1650,9 +1725,15 @@ export function createBattleScene({
                     monsterHeartsAfter: state.lastResult.monsterHeartsAfter,
                     closureGold: state.lastResult.closureGold ?? 0,
                     strikeGold: state.lastResult.strikeGold ?? 0,
+                    fieldGold: state.lastResult.fieldGold ?? 0,
+                    heartHeal: state.lastResult.heartHeal ?? 0,
+                    fieldHeartAmount: state.lastResult.fieldHeartAmount ?? 0,
                     goldEarned: state.lastResult.goldEarned ?? 0,
                     goldBefore: state.lastResult.goldBefore,
                     goldAfter: state.lastResult.goldAfter,
+                    playerHeartsBefore: state.lastResult.playerHeartsBefore,
+                    playerHeartsAfter: state.lastResult.playerHeartsAfter,
+                    closureResources: state.lastResult.closureResources,
                     strikeCount: state.lastResult.strikeCount ?? 0,
                     strikeWindowOpen: state.lastResult.strikeWindowOpen ?? false,
                     placementFocusSpent: state.lastResult.placementFocusSpent,

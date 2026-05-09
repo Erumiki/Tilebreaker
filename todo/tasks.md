@@ -357,7 +357,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Battle Economy: field gold, hearts and monster kill bounty
+### ~~[2026-05-09] MVP Battle Economy: field gold, hearts and monster kill bounty~~ DONE
 
 **Idea:** make battles develop economically, not only tactically, by adding resources on the board and a clear monster reward.
 
@@ -378,6 +378,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** a battle can show gold/heart resources under the board layer, resources do not block tile placement, closure can award field bonus gold and healing, monster death awards the configured bounty once, and all income/heal sources are visible in UI/debug/test output.
 
 **Art dependency:** use placeholder `gold` and `heart` icons from `assets/art_mvp`; final icons can be swapped later.
+
+**Status:** implemented for active `legacy`: battles seed configurable `fieldResources` as board underlay data, direct placement on field gold collects it once, closure consumes remaining gold/hearts inside scored cells, heart resources heal up to `hearts.maxPlayerHp`, debug/log output records resource source/amount/before-after values and consumed ids/cells, and monster kill bounty pays `battle.reward` once on victory. Result/intro copy now shows the bounty as real gold. Unit/check pass; smoke covers visible field resources and per-battle bounty accounting.
 
 **Priority:** must
 

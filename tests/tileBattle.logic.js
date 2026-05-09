@@ -6,7 +6,12 @@ import {
     getGameplayVariant,
     normalizeGameplayVariantId,
 } from '../src/entities/gameplayVariants.js';
-import { createRunState, getRewardChoices } from '../src/entities/run.js';
+import {
+    BattleOutcome,
+    createRunState,
+    getRewardChoices,
+    resolveBattle,
+} from '../src/entities/run.js';
 import {
     advanceTileQueue,
     applyOpeningDrawBag,
@@ -58,6 +63,37 @@ test('new runs start with zero gold for the hand-submit economy', () => {
     });
 
     assert.equal(run.gold, 0);
+});
+
+test('monster bounty pays configured reward once on victory', () => {
+    const run = createRunState({
+        totalBattles: 1,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h'],
+        seed: 20260508,
+        settings: {
+            gameplayVariant: 'legacy',
+            hearts: { maxPlayerHp: 18 },
+        },
+    });
+
+    run.gold = 4;
+
+    const firstResult = resolveBattle(run, BattleOutcome.Victory, {
+        id: 'battle_test',
+        reward: 3,
+    });
+    const secondResult = resolveBattle(run, BattleOutcome.Victory, {
+        id: 'battle_test',
+        reward: 3,
+    });
+
+    assert.equal(firstResult.bountyGold, 3);
+    assert.equal(firstResult.gold, 7);
+    assert.equal(secondResult.bountyGold, 0);
+    assert.equal(run.gold, 7);
+    assert.deepEqual(run.bountiesClaimed, ['battle_test']);
+    assert.equal(run.maxPlayerHp, 18);
 });
 
 function emptyBoard() {
@@ -167,6 +203,63 @@ test('legacy starts on a 7x7 board with one universal red-blue center anchor', (
     const directColorBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
     directColorBoard[3][3] = startTile('tile_red_line_v');
     assert.equal(canPlaceTile(directColorBoard, startTile('tile_blue_line_v'), 3, 2, startSettings), false);
+});
+
+test('legacy field resources seed on empty board cells under the tile layer', () => {
+    const resourceSettings = {
+        ...settings,
+        boardSize: 7,
+        handSize: 3,
+        drawMode: 'hand',
+        gameplayVariant: 'legacy',
+        activeCombatColors: ['red', 'blue'],
+        specialTiles: [
+            {
+                id: 'starter_universal_line_v',
+                color: 'universal',
+                pattern: 'universal_line_v',
+                matrix: ['.*.', '.*.', '.*.'],
+                special: 'universal_boundary',
+                gameplayVariants: ['legacy'],
+            },
+        ],
+        startingBoardTiles: [
+            { id: 'starter_universal_line_v', x: 3, y: 3, gameplayVariants: ['legacy'] },
+        ],
+        startingDeckRecipe: [
+            { pattern: 'line_h', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'line_v', colors: ['red', 'blue'], count: 1 },
+        ],
+        fieldResources: {
+            enabled: true,
+            gold: { count: 2, amount: 1 },
+            heart: { count: 1, amount: 2 },
+        },
+    };
+    const resourceTiles = createTilesFromManifest(manifest, resourceSettings);
+    const run = createRunState({
+        totalBattles: 1,
+        playerHp: 18,
+        startingDeck: createStartingDeckIds(resourceTiles, resourceSettings),
+        seed: 20260508,
+        settings: resourceSettings,
+    });
+    const state = createTileBattleState({
+        battle: {
+            enemyHp: 3,
+            attacks: [{ red: 1, blue: 1 }],
+        },
+        run,
+        settings: resourceSettings,
+        tiles: resourceTiles,
+    });
+
+    assert.equal(state.boardResources.length, 3);
+    assert.equal(state.boardResources.filter((resource) => resource.type === 'gold').length, 2);
+    assert.equal(state.boardResources.filter((resource) => resource.type === 'heart').length, 1);
+    assert.equal(state.boardResources.every((resource) => !resource.consumed), true);
+    assert.equal(state.boardResources.some((resource) => resource.x === 3 && resource.y === 3), false);
+    assert.equal(state.boardResources.every((resource) => state.board[resource.y][resource.x] === null), true);
 });
 
 test('universal boundary assists closure without adding wildcard cells to score area', () => {
@@ -656,6 +749,137 @@ test('legacy placement scores closure immediately, pays gold, and skips monster 
     assert.equal(state.phase, 'placing');
     assert.equal(state.strikeWindowOpen, true);
     assert.equal(state.board.flat().filter(Boolean).length, 0);
+});
+
+test('field gold is picked up by placing on its cell exactly once', () => {
+    const resourceSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+    };
+    const run = {
+        gold: 2,
+        colorMultipliers: { red: 1, blue: 1, green: 1 },
+    };
+    const state = {
+        round: 1,
+        playerHp: 12,
+        enemyHp: 3,
+        board: emptyBoard(),
+        boardResources: [
+            { id: 'gold_a', type: 'gold', x: 1, y: 1, amount: 2, consumed: false },
+        ],
+        hand: [tile('tile_red_line_h'), tile('tile_blue_line_h')],
+        heldTile: null,
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        battleLog: [],
+        resourceEvents: [],
+        outcome: null,
+    };
+
+    assert.equal(placeTile(state, resourceSettings, 1, 1, run), true);
+    assert.equal(run.gold, 4);
+    assert.equal(state.boardResources[0].consumed, true);
+    assert.equal(state.boardResources[0].consumedBy, 'placement');
+    assert.equal(state.lastPlacementResourceResult.amount, 2);
+    assert.equal(state.lastPlacementResourceResult.goldBefore, 2);
+    assert.equal(state.lastPlacementResourceResult.goldAfter, 4);
+    assert.equal(state.resourceEvents[0].source, 'placement');
+    assert.equal(state.battleLog.at(-1), 'Field gold picked up: +2 gold.');
+
+    assert.equal(placeTile(state, resourceSettings, 5, 5, run), true);
+    assert.equal(run.gold, 4);
+});
+
+test('closed fields consume resource gold and heal hearts up to max', () => {
+    const resourceSettings = {
+        ...settings,
+        gameplayVariant: 'legacy',
+        roundBoardCleanup: 'clearScoredTiles',
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+        hearts: {
+            maxPlayerHp: 12,
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+        gold: {
+            closureGold: 1,
+            strikeGoldPerCount: 1,
+        },
+    };
+    const run = {
+        gold: 2,
+        maxPlayerHp: 12,
+        colorMultipliers: { red: 1, blue: 1, green: 1 },
+    };
+    const state = {
+        round: 1,
+        playerHp: 10,
+        enemyHp: 3,
+        board: emptyBoard(),
+        boardResources: [
+            { id: 'gold_inside', type: 'gold', x: 2, y: 2, amount: 2, consumed: false },
+            { id: 'heart_inside', type: 'heart', x: 2, y: 2, amount: 4, consumed: false },
+        ],
+        hand: [tile('tile_red_corner_lu')],
+        heldTile: null,
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        handSubmitsThisBattle: 0,
+        strikeCount: 0,
+        strikeWindowOpen: false,
+        phase: 'placing',
+        lastResult: null,
+        battleLog: [],
+        resourceEvents: [],
+        outcome: null,
+    };
+
+    state.board[1][1] = tile('tile_red_corner_rd');
+    state.board[1][2] = tile('tile_red_tee_d');
+    state.board[1][3] = tile('tile_red_corner_dl');
+    state.board[2][1] = tile('tile_red_tee_r');
+    state.board[2][3] = tile('tile_red_tee_l');
+    state.board[3][1] = tile('tile_red_corner_ur');
+    state.board[3][2] = tile('tile_red_tee_u');
+
+    assert.equal(placeTile(state, resourceSettings, 3, 3, run), true);
+    const result = resolveImmediatePlacement(state, {
+        enemyHp: 3,
+        attacks: [{ red: 0, blue: 0 }],
+    }, resourceSettings, run);
+
+    assert.equal(result.closedZones, 1);
+    assert.equal(result.closureGold, 1);
+    assert.equal(result.fieldGold, 2);
+    assert.equal(result.heartHeal, 2);
+    assert.equal(result.goldEarned, 3);
+    assert.equal(result.goldBefore, 2);
+    assert.equal(result.goldAfter, 5);
+    assert.equal(result.playerHeartsBefore, 10);
+    assert.equal(result.playerHeartsAfter, 12);
+    assert.equal(state.playerHp, 12);
+    assert.equal(run.playerHp, 12);
+    assert.equal(run.gold, 5);
+    assert.equal(state.boardResources.every((resource) => resource.consumed), true);
+    assert.deepEqual(
+        state.boardResources.map((resource) => resource.consumedBy),
+        ['closure', 'closure'],
+    );
+    assert.equal(state.resourceEvents.at(-1).source, 'closure');
+    assert.equal(state.resourceEvents.at(-1).goldAmount, 2);
+    assert.equal(state.resourceEvents.at(-1).heartHeal, 2);
+    assert.equal(state.battleLog.some((entry) => entry === 'Field gold sealed: +2 gold.'), true);
+    assert.equal(state.battleLog.some((entry) => entry === 'Heart sealed: +2 hearts.'), true);
 });
 
 test('empty locked last-chance hand loses if the monster survived', () => {

@@ -41,7 +41,7 @@ function getRewardPreview(battle) {
     const reward = battle.reward ?? 0;
 
     return reward > 0
-        ? `Награда после победы: +${reward} золота (в следующей экономике)`
+        ? `Награда после победы: +${reward} золота`
         : 'Награда после победы будет уточнена';
 }
 

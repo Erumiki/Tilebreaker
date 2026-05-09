@@ -14,13 +14,21 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Field resources and kill bounty extend battle economy
+
+**Context:** Closure and strike gold made battle income visible, but gold still had no map-level decision and monsters did not pay their configured victory reward.
+
+**Decision:** Active `legacy` seeds configurable board-underlay field resources from `tileBattle.fieldResources`. Gold on a placed cell is collected immediately and consumed once; remaining gold and hearts inside scored closure cells are consumed by closure. Hearts heal only through closure and respect `hearts.maxPlayerHp`. Monster victory pays `battle.reward` from `configs/levels.json` once as kill bounty.
+
+**Rationale:** This makes board position matter economically without changing tile topology or adding the shop early. The player can choose between direct gold pickup, sealing resources into a larger contour and preserving heart pressure from `Сдать руку`.
+
 ### 2026-05-09 - Monster intro is a presentation-only route
 
 **Context:** The active Core 1 loop needs a readable beat before each battle so the player sees the incoming monster, hearts, danger and pending reward before the board appears.
 
-**Decision:** Add a standalone `battleIntro` scene between menu/upgrades and battle. It reads the current `configs/levels.json` battle data, uses `assets/art_mvp` intro/backdrop/monster placeholder ids with drawn fallbacks and exposes `getBattleIntroDebug()`. The intro has one action, `Битва`, and does not create tile-battle state or pay kill bounty.
+**Decision:** Add a standalone `battleIntro` scene between menu/upgrades and battle. It reads the current `configs/levels.json` battle data, uses `assets/art_mvp` intro/backdrop/monster placeholder ids with drawn fallbacks and exposes `getBattleIntroDebug()`. The intro has one action, `Битва`, and does not create tile-battle state.
 
-**Rationale:** A separate scene strengthens the first-minute fantasy without touching combat rules, deck accounting or the later shop/economy tasks. Keeping bounty as honest preview text avoids promising a payout before the battle-economy task implements it.
+**Rationale:** A separate scene strengthens the first-minute fantasy without touching combat rules or deck accounting. The later battle-economy task now pays the previewed bounty on victory.
 
 ### 2026-05-09 - Art direction is Astral Archive defense
 

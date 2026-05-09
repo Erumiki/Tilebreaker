@@ -357,6 +357,94 @@ function getGoldRules(settings) {
     };
 }
 
+function getFieldResourceRules(settings) {
+    const resources = settings.fieldResources ?? {};
+
+    return {
+        enabled: resources.enabled === true,
+        gold: {
+            count: Math.max(0, Math.floor(resources.gold?.count ?? 0)),
+            amount: Math.max(0, resources.gold?.amount ?? 1),
+        },
+        heart: {
+            count: Math.max(0, Math.floor(resources.heart?.count ?? 0)),
+            amount: Math.max(0, resources.heart?.amount ?? 1),
+        },
+    };
+}
+
+function getMaxPlayerHp(settings, run = null) {
+    return run?.maxPlayerHp
+        ?? settings.hearts?.maxPlayerHp
+        ?? settings.startingPlayerHp
+        ?? Infinity;
+}
+
+function createFieldResourceRandom(run) {
+    let state = ((run?.rngState ?? 20260508)
+        ^ ((run?.currentBattle ?? 1) * 0x9e3779b9)) >>> 0;
+
+    return () => {
+        state = (state * 1664525 + 1013904223) >>> 0;
+        return state / 0x100000000;
+    };
+}
+
+function createFieldResources(board, settings, run) {
+    const rules = getFieldResourceRules(settings);
+
+    if (!isLegacyVariant(settings) || !rules.enabled) {
+        return [];
+    }
+
+    const cells = [];
+
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            if (!board[y][x]) {
+                cells.push({ x, y });
+            }
+        }
+    }
+
+    const random = createFieldResourceRandom(run);
+    const resources = [];
+    const battleNumber = run?.currentBattle ?? 1;
+    const takeCell = () => {
+        if (cells.length === 0) {
+            return null;
+        }
+
+        const index = Math.floor(random() * cells.length);
+        const [cell] = cells.splice(index, 1);
+        return cell;
+    };
+    const addResources = (type, count, amount) => {
+        for (let index = 0; index < count; index += 1) {
+            const cell = takeCell();
+
+            if (!cell) {
+                return;
+            }
+
+            resources.push({
+                id: `${battleNumber}_${type}_${index + 1}`,
+                type,
+                x: cell.x,
+                y: cell.y,
+                amount,
+                consumed: false,
+                consumedBy: null,
+            });
+        }
+    };
+
+    addResources('gold', rules.gold.count, rules.gold.amount);
+    addResources('heart', rules.heart.count, rules.heart.amount);
+
+    return resources;
+}
+
 function addBattleLog(state, message) {
     state.battleLog ??= [];
     state.battleLog.push(message);
@@ -364,6 +452,138 @@ function addBattleLog(state, message) {
     if (state.battleLog.length > 6) {
         state.battleLog.splice(0, state.battleLog.length - 6);
     }
+}
+
+function addResourceEvent(state, event) {
+    state.resourceEvents ??= [];
+    state.resourceEvents.push(event);
+
+    if (state.resourceEvents.length > 12) {
+        state.resourceEvents.splice(0, state.resourceEvents.length - 12);
+    }
+}
+
+function describeResource(resource) {
+    return {
+        id: resource.id,
+        type: resource.type,
+        x: resource.x,
+        y: resource.y,
+        amount: resource.amount,
+    };
+}
+
+function consumeResources(resources, source) {
+    for (const resource of resources) {
+        resource.consumed = true;
+        resource.consumedBy = source;
+    }
+}
+
+function getUnconsumedResourcesAt(state, x, y, type = null) {
+    return (state.boardResources ?? []).filter((resource) => (
+        !resource.consumed
+        && resource.x === x
+        && resource.y === y
+        && (!type || resource.type === type)
+    ));
+}
+
+function collectPlacementResources(state, run, x, y) {
+    const resources = getUnconsumedResourcesAt(state, x, y, 'gold');
+    const amount = resources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
+    const goldBefore = run?.gold ?? 0;
+    const result = {
+        source: 'placement',
+        type: 'gold',
+        amount,
+        resources: resources.map(describeResource),
+        goldBefore,
+        goldAfter: goldBefore + amount,
+    };
+
+    state.lastPlacementResourceResult = result;
+
+    if (amount <= 0) {
+        return result;
+    }
+
+    consumeResources(resources, 'placement');
+
+    if (run) {
+        run.gold = goldBefore + amount;
+        result.goldAfter = run.gold;
+    }
+
+    addResourceEvent(state, result);
+    addBattleLog(state, `Field gold picked up: +${amount} gold.`);
+
+    return result;
+}
+
+function collectClosureResources(state, run, settings, score) {
+    const scoredTileKeys = getScoredTileKeys({ score });
+    const resources = (state.boardResources ?? []).filter((resource) => (
+        !resource.consumed
+        && scoredTileKeys.has(boardKey(resource.x, resource.y))
+    ));
+    const goldResources = resources.filter((resource) => resource.type === 'gold');
+    const heartResources = resources.filter((resource) => resource.type === 'heart');
+    const goldAmount = goldResources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
+    const heartAmount = heartResources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
+    const goldBefore = run?.gold ?? 0;
+    const playerHeartsBefore = state.playerHp ?? 0;
+    const maxPlayerHp = getMaxPlayerHp(settings, run);
+    const heartHeal = Math.max(0, Math.min(heartAmount, maxPlayerHp - playerHeartsBefore));
+    const result = {
+        source: 'closure',
+        resources: resources.map(describeResource),
+        goldAmount,
+        heartAmount,
+        heartHeal,
+        goldBefore,
+        goldAfter: goldBefore + goldAmount,
+        playerHeartsBefore,
+        playerHeartsAfter: playerHeartsBefore + heartHeal,
+    };
+
+    state.lastClosureResourceResult = result;
+
+    if (resources.length === 0) {
+        return result;
+    }
+
+    consumeResources(resources, 'closure');
+
+    if (run && goldAmount > 0) {
+        run.gold = goldBefore + goldAmount;
+        result.goldAfter = run.gold;
+    }
+
+    if (heartResources.length > 0) {
+        state.playerHp = playerHeartsBefore + heartHeal;
+        if (run) {
+            run.playerHp = state.playerHp;
+        }
+        result.playerHeartsAfter = state.playerHp;
+    }
+
+    addResourceEvent(state, result);
+
+    if (goldAmount > 0) {
+        addBattleLog(state, `Field gold sealed: +${goldAmount} gold.`);
+    }
+
+    if (heartResources.length > 0) {
+        addBattleLog(
+            state,
+            heartHeal > 0
+                ? `Heart sealed: +${heartHeal} hearts.`
+                : 'Heart sealed: already at max hearts.',
+        );
+    }
+
+    return result;
 }
 
 function computeHandSubmitCostPreview(state, settings, options = {}) {
@@ -1693,6 +1913,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         playerHp: run.playerHp,
         enemyHp: battle.enemyHp,
         board: startingBoard,
+        boardResources: createFieldResources(startingBoard, settings, run),
         hand,
         heldTile: null,
         selectedHandIndex: hand.findIndex(Boolean),
@@ -1706,7 +1927,10 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         phase: 'placing',
         lastResult: null,
         lastSubmitResult: null,
+        lastPlacementResourceResult: null,
+        lastClosureResourceResult: null,
         battleLog: [],
+        resourceEvents: [],
         handSubmitLocked: false,
         lockedSubmitCost: null,
         outcome: null,
@@ -1764,7 +1988,7 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
     return true;
 }
 
-export function placeTile(state, settings, x, y) {
+export function placeTile(state, settings, x, y, run = null) {
     const tileDef = state.hand[state.selectedHandIndex];
 
     if (!canPlaceTile(state.board, tileDef, x, y, settings)) {
@@ -1776,6 +2000,7 @@ export function placeTile(state, settings, x, y) {
     state.board[y][x] = tileDef;
     state.lastPlacedTileColor = tileDef.color;
     state.lastPlacedTileId = tileDef.id;
+    collectPlacementResources(state, run, x, y);
     const postPlacementScore = scoreTileBoard(state.board, settings);
     state.lastPlacementClosedZones = postPlacementScore.zones.length;
     state.lastPlacementFocusDelta = 0;
@@ -2035,6 +2260,7 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
         if (state.lastResult?.lastClosureImmediate) {
             state.lastResult = null;
         }
+        state.lastClosureResourceResult = null;
 
         return null;
     }
@@ -2055,11 +2281,16 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
     const strikeGold = wasStrikeWindowOpen
         ? state.strikeCount * goldRules.strikeGoldPerCount
         : 0;
-    const goldEarned = closureGold + strikeGold;
+    const baseGoldEarned = closureGold + strikeGold;
 
     if (run) {
-        run.gold = (run.gold ?? 0) + goldEarned;
+        run.gold = (run.gold ?? 0) + baseGoldEarned;
     }
+
+    const closureResources = collectClosureResources(state, run, settings, score);
+    const fieldGold = closureResources.goldAmount;
+    const heartHeal = closureResources.heartHeal;
+    const goldEarned = baseGoldEarned + fieldGold;
 
     state.enemyHp = Math.max(0, state.enemyHp - enemyDamage);
 
@@ -2096,9 +2327,15 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
         monsterHeartsAfter: state.enemyHp,
         closureGold,
         strikeGold,
+        fieldGold,
+        heartHeal,
+        fieldHeartAmount: closureResources.heartAmount,
         goldEarned,
         goldBefore,
         goldAfter: run?.gold ?? goldBefore,
+        playerHeartsBefore: closureResources.playerHeartsBefore,
+        playerHeartsAfter: closureResources.playerHeartsAfter,
+        closureResources,
         strikeCount: state.strikeCount,
         strikeWindowOpen: state.strikeWindowOpen,
     };
@@ -2304,6 +2541,8 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
     state.lastPlacementFocusDelta = 0;
     state.lastPlacementClosedZones = 0;
     state.lastChainDelta = 0;
+    state.lastPlacementResourceResult = null;
+    state.lastClosureResourceResult = null;
     updateHandSubmitLock(state, settings);
     state.phase = 'placing';
     state.lastResult = null;

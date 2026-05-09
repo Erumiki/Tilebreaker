@@ -142,6 +142,9 @@ Gold is currently battle income and future shop currency:
 - a run starts at 0 gold;
 - each closed zone gives `+1 gold`;
 - consecutive closing placements award strike bonus gold equal to the current strike count.
+- active `legacy` seeds configurable board-underlay field resources: direct placement on gold collects it immediately, and closure consumes remaining gold/hearts in scored cells;
+- field hearts heal only through closure and are capped by `hearts.maxPlayerHp`;
+- monster victory pays `battle.reward` from `configs/levels.json` once as kill bounty.
 
 Gold spending is not implemented yet. Buyable card design lives in `design/card-pool.md`; the shop implementation lives later in `todo/tasks.md`.
 
@@ -183,7 +186,6 @@ Detailed art direction lives in `design/art-direction.md`. Accepted style refere
 
 - Deep permanent meta-progression.
 - Full card shop and buyable special cards.
-- Field resources and kill bounty.
 - Final monster intro presentation.
 - Full art replacement through the MVP art manifest.
 - Manual rotation as a default rule.
