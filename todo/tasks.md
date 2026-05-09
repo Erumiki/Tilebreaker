@@ -8,7 +8,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Balance Gate: validate shop cards and decide final pool
+### ~~[2026-05-09] MVP Balance Gate: validate shop cards and decide final pool~~
 
 **Idea:** turn the current balance-unverified shop into a deliberate MVP card pool.
 
@@ -32,6 +32,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Priority:** must
 
 **Layer:** MVP
+
+**Completed 2026-05-09:** added `scripts/simulate-card-balance.js`, ran `CARD_BALANCE_RUNS=40 ./scripts/node.sh scripts/simulate-card-balance.js`, and recorded the final family decisions in `design/card-balance-gate.md`. Gate result: keep restrained ordinary line/tee/corner and plus/cross; stage/disable guaranteed `joker_line_v` and `double_red_line_h` in the next config sync.
 
 ---
 
