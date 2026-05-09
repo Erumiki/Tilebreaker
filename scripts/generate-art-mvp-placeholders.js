@@ -474,6 +474,85 @@ function drawPanelSurface(bitmap, asset) {
     drawOrnateFrame(bitmap, inset, accent, 210);
 }
 
+function drawShopCardSurface(bitmap, asset) {
+    const state = asset.state;
+    const isBought = state === 'bought';
+    const isUnaffordable = state === 'unaffordable';
+    const isAffordable = state === 'affordable' || state === 'offer';
+    const accent = isBought
+        ? [117, 213, 145, 255]
+        : isUnaffordable ? [151, 137, 151, 255] : [235, 181, 102, 255];
+    const base = isBought
+        ? [13, 24, 21, 238]
+        : isUnaffordable ? [17, 15, 22, 226] : [13, 16, 23, 238];
+    const mid = isBought
+        ? [22, 54, 39, 242]
+        : isUnaffordable ? [41, 33, 44, 232] : [37, 27, 38, 242];
+    const inset = Math.max(8, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.035));
+    const inner = {
+        x: inset,
+        y: inset,
+        width: bitmap.width - inset * 2,
+        height: bitmap.height - inset * 2,
+    };
+    const previewSize = Math.floor(Math.min(bitmap.width * 0.5, bitmap.height * 0.3));
+    const preview = {
+        x: Math.floor(bitmap.width / 2 - previewSize / 2),
+        y: Math.floor(bitmap.height * 0.22),
+        width: previewSize,
+        height: previewSize,
+    };
+    const seed = hashString(asset.id);
+
+    bitmap.fillRect(0, 0, bitmap.width, bitmap.height, [0, 0, 0, 0]);
+    bitmap.fillRect(inner.x, inner.y, inner.width, inner.height, base);
+    for (let y = inner.y; y < inner.y + inner.height; y += 1) {
+        const t = (y - inner.y) / Math.max(1, inner.height);
+        bitmap.fillRect(inner.x, y, inner.width, 1, mix(base, mid, t * 0.42));
+    }
+
+    bitmap.fillEllipse(bitmap.width * 0.5, bitmap.height * 0.36, bitmap.width * 0.34, bitmap.height * 0.18, withAlpha(accent, isUnaffordable ? 12 : 20));
+    drawCompass(bitmap, bitmap.width * 0.5, bitmap.height * 0.36, Math.min(bitmap.width, bitmap.height) * 0.17, accent, isUnaffordable ? 30 : 46);
+
+    const specks = 36;
+    for (let index = 0; index < specks; index += 1) {
+        const x = inner.x + noise01(seed, index * 3) * inner.width;
+        const y = inner.y + noise01(seed, index * 3 + 1) * inner.height;
+        const size = 1 + noise01(seed, index * 3 + 2) * 1.8;
+        bitmap.fillRect(x, y, size, size, withAlpha(accent, isUnaffordable ? 12 : 20));
+    }
+
+    bitmap.fillRect(preview.x - 10, preview.y - 10, preview.width + 20, preview.height + 20, [4, 7, 11, isUnaffordable ? 92 : 130]);
+    bitmap.fillRect(preview.x - 5, preview.y - 5, preview.width + 10, preview.height + 10, [16, 18, 23, isUnaffordable ? 108 : 154]);
+    drawFrame({
+        width: preview.width + 18,
+        height: preview.height + 18,
+        fillRect(x, y, width, height, color) {
+            bitmap.fillRect(preview.x - 9 + x, preview.y - 9 + y, width, height, color);
+        },
+    }, withAlpha(accent, isUnaffordable ? 72 : 112), 2);
+    drawStar(bitmap, bitmap.width * 0.5, preview.y + preview.height + 34, Math.min(bitmap.width, bitmap.height) * 0.035, accent, isUnaffordable ? 58 : 94);
+
+    const footerY = Math.floor(bitmap.height * 0.73);
+    if (isBought) {
+        bitmap.fillRect(inner.x + 10, footerY, inner.width - 20, 34, [74, 151, 97, 106]);
+        bitmap.fillRect(inner.x + 10, footerY + 31, inner.width - 20, 3, [171, 238, 177, 92]);
+    } else if (isAffordable) {
+        bitmap.fillRect(inner.x + 10, footerY, inner.width - 20, 34, [91, 64, 30, 76]);
+        bitmap.fillRect(inner.x + 10, footerY + 31, inner.width - 20, 3, [241, 196, 111, 82]);
+    } else if (isUnaffordable) {
+        bitmap.fillRect(inner.x + 10, footerY, inner.width - 20, 34, [42, 35, 43, 92]);
+    }
+
+    drawFrame(bitmap, [24, 14, 12, 210], 4);
+    drawFrame(bitmap, withAlpha(accent, isUnaffordable ? 118 : 184), 2);
+    drawCellCornerBrackets(bitmap, accent, isUnaffordable ? 132 : 220, {
+        inset: inset,
+        length: 28,
+        thickness: 3,
+    });
+}
+
 function drawCellCornerBrackets(bitmap, color, alpha, options = {}) {
     const inset = options.inset ?? Math.max(10, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.12));
     const length = options.length ?? Math.max(16, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.2));
@@ -1086,7 +1165,12 @@ function drawPlaceholder(asset) {
         return bitmap;
     }
 
-    if (asset.category === 'ui_chrome' || asset.category === 'card_frame' || asset.category === 'shop_card') {
+    if (asset.category === 'shop_card') {
+        drawShopCardSurface(bitmap, asset);
+        return bitmap;
+    }
+
+    if (asset.category === 'ui_chrome' || asset.category === 'card_frame') {
         drawPanelSurface(bitmap, asset);
         if (asset.state === 'rare') {
             drawStar(bitmap, width * 0.86, height * 0.18, Math.min(width, height) * 0.08, [91, 177, 255, 255], 210);
@@ -1220,16 +1304,30 @@ function validateManifest(manifest) {
 function main() {
     const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
     validateManifest(manifest);
+    const assetIds = new Set((process.env.ART_ASSET_IDS ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean));
 
     const outputDir = path.join(ROOT, manifest.root);
     fs.mkdirSync(outputDir, { recursive: true });
 
-    for (const asset of manifest.assets) {
+    const assets = assetIds.size > 0
+        ? manifest.assets.filter((asset) => assetIds.has(asset.id))
+        : manifest.assets;
+
+    if (assetIds.size > 0 && assets.length !== assetIds.size) {
+        const knownIds = new Set(assets.map((asset) => asset.id));
+        const missingIds = [...assetIds].filter((id) => !knownIds.has(id));
+        throw new Error(`Unknown ART_ASSET_IDS: ${missingIds.join(', ')}`);
+    }
+
+    for (const asset of assets) {
         const bitmap = drawPlaceholder(asset);
         fs.writeFileSync(path.join(outputDir, asset.file), encodePng(bitmap));
     }
 
-    console.log(`Generated ${manifest.assets.length} MVP art placeholders in ${manifest.root}`);
+    console.log(`Generated ${assets.length} MVP art placeholders in ${manifest.root}`);
 }
 
 main();

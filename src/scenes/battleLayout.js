@@ -88,11 +88,12 @@ function withMetadata(layout, screen, safeArea) {
 }
 
 function createDesktopLayout(screen, settings) {
-    const boardPixels = Math.min(screen.width - 360, screen.height - 290, 438);
+    const minSideWidth = 300;
+    const boardPixels = Math.min(screen.width - minSideWidth - 78, screen.height - 290, 438);
     const boardSize = Math.max(300, boardPixels);
     const boardX = Math.max(
         24,
-        Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - 300),
+        Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - minSideWidth - 48),
     );
     const boardY = 144;
     const isQueue = isQueueDrawMode(settings);
@@ -115,7 +116,7 @@ function createDesktopLayout(screen, settings) {
     const handX = groupX + (holdEnabled ? handSlot + holdGap : 0);
     const handY = screen.height - handSlot - 28;
     const sideX = boardX + boardSize + 24;
-    const sideWidth = Math.max(240, screen.width - sideX - 24);
+    const sideWidth = Math.max(minSideWidth, screen.width - sideX - 24);
     const sidePanel = rect(sideX, boardY, sideWidth, boardSize);
     const hand = Array.from({ length: handCount }, (_, index) => {
         if (!isQueue) {

@@ -306,4 +306,7 @@ window.__tilebreakerDebug = {
     getShopDebug() {
         return scene?.name === 'shop' ? scene.getDebugState?.() ?? null : null;
     },
+    getResultDebug() {
+        return scene?.name === 'result' ? scene.getDebugState?.() ?? null : null;
+    },
 };

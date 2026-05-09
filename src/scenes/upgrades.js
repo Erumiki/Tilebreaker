@@ -8,12 +8,17 @@ function getShopLayout(screen, offerCount) {
     const rows = Math.ceil(offerCount / columns);
     const maxGridWidth = isPortrait ? screen.width - 32 : Math.min(screen.width - 56, columns * 190 + gap * (columns - 1));
     const cardWidth = (maxGridWidth - gap * (columns - 1)) / columns;
+    const startY = isPortrait ? Math.max(124, screen.height * 0.2) : screen.height * 0.34;
+    const continueHeight = isPortrait ? 56 : 62;
+    const continueGap = isPortrait ? 12 : 26;
+    const bottomPadding = isPortrait ? 18 : 0;
+    const availableGridHeight = screen.height - startY - continueHeight - continueGap - bottomPadding;
+    const portraitCardHeight = (availableGridHeight - gap * (rows - 1)) / Math.max(1, rows);
     const cardHeight = isPortrait
-        ? Math.max(124, Math.min(146, (screen.height - 312) / Math.max(1, rows)))
+        ? Math.max(98, Math.min(146, portraitCardHeight))
         : screen.height < 720 ? 166 : 210;
     const gridWidth = cardWidth * columns + gap * (columns - 1);
     const startX = screen.width / 2 - gridWidth / 2;
-    const startY = isPortrait ? Math.max(140, screen.height * 0.2) : screen.height * 0.34;
     const offerRects = Array.from({ length: offerCount }, (_, index) => {
         const column = index % columns;
         const row = Math.floor(index / columns);
@@ -29,22 +34,42 @@ function getShopLayout(screen, offerCount) {
     const gridBottom = startY + rows * cardHeight + (rows - 1) * gap;
     const continueButton = {
         x: screen.width / 2 - continueWidth / 2,
-        y: Math.min(screen.height - 78, gridBottom + (isPortrait ? 14 : 26)),
+        y: Math.min(screen.height - continueHeight - bottomPadding, gridBottom + continueGap),
         width: continueWidth,
-        height: isPortrait ? 56 : 62,
+        height: continueHeight,
     };
+    const viewport = {
+        width: screen.width,
+        height: screen.height,
+    };
+    const allRects = [...offerRects, continueButton];
+    const isInsideViewport = (rect) => rect.x >= 0
+        && rect.y >= 0
+        && rect.x + rect.width <= viewport.width
+        && rect.y + rect.height <= viewport.height;
+    const overlapsContinue = offerRects.some((rect) => !(
+        rect.x + rect.width <= continueButton.x
+        || continueButton.x + continueButton.width <= rect.x
+        || rect.y + rect.height <= continueButton.y
+        || continueButton.y + continueButton.height <= rect.y
+    ));
 
     return {
         mode: isPortrait ? 'portrait' : 'desktop',
         offers: offerRects,
         continueButton,
+        minTouchTarget: Math.min(
+            continueButton.width,
+            continueButton.height,
+            ...offerRects.flatMap((rect) => [rect.width, rect.height]),
+        ),
         viewport: {
             screen: {
                 width: screen.width,
                 height: screen.height,
             },
-            overflows: offerRects.some((rect) => rect.y + rect.height > screen.height)
-                || continueButton.y + continueButton.height > screen.height,
+            overflows: allRects.some((rect) => !isInsideViewport(rect)),
+            overlapsContinue,
         },
     };
 }
@@ -158,11 +183,12 @@ function drawOfferCard(ui, {
     };
     const tileTexture = getTileTexture(tileTextures, offer);
 
-    ui.drawText(offer.name, rect.x + rect.width / 2, rect.y + 12, {
+    ui.drawText(wrapText(offer.name, compact ? 18 : 22, compact ? 2 : 1), rect.x + rect.width / 2, rect.y + (compact ? 9 : 12), {
         align: 'center',
         size: compact ? 13 : 17,
         color: textColor,
         weight: 700,
+        lineHeight: compact ? 15 : 20,
     });
 
     if (tileTexture) {
@@ -309,6 +335,7 @@ export function createShopScene({
                     offerId: offer.offerId,
                     cardId: offer.cardId,
                     tileId: offer.tileId,
+                    type: offer.type,
                     name: offer.name,
                     cost: offer.cost,
                     rarity: offer.rarity,

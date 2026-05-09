@@ -42,6 +42,14 @@ async function getBattleDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getBattleDebug());
 }
 
+async function getBattleDebugIfActive(page) {
+  return page.evaluate(() => (
+    window.__tilebreakerDebug?.getSceneName?.() === 'battle'
+      ? window.__tilebreakerDebug.getBattleDebug()
+      : null
+  ));
+}
+
 async function getBattleIntroDebug(page) {
   await expect.poll(async () => {
     try {
@@ -72,15 +80,27 @@ async function getShopDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getShopDebug());
 }
 
+async function getResultDebug(page) {
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(() => {
+        const debug = window.__tilebreakerDebug?.getResultDebug?.();
+        return Boolean(debug?.layout?.actionButton?.width);
+      });
+    } catch {
+      return false;
+    }
+  }).toBe(true);
+
+  return page.evaluate(() => window.__tilebreakerDebug.getResultDebug());
+}
+
 async function getMainMenuDebug(page) {
   await expect.poll(async () => {
     try {
       return await page.evaluate(() => {
         const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
-        return Boolean(
-          debug?.layout?.startButton?.width
-          && debug?.layout?.variants?.length,
-        );
+        return Boolean(debug?.layout?.startButton?.width);
       });
     } catch {
       return false;
@@ -137,6 +157,41 @@ function expectBattleIntroFits(debug) {
   ].forEach(([label, rect]) => expectRectInsideViewport(rect, viewport, `intro.${label}`));
 }
 
+function rectsOverlap(a, b) {
+  return !(
+    a.x + a.width <= b.x
+    || b.x + b.width <= a.x
+    || a.y + a.height <= b.y
+    || b.y + b.height <= a.y
+  );
+}
+
+function expectShopFits(debug, expectedMode = null) {
+  if (expectedMode) {
+    expect(debug.layout.mode).toBe(expectedMode);
+  }
+
+  expect(debug.layout.viewport.overflows).toBe(false);
+  expect(debug.layout.viewport.overlapsContinue).toBe(false);
+  expect(debug.layout.minTouchTarget).toBeGreaterThanOrEqual(44);
+
+  const viewport = debug.layout.viewport.screen;
+  debug.layout.offers.forEach((rect, index) => {
+    expectRectInsideViewport(rect, viewport, `shop.offer.${index}`);
+    expect(rectsOverlap(rect, debug.layout.continueButton), `shop.offer.${index} overlaps continue`).toBe(false);
+  });
+  expectRectInsideViewport(debug.layout.continueButton, viewport, 'shop.continueButton');
+}
+
+function expectResultFits(debug) {
+  expect(debug.layout.viewport.overflows).toBe(false);
+  expect(debug.layout.viewport.overlaps).toBe(false);
+
+  const viewport = debug.layout.viewport.screen;
+  expectRectInsideViewport(debug.layout.panel, viewport, 'result.panel');
+  expectRectInsideViewport(debug.layout.actionButton, viewport, 'result.actionButton');
+}
+
 async function enterBattleFromIntro(page) {
   await expectScene(page, 'battleIntro');
   const introDebug = await getBattleIntroDebug(page);
@@ -144,6 +199,14 @@ async function enterBattleFromIntro(page) {
   await clickRect(page, introDebug.buttonRect);
   await expectScene(page, 'battle');
   return introDebug;
+}
+
+async function continueFromResult(page) {
+  await expectScene(page, 'result');
+  const resultDebug = await getResultDebug(page);
+  expectResultFits(resultDebug);
+  await clickRect(page, resultDebug.layout.actionButton);
+  return resultDebug;
 }
 
 async function buyAffordableShopOffers(page, maxBuys) {
@@ -186,9 +249,13 @@ async function continueFromShop(page, { maxBuys = 0 } = {}) {
 
   expect(shopDebug.offers).toHaveLength(5);
   expect(shopDebug.shop.balanceStatus).toBe('mvp_balance_synced');
+  expect(shopDebug.layout.viewport.overflows).toBe(false);
+  expect(shopDebug.layout.viewport.overlapsContinue).toBe(false);
+  expect(shopDebug.offers.every((offer) => offer.type === 'shop_card')).toBe(true);
   expect(shopDebug.offers.every((offer) => offer.balanceStatus.startsWith('mvp_keep'))).toBe(true);
   expect(shopDebug.offers.some((offer) => ['card_joker_line_v', 'card_double_line'].includes(offer.cardId))).toBe(false);
   expect(shopDebug.offers.every((offer) => offer.cardId.startsWith('card_'))).toBe(true);
+  expect(shopDebug.offers.some((offer) => ['add_tile', 'remove_tile', 'boost_color'].includes(offer.type))).toBe(false);
 
   if (maxBuys > 0) {
     await buyAffordableShopOffers(page, maxBuys);
@@ -201,17 +268,20 @@ async function continueFromShop(page, { maxBuys = 0 } = {}) {
 }
 
 async function placeHandIndex(page, handIndex, cellX, cellY) {
-  const sceneBefore = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
-  if (sceneBefore !== 'battle') {
+  let debug = await getBattleDebugIfActive(page);
+  if (!debug?.layout) {
     return false;
   }
 
-  let debug = await getBattleDebug(page);
   const placedBefore = debug.placedCount;
   await clickRect(page, debug.layout.hand[handIndex]);
   await page.waitForTimeout(50);
 
-  debug = await getBattleDebug(page);
+  debug = await getBattleDebugIfActive(page);
+  if (!debug?.layout) {
+    return true;
+  }
+
   const { board, cellSize } = debug.layout;
   await page.mouse.click(
     board.x + (cellX + 0.5) * cellSize,
@@ -580,6 +650,8 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
 
   let menuDebug = await getMainMenuDebug(page);
   expect(menuDebug.selectedVariant).toBe('legacy');
+  expect(menuDebug.variants).toEqual([]);
+  expect(menuDebug.layout.variants).toEqual([]);
   await clickRect(page, menuDebug.layout.startButton);
   let introDebug = await enterBattleFromIntro(page);
   expect(introDebug.battleNumber).toBe(1);
@@ -679,7 +751,7 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     expect(run.bountiesClaimed).toHaveLength(battle);
     expect(run.gold).toBeGreaterThanOrEqual(battle);
 
-    await clickCanvas(page, 0.5, 0.73);
+    await continueFromResult(page);
 
     if (battle < 5) {
       const maxBuys = 0;
@@ -695,6 +767,7 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
       expect(introDebug.battleNumber).toBe(battle + 1);
       const upgradedRun = await page.evaluate(() => window.__tilebreakerDebug.getRun());
       expect(upgradedRun.shopHistory).toHaveLength(battle);
+      expect(upgradedRun.upgrades).toHaveLength(0);
     } else {
       await expectScene(page, 'mainmenu');
     }
@@ -710,11 +783,12 @@ test('shop sells an affordable card and continues to the next monster intro', as
   await expectScene(page, 'mainmenu');
 
   const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.layout.variants).toEqual([]);
   await clickRect(page, menuDebug.layout.startButton);
   await enterBattleFromIntro(page);
   await playUntilBattleResult(page);
   await expectScene(page, 'result');
-  await clickCanvas(page, 0.5, 0.73);
+  await continueFromResult(page);
 
   const introDebug = await continueFromShop(page, { maxBuys: 1 });
   expect(introDebug.battleNumber).toBe(2);
@@ -734,6 +808,7 @@ test('player can hold and swap one hand card', async ({ page }) => {
   await expectScene(page, 'mainmenu');
 
   const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.layout.variants).toEqual([]);
   await clickRect(page, menuDebug.layout.startButton);
   await enterBattleFromIntro(page);
 
@@ -789,6 +864,7 @@ for (const viewport of [
     await expectScene(page, 'mainmenu');
 
     const menuDebug = await getMainMenuDebug(page);
+    expect(menuDebug.layout.variants).toEqual([]);
     await clickRect(page, menuDebug.layout.startButton);
     const introDebug = await enterBattleFromIntro(page);
     expect(introDebug.layout.mode).toBe('portrait');
@@ -832,25 +908,43 @@ for (const viewport of [
   });
 }
 
-test('player can choose a kept experiment from the temporary variant picker', async ({ page }) => {
-  await page.goto('/?seed=20260508&drawMode=queue');
+test('portrait shop layout keeps offers and continue visible', async ({ page }) => {
+  test.setTimeout(60_000);
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
 
   await expect(page.locator('#game')).toBeVisible();
   await expectScene(page, 'mainmenu');
 
-  let menuDebug = await getMainMenuDebug(page);
-  expect(menuDebug.variants.map((variant) => variant.id)).not.toContain('placement_payoff');
-  expect(menuDebug.variants.map((variant) => variant.id)).not.toContain('road_mode');
-  const targetsButton = menuDebug.layout.variants.find((button) => (
-    button.variant.id === 'connect_targets'
-  ));
-  await clickRect(page, targetsButton.rect);
+  const menuDebug = await getMainMenuDebug(page);
+  await clickRect(page, menuDebug.layout.startButton);
+  await enterBattleFromIntro(page);
+  await playUntilBattleResult(page);
+  await expectScene(page, 'result');
+  await continueFromResult(page);
 
-  await expect.poll(() => page.evaluate(() => (
-    window.__tilebreakerDebug.getMainMenuDebug().selectedVariant
-  ))).toBe('connect_targets');
+  await expectScene(page, 'shop');
+  const shopDebug = await getShopDebug(page);
+  expectShopFits(shopDebug, 'portrait');
+  expect(shopDebug.offers).toHaveLength(5);
+  expect(shopDebug.offers.every((offer) => offer.type === 'shop_card')).toBe(true);
 
-  menuDebug = await getMainMenuDebug(page);
+  await clickRect(page, shopDebug.layout.continueButton);
+  const introDebug = await getBattleIntroDebug(page);
+  expect(introDebug.battleNumber).toBe(2);
+});
+
+test('normal menu hides variants while debug URLs remain playable', async ({ page }) => {
+  await page.goto('/?seed=20260508&variant=c&drawMode=queue');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('connect_targets');
+  expect(menuDebug.variants).toEqual([]);
+  expect(menuDebug.layout.variants).toEqual([]);
 
   await clickRect(page, menuDebug.layout.startButton);
   await enterBattleFromIntro(page);
@@ -892,7 +986,7 @@ test('one-color chain variant is playable through the first two battles', async 
     run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
     expect(run.completedBattles).toBe(battle);
 
-    await clickCanvas(page, 0.5, 0.73);
+    await continueFromResult(page);
 
     if (battle < 2) {
       await continueFromShop(page);
@@ -935,7 +1029,7 @@ test('connect-targets variant is playable through the first two battles', async 
     run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
     expect(run.completedBattles).toBe(battle);
 
-    await clickCanvas(page, 0.5, 0.73);
+    await continueFromResult(page);
 
     if (battle < 2) {
       await continueFromShop(page);

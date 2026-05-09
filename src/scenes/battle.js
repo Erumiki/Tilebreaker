@@ -555,6 +555,7 @@ function drawFieldResources(ui, artTextures, rect, resources, occupied) {
 
 function drawAttackRow(ui, rect, color, attack, result, settings) {
     const handSubmitEconomy = usesHandSubmitEconomy(settings);
+    const compact = rect.width < 270;
 
     ui.drawRect(rect, '#132334', 0.96);
     ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, getColorHex(color, settings), 1);
@@ -562,13 +563,16 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
         size: 16,
         color: '#ecf6ff',
     });
-    ui.drawText(handSubmitEconomy ? 'Захват' : `Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - 124, rect.y + 9, {
+    ui.drawText(handSubmitEconomy ? 'Захват' : `Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - (compact ? 92 : 124), rect.y + 9, {
         size: 15,
         color: '#afc4d7',
     });
 
     if (!result) {
-        ui.drawText(handSubmitEconomy ? 'Замкни границу, чтобы ударить' : 'Ждет твоего захвата', rect.x + 18, rect.y + 34, {
+        const prompt = compact
+            ? handSubmitEconomy ? 'Замкни границу' : 'Ждет захвата'
+            : handSubmitEconomy ? 'Замкни границу, чтобы ударить' : 'Ждет твоего захвата';
+        ui.drawText(prompt, rect.x + 18, rect.y + 34, {
             size: 14,
             color: '#7f9aad',
         });
@@ -593,6 +597,20 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     ui.drawText(outcomeLabel, rect.x + 18, rect.y + 49, {
         size: 14,
         color: outcomeColor,
+    });
+}
+
+function drawBattlePanelSurface(ui, rect, isUrgent = false) {
+    const accent = isUrgent ? '#d78486' : '#d6a25c';
+    ui.drawRect(rect, '#050911', 0.84);
+    ui.drawRect(insetRect(rect, 10), '#0b121d', 0.56);
+    drawBorder(ui, rect, '#1c130f', 4, 0.9);
+    drawBorder(ui, insetRect(rect, 7), accent, 2, isUrgent ? 0.54 : 0.48);
+    drawCornerMarkers(ui, rect, accent, {
+        inset: 7,
+        length: 28,
+        thickness: 4,
+        alpha: isUrgent ? 0.72 : 0.62,
     });
 }
 
@@ -827,13 +845,14 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
 
-    if (!drawArtImage(ui, artTextures, 'panel_dark', panel, { alpha: 0.94 })) {
-        ui.drawRect(panel, '#0f1d2b', 0.94);
-        drawBorder(ui, panel, '#28445c', 2, 0.9);
-    }
-    const monsterIconSize = 54;
+    drawBattlePanelSurface(ui, panel, state.outcome === 'defeat');
+    const compact = panel.width < 330;
+    const monsterIconSize = compact ? 48 : 54;
     const monsterIconId = getBattleAssetId('monster_icon', battle);
     const headerTextX = panel.x + 18 + monsterIconSize + 12;
+    const lowerBlockY = panel.y + Math.min(400, Math.max(346, panel.height - 56));
+    const submitBlockY = panel.y + Math.min(444, Math.max(350, panel.height - 52));
+    const logBlockY = Math.min(panel.y + panel.height - 48, submitBlockY + 23);
 
     ui.drawRect({
         x: panel.x + 18,
@@ -854,11 +873,11 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         height: monsterIconSize,
     }, '#f3d991', 1, 0.8);
     ui.drawText(getMonsterName(battle), headerTextX, panel.y + 18, {
-        size: 24,
+        size: compact ? 20 : 24,
         color: '#ffffff',
     });
     ui.drawText(`Раунд ${state.round} · ${variant.shortLabel}`, headerTextX, panel.y + 52, {
-        size: 17,
+        size: compact ? 16 : 17,
         color: '#9fb8ca',
     });
     drawIconText(ui, artTextures, 'icon_heart_full', panel.x + 18, panel.y + 88, 21, `Игрок ${state.playerHp}`, {
@@ -959,19 +978,19 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
             : handSubmitEconomy
                 ? `Зон ${zones}  |  Золото +${state.lastResult.goldEarned ?? 0}  |  Strike x${state.lastResult.strikeCount ?? 0}`
                 : `Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`;
-        ui.drawText(summary, panel.x + 18, panel.y + 400, {
+        ui.drawText(summary, panel.x + 18, lowerBlockY, {
             size: 15,
             color: '#d8e7f2',
         });
         ui.drawText(handSubmitEconomy
             ? `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку 0`
-            : `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
+            : `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, lowerBlockY + 22, {
             size: 15,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
         if (!handSubmitEconomy && !state.outcome && (state.lastResult.newPickDamage?.totalDamage ?? 0) > 0) {
             const pickDamage = state.lastResult.newPickDamage;
-            ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, panel.y + 444, {
+            ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, lowerBlockY + 44, {
                 size: 15,
                 color: pickDamage.totalDamage > 0 ? '#ffd0d7' : '#c9ffd9',
             });
@@ -980,17 +999,20 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
 
     if (handSubmitEconomy) {
         const submitCost = getHandSubmitCostPreview(state, settings);
-        ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: невыставлено ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}`, panel.x + 18, panel.y + 444, {
+        ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: карт ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}`, panel.x + 18, submitBlockY, {
             size: 15,
             color: submitCost.canPay ? '#ffd0d7' : '#ff8b9c',
         });
 
-        (state.battleLog ?? []).slice(-3).forEach((entry, index) => {
-            ui.drawText(entry, panel.x + 18, panel.y + 468 + index * 18, {
-                size: 13,
-                color: '#9fb8ca',
+        const maxLogRows = Math.max(0, Math.floor((panel.y + panel.height - logBlockY - 14) / 18));
+        if (maxLogRows > 0) {
+            (state.battleLog ?? []).slice(-maxLogRows).forEach((entry, index) => {
+                ui.drawText(entry, panel.x + 18, logBlockY + index * 18, {
+                    size: 13,
+                    color: '#9fb8ca',
+                });
             });
-        });
+        }
     }
 }
 

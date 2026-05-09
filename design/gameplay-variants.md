@@ -165,7 +165,7 @@ http://127.0.0.1:5173/?seed=20260508&gameplayVariant=placement_payoff
 
 Short aliases are also valid: `legacy`, `baseline`, `a`, `b`, `c`, `d`. `baseline` is kept as a compatible alias for `legacy`.
 
-The game entry temporarily shows only variants kept for discussion. Modes removed after playtest remain available through URL/debug, but are not shown in the menu.
+The normal game entry no longer shows a variant picker. All non-legacy variants remain reachable only through explicit URL/debug overrides.
 
 The simulator prints active variant and overall order:
 

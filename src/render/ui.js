@@ -55,6 +55,13 @@ export function createUiRenderer(PIXI, stage) {
         return graphic;
     }
 
+    function drawGraphic(draw) {
+        const graphic = useDrawItem('graphic', () => new PIXI.Graphics());
+        graphic.clear();
+        draw(graphic);
+        return graphic;
+    }
+
     function drawText(text, x, y, options = {}) {
         const content = Array.isArray(text) ? text.join('\n') : String(text);
         const align = options.align ?? 'left';
@@ -67,6 +74,7 @@ export function createUiRenderer(PIXI, stage) {
         label.style = {
             fontFamily: options.family ?? 'Arial, sans-serif',
             fontSize: options.size ?? 24,
+            fontStyle: options.fontStyle ?? 'normal',
             fontWeight: options.weight ?? 600,
             fill: colorToPixi(options.color ?? '#ffffff'),
             align,
@@ -81,6 +89,7 @@ export function createUiRenderer(PIXI, stage) {
 
         label.x = x;
         label.y = y;
+        label.alpha = options.alpha ?? 1;
         return label;
     }
 
@@ -139,6 +148,7 @@ export function createUiRenderer(PIXI, stage) {
             }
         },
         drawRect,
+        drawGraphic,
         drawText,
         drawImage,
         drawButton,

@@ -19,7 +19,7 @@
 - Active default `gameplayVariant` is `legacy`. It is the preserved two-color capture-fill ruleset and the main rescue candidate.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
 - URL overrides accept `?gameplayVariant=placement_payoff` and short aliases `?variant=a`, `?variant=b`, `?variant=c`, `?variant=d`.
-- The main menu temporarily shows only the still-useful variant picker options. Modes removed from active playtest stay URL/debug-addressable but are hidden from the menu.
+- The main menu is now locked to one normal Core 1 Rescue start path. Variant A-D remain URL/debug-addressable through `?gameplayVariant=` or `?variant=a|b|c|d`, but no player-facing variant picker appears in the normal menu.
 - The combat UI and debug state show the short variant id (`LEG`, `A`, `B`, `C`, `D`) so manual playtests do not get mixed.
 - Battle layout now lives in pure `src/scenes/battleLayout.js` and returns named rects for `hud`, `monsterBanner`, `board`, `feedback`, `log`, `hold`, `hand[]`, `primaryButton`/`endRoundButton` and `sidePanel`. The coordinate contract and UI state inventory live in `design/ui-mockup.md`.
 - Battle intro now lives in `src/scenes/battleIntro.js`: every new battle enters through a static monster presentation scene with one `Битва` button before tile-battle state is created.
@@ -71,7 +71,7 @@
 - Zone closure is scored immediately after the placement that closes the zone. Monster hearts, field resources, gold and strike feedback update before any later placement, hold or hand submit.
 - Gold is the active between-round card-buying currency. A run starts at 0 gold; each closed zone gives `+1 gold`; strike bonus adds `+strikeCount gold`; field gold can be collected by placement or closure; monster kill bounty pays `battle.reward` once on victory.
 - Active legacy battles seed board-underlay resources from `tileBattle.fieldResources`: 3 gold and 1 heart by default. Gold on the placed cell is picked up immediately and consumed once. Remaining gold/hearts inside scored closure cells are consumed by closure; hearts heal only through closure and respect `hearts.maxPlayerHp`.
-- Between battles, the active normal path is now a gold card shop instead of the old `1 of 3` free reward screen: 5 catalog-driven offers are generated for the next battle, respecting rarity, offer weight, active colors, unlock battle and `maxPerShop`; the player can buy any number they can afford or skip.
+- Between battles, the active normal path is now a gold card shop instead of the old `1 of 3` free reward screen: 5 catalog-driven offers are generated for the next battle, respecting rarity, offer weight, active colors, unlock battle and `maxPerShop`; the player can buy any number they can afford or skip. The shop layout exposes overflow/overlap/minimum-touch debug checks and is smoke-covered on a 360x740 portrait viewport.
 - Bought cards spend gold immediately, add their tile id to both the persistent deck and discard pile, and carry their final catalog `balanceStatus` in debug/history. The active MVP pool is ordinary red/blue line, tee and corner cards plus red/blue plus/cross; `joker_line_v`, `double_red_line_h` and stronger joker/double candidates remain staged for post-MVP revalidation.
 - `double_red_line_h` is the first implemented double-card family, but it is staged out of the final MVP shop. Its retained debug/data behavior buys and draws one card id, then placement expands it into two adjacent ordinary `tile_red_line_h` board segments.
 - MVP art now has a stable replacement contract in `assets/art_mvp/art_manifest.json`: 82 placeholder PNGs for screen backgrounds, level backdrops, board cells, hand/hold slots, card/shop frames, buttons, monster portraits/icons, hearts, gold, strike, deck/discard/hold icons, capture overlays and basic effects.
@@ -82,7 +82,7 @@
 - Latest balance-sync result: the guaranteed `joker_line_v` shop slot is removed, `joker_line_v` and `double_red_line_h` are staged, and active cards report final `mvp_keep_*` statuses. Art proof files stay presentation-only until lead/balance accepts switching staged catalog `specialTile.file` values.
 - A strike happens when the next valid placement after a closure also closes a zone. Valid non-closing placement or `Сдать руку` resets it; selection, hold/swap and invalid clicks do not.
 - Starting player hearts are 18 in the active rescue build.
-- The old `1 of 3` free reward choice is no longer the normal path. After each non-final victory, the player goes through the gold card shop; old add/remove/boost helpers are legacy/debug context only.
+- The old `1 of 3` free reward choice is no longer the normal path. After each non-final victory, the player goes through the gold card shop; old add/remove/boost helpers are legacy/debug context only and are asserted absent from normal-path shop smoke.
 - `dot` and base `cap` tiles are not in the MVP deck.
 - A combat color's micro-cells are territory boundaries.
 - A fully enclosed empty or filled interior becomes captured land for that color.

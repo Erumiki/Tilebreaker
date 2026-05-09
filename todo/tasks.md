@@ -61,7 +61,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Final MVP Path Lock: normal route, variants and shop mobile safety
+### ~~[2026-05-09] Final MVP Path Lock: normal route, variants and shop mobile safety~~
 
 **Idea:** remove player-facing debug ambiguity before the final polish pass.
 
@@ -80,6 +80,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Priority:** must
 
 **Layer:** MVP
+
+**Completed 2026-05-09:** locked the normal menu to a single Core 1 Rescue start with no player-facing variant picker; archived variants remain reachable through explicit `?variant=` / `?gameplayVariant=` debug URLs. Tightened shop layout/debug for portrait overflow, continue-button overlap and minimum touch targets, and added smoke coverage for a 360x740 shop path. Normal-route smoke now verifies `menu -> battleIntro -> battle -> result -> shop -> battleIntro -> next battle -> final`, active shop-card offers, and that old add/remove/boost reward helpers do not appear in the player path. Verified with `./scripts/npm.sh run check`, `./scripts/node.sh --test tests/tileBattle.logic.js` and targeted `./scripts/npm.sh run test:e2e`.
 
 ---
 
