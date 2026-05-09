@@ -1,30 +1,30 @@
 # Tile Art Brief
 
-Дата: 2026-05-08.
+Date: 2026-05-08.
 
-Цель: получить v2-пакет ассетов тайлов для MVP Tilebreaker. Тайлы должны соответствовать результатам симуляции из `design/tile-feasibility.md`: 3x3 micro-land matrix, строгая совместимость краев, большие захваченные области как главный риск и награда.
+Goal: produce a v2 tile asset pack for the Tilebreaker MVP. Tiles must match the simulation results from `design/tile-feasibility.md`: 3x3 micro-land matrix, strict edge compatibility, large captured areas as the main risk and reward.
 
-## Короткое задание для AI-художника
+## Short Brief For AI Artist
 
-Нужно нарисовать набор top-down игровых тайлов для 2D board-game интерфейса. Каждый тайл — квадратная плитка, внутри которой явно читается сетка `3x3` микроземель.
+Draw a set of top-down game tiles for a 2D board-game interface. Each tile is a square piece with a clearly readable `3x3` micro-land grid inside it.
 
-Цвета микроземель:
+Micro-land colors:
 
-- `red` — красная земля;
-- `blue` — синяя земля;
-- `green` — зеленая земля;
-- `gray` — нейтральная серая земля.
+- `red` - red land;
+- `blue` - blue land;
+- `green` - green land;
+- `gray` - neutral gray land.
 
-Важнее всего не красота в одиночку, а точная игровая читаемость:
+The most important thing is not isolated beauty, but exact gameplay readability:
 
-- игрок должен видеть, какие 3 micro-cells выходят на каждый край тайла;
-- одинаковые края должны визуально стыковаться без разрыва;
-- декор не должен создавать ложные цветные выходы;
-- все 9 micro-cells должны читаться в маленьком размере на поле 6x6.
+- the player must see which 3 micro-cells exit on each tile edge;
+- matching edges must visually connect without a break;
+- decoration must not create false colored exits;
+- all 9 micro-cells must remain readable at small size on a 6x6 board.
 
-## Техническая модель
+## Technical Model
 
-Каждый тайл имеет `3x3` матрицу:
+Each tile has a `3x3` matrix:
 
 ```text
 a b c
@@ -32,7 +32,7 @@ d e f
 g h i
 ```
 
-Края тайла:
+Tile edges:
 
 ```text
 top    = a b c
@@ -41,26 +41,26 @@ bottom = g h i
 left   = a d g
 ```
 
-Смежные тайлы совместимы, только если их соприкасающиеся края совпадают по всем 3 micro-cells.
+Adjacent tiles are compatible only if their touching edges match across all 3 micro-cells.
 
-## Визуальный стиль
+## Visual Style
 
-- Вид строго сверху.
-- Без перспективы, без изометрии, без 3D-рельефа.
-- Чистый board-game UI, не диорама и не фотореализм.
-- Внешний контур тайла сильнее внутренних разделителей.
-- Внутренняя сетка 3x3 должна быть видна, но соседние клетки одного цвета могут мягко склеиваться в единую зону.
-- Цвета должны отличаться не только оттенком, но и светлотой/паттерном.
-- Красный, синий, зеленый и серый не должны путаться при уменьшении.
-- Текстуры допустимы только легкие: они должны помогать различать земли, а не спорить с формой.
-- Тени короткие и UI-шные. Никаких длинных cast shadows.
-- Никаких мелких объектов, бликов, сильных градиентов, шумных hand-painted линий и декоративных рамок, которые мешают видеть 3x3 структуру.
+- Strict top-down view.
+- No perspective, no isometry, no 3D relief.
+- Clean board-game UI, not a diorama or photorealism.
+- Outer tile contour should be stronger than inner dividers.
+- Inner 3x3 grid must be visible, but neighboring cells of the same color may softly merge into one zone.
+- Colors should differ not only by hue, but also by brightness/pattern.
+- Red, blue, green and gray must not be confused when scaled down.
+- Textures are allowed only if subtle: they should help distinguish lands, not fight the shape.
+- Shadows should be short and UI-like. No long cast shadows.
+- No tiny objects, highlights, heavy gradients, noisy hand-painted lines or decorative frames that make the 3x3 structure harder to read.
 
-## Важное сомнение: земли или дороги
+## Important Concern: Land Or Roads
 
-После первого просмотра ассетов возник риск, что текущие `corner`-тайлы выглядят не как участки земли, а как закрытые цветные дороги на сером фоне. Пример: `tile_blue_corner_lu`.
+After the first asset review, there was a risk that current `corner` tiles read not as land patches, but as closed colored roads on gray background. Example: `tile_blue_corner_lu`.
 
-Текущая схема:
+Current scheme:
 
 ```text
 .X.
@@ -68,7 +68,7 @@ XX.
 ...
 ```
 
-Визуально у нее есть одинокий серый micro-cell в верхнем левом углу. Он находится между двумя синими выходами и может читаться как дырка в земле, а не как граница участка. Если залить этот серый угол тем же цветом, тайл станет больше похож на массив земли:
+Visually, it has a lone gray micro-cell in the upper-left corner. It sits between two blue exits and may read as a hole in the land rather than a plot boundary. If that gray corner is filled with the same color, the tile will look more like a land mass:
 
 ```text
 XX.
@@ -76,39 +76,39 @@ XX.
 ...
 ```
 
-Но это не чисто художественная правка. Она меняет игровую топологию:
+But this is not a purely artistic change. It changes gameplay topology:
 
-- старый `corner_lu` имеет края `top = .X.`, `left = .X.`;
-- залитый `corner_lu` будет иметь края `top = XX.`, `left = XX.`;
-- значит он уже не матчится с текущими `cap`, `line` и `corner`, построенными вокруг выхода только через центр края;
-- зона станет не тонкой дорожкой, а толстым land mass, что может лучше поддерживать фантазию "земли", но потребует новой стартовой колоды и повторной симуляции.
+- old `corner_lu` has edges `top = .X.`, `left = .X.`;
+- filled `corner_lu` would have edges `top = XX.`, `left = XX.`;
+- so it no longer matches current `cap`, `line` and `corner` tiles built around exiting only through the edge center;
+- the zone becomes a thick land mass instead of a thin road, which may better support the "land" fantasy, but requires a new starting deck and another simulation.
 
-Предварительный вывод:
+Preliminary conclusion:
 
-- для MVP можно оставить текущую center-exit модель, потому что она уже проверена симуляцией и дает понятные маленькие закрытия;
-- для следующей арт-итерации стоит проверить `land mass`-вариант, где углы и, возможно, концевики имеют заполненные 2x2/2x3 формы;
-- нельзя смешивать обе модели без явного решения: center-exit тайлы и filled-land тайлы имеют разные edge signatures и будут ощущаться как разные языки;
-- если цель — "земли, а не дороги", лучше сначала сделать альтернативный набор `v2_land_mass`, прогнать тот же `scripts/simulate-tiles.js` и только потом заменять основной пакет.
+- for the MVP, the current center-exit model can remain because it is already simulated and gives understandable small closures;
+- for the next art iteration, test a `land mass` variant where corners and possibly caps have filled 2x2/2x3 shapes;
+- do not mix both models without an explicit decision: center-exit tiles and filled-land tiles have different edge signatures and will feel like different languages;
+- if the goal is "lands, not roads", first make an alternative `v2_land_mass` set, run the same `scripts/simulate-tiles.js`, and only then replace the main pack.
 
-Это сомнение закрыто решением ниже: для MVP оставляем цветные клетки как границы, разрешаем захват пустой внутренности и пересобираем набор тайлов под соединяемые контуры.
+This concern is closed by the decision below: for the MVP, keep colored cells as boundaries, allow capture of empty interior and rebuild the tile set around connectable contours.
 
-## Принятое правило для MVP: граница заливает землю
+## Accepted MVP Rule: Boundary Fills Land
 
-Для текущего MVP center-exit тайлы остаются валидными, но их нужно читать не как "дороги, которые сами дают очки", а как цветные границы территории.
+For the current MVP, center-exit tiles remain valid, but they should be read not as "roads that score by themselves", but as colored territory boundaries.
 
-Когда цветная граница полностью замыкает область, вся внутренняя область временно заливается цветом этой границы и считается как захваченная земля. Например, если синяя линия замкнулась вокруг серой или пустой внутренности, эта внутренность визуально становится синей и входит в синий счет. Пустые места, связанные с внешней областью, остаются внешним воздухом; пустые места внутри замкнутого контура становятся землей владельца.
+When a colored boundary fully closes an area, the whole interior is temporarily filled with that boundary color and counted as captured land. For example, if a blue line closes around gray or empty interior, that interior visually becomes blue and contributes to the blue score. Empty spaces connected to the outside remain outside air; empty spaces inside a closed contour become owner land.
 
-Следствия для арта:
+Art consequences:
 
-- текущие тонкие `line`, `corner`, `tee` и `plus` формы допустимы, потому что они обозначают границу будущего захвата;
-- после закрытия нужен отдельный визуальный state: captured fill поверх внутренних micro-cells;
-- заливка внутренности должна быть мягче/ровнее, чем исходная цветная граница, чтобы игрок видел и контур, и захваченную площадь;
-- не надо вручную перекрашивать "сиротские" серые углы внутри самих PNG, пока не принято отдельное `land mass`-решение;
-- preview будущей боевой сцены должен показывать не только тайлы в руке, но и состояние после захвата, иначе фантазия земли будет теряться.
+- current thin `line`, `corner`, `tee` and `plus` shapes are acceptable because they mark the boundary of a future capture;
+- after closure, a separate visual state is needed: captured fill over inner micro-cells;
+- interior fill should be softer/smoother than the original colored boundary so the player can see both contour and captured area;
+- do not manually repaint "orphan" gray corners inside the PNGs until a separate `land mass` decision is made;
+- a future battle-scene preview should show not only tiles in hand, but also the post-capture state, otherwise the land fantasy will be lost.
 
-## Решение для v2: только соединяемые границы
+## v2 Decision: Only Connectable Boundaries
 
-Тайлы с боевой клеткой только в центре больше не подходят для MVP-колоды:
+Tiles with a combat cell only in the center no longer fit the MVP deck:
 
 ```text
 ...
@@ -116,7 +116,7 @@ XX.
 ...
 ```
 
-Такой `dot` не имеет цветного выхода на край, не помогает строить замкнутую границу и засоряет руку. Для MVP его нужно заменить на `plus/cross`:
+Such a `dot` has no colored edge exit, does not help build a closed boundary and pollutes the hand. For the MVP it should be replaced by `plus/cross`:
 
 ```text
 .X.
@@ -124,44 +124,44 @@ XXX
 .X.
 ```
 
-Общее правило для боевых тайлов v2: каждый red/blue/green тайл должен иметь хотя бы один цветной выход на край. В MVP не должно быть обычных боевых тайлов, которые не соединяются с соседями. `dot` можно вернуть позже только как специальный бонусный/ресурсный тайл с отдельным правилом.
+General rule for v2 combat tiles: every red/blue/green tile must have at least one colored exit to an edge. The MVP should not contain ordinary combat tiles that do not connect to neighbors. `dot` can return later only as a special bonus/resource tile with a separate rule.
 
-Новый набор должен быть языком границ территории, а не языком дорог или островков. Приоритет паттернов:
+The new set should be a language of territory boundaries, not roads or isolated islands. Pattern priority:
 
-- `line` — рост периметра;
-- `corner` — маленькие и средние замыкания;
-- `tee` — развилки и риск больших областей;
-- `plus` — универсальный узел, замена старого `dot`.
+- `line` - perimeter growth;
+- `corner` - small and medium closures;
+- `tee` - forks and risk of larger areas;
+- `plus` - universal node, replacement for old `dot`.
 
-## Размеры и экспорт
+## Sizes And Export
 
-Предпочтительный размер одного тайла: `256x256 px`.
+Preferred tile size: `256x256 px`.
 
-Нужно сдать:
+Deliver:
 
-- отдельные прозрачные PNG каждого тайла;
-- contact sheet / preview всех тайлов в сетке с подписями;
-- если возможно, один transparent PNG sprite sheet `6x6`.
+- separate transparent PNG for each tile;
+- contact sheet / preview of all tiles in a labeled grid;
+- if possible, one transparent PNG sprite sheet `6x6`.
 
-Требования:
+Requirements:
 
-- все PNG одинакового размера;
-- прозрачный фон;
-- lowercase filenames, underscores, без пробелов;
-- края земли должны доходить до края тайла там, где micro-cell выходит на край;
-- не добавлять декоративный прозрачный inset внутри самого тайла.
+- all PNGs same size;
+- transparent background;
+- lowercase filenames, underscores, no spaces;
+- land edges must reach the tile edge where the micro-cell exits on that edge;
+- do not add decorative transparent inset inside the tile itself.
 
-## Набор тайлов
+## Tile Set
 
-Нужно 36 тайлов.
+Need 36 tiles.
 
-Для каждого боевого цвета `red`, `blue`, `green` нужно 11 паттернов. Серые клетки обозначены `.`. Боевой цвет обозначен `X`.
+For each combat color `red`, `blue`, `green`, need 11 patterns. Gray cells are marked `.`. Combat color is marked `X`.
 
-В v2 больше нет `dot`, `cap_l`, `cap_r`, `cap_u`, `cap_d` в стартовом наборе. Они были полезны для старой компонентной модели, но плохо работают в capture-fill модели. Новый набор строится из прямых, углов, T-развилок и плюса.
+v2 no longer has `dot`, `cap_l`, `cap_r`, `cap_u`, `cap_d` in the starting set. They were useful for the old component model, but work poorly in the capture-fill model. The new set is built from straights, corners, T-forks and plus.
 
 ### plus
 
-Перекресток границы. Замена старого `dot`.
+Boundary crossroads. Replacement for old `dot`.
 
 ```text
 .X.
@@ -179,7 +179,7 @@ tile_green_plus.png
 
 ### line_h
 
-Горизонтальная линия через центр, выход в центр левого и правого края.
+Horizontal line through the center, exits at the center of left and right edges.
 
 ```text
 ...
@@ -197,7 +197,7 @@ tile_green_line_h.png
 
 ### line_v
 
-Вертикальная линия через центр, выход в центр верхнего и нижнего края.
+Vertical line through the center, exits at the center of top and bottom edges.
 
 ```text
 .X.
@@ -215,7 +215,7 @@ tile_green_line_v.png
 
 ### corner_ur
 
-Угол, соединяющий верх и право через центр. Никаких выходов вниз и влево.
+Corner connecting up and right through the center. No exits down or left.
 
 ```text
 .X.
@@ -233,7 +233,7 @@ tile_green_corner_ur.png
 
 ### corner_rd
 
-Угол, соединяющий право и низ через центр. Никаких выходов вверх и влево.
+Corner connecting right and down through the center. No exits up or left.
 
 ```text
 ...
@@ -251,7 +251,7 @@ tile_green_corner_rd.png
 
 ### corner_dl
 
-Угол, соединяющий низ и лево через центр. Никаких выходов вверх и вправо.
+Corner connecting down and left through the center. No exits up or right.
 
 ```text
 ...
@@ -269,7 +269,7 @@ tile_green_corner_dl.png
 
 ### corner_lu
 
-Угол, соединяющий лево и верх через центр. Никаких выходов вправо и вниз.
+Corner connecting left and up through the center. No exits right or down.
 
 ```text
 .X.
@@ -287,7 +287,7 @@ tile_green_corner_lu.png
 
 ### tee_u
 
-T-развилка, соединяющая лево, верх и право. Никакого выхода вниз.
+T-fork connecting left, up and right. No exit down.
 
 ```text
 .X.
@@ -305,7 +305,7 @@ tile_green_tee_u.png
 
 ### tee_r
 
-T-развилка, соединяющая верх, право и низ. Никакого выхода влево.
+T-fork connecting up, right and down. No exit left.
 
 ```text
 .X.
@@ -323,7 +323,7 @@ tile_green_tee_r.png
 
 ### tee_d
 
-T-развилка, соединяющая лево, право и низ. Никакого выхода вверх.
+T-fork connecting left, right and down. No exit up.
 
 ```text
 ...
@@ -341,7 +341,7 @@ tile_green_tee_d.png
 
 ### tee_l
 
-T-развилка, соединяющая верх, лево и низ. Никакого выхода вправо.
+T-fork connecting up, left and down. No exit right.
 
 ```text
 .X.
@@ -359,7 +359,7 @@ tile_green_tee_l.png
 
 ### gray blank
 
-Три варианта полностью серого нейтрального тайла. Они могут немного отличаться декоративно, но не должны иметь красных, синих или зеленых активных элементов.
+Three variants of a fully gray neutral tile. They may differ slightly in decoration, but must not contain red, blue or green active elements.
 
 ```text
 ...
@@ -375,29 +375,29 @@ tile_gray_blank_02.png
 tile_gray_blank_03.png
 ```
 
-## Проверка результата
+## Result Check
 
-После генерации ассетов нужно проверить:
+After generating assets, check:
 
-- все 36 файлов есть;
-- все тайлы одного размера;
-- фон прозрачный;
-- каждый паттерн соответствует своей 3x3 схеме;
-- red/blue/green версии одного паттерна имеют одинаковую геометрию;
-- цвет не выходит на лишние края;
-- в стартовом v2-наборе нет `dot`-тайлов без выхода на край;
-- `corner` соединяет две соседние стороны через центр, а не диагональю;
-- `tee` имеет ровно три выхода;
-- `plus` имеет ровно четыре выхода;
-- серый тайл не выглядит как активный цвет;
-- тайлы читаются при уменьшении до размера игрового поля.
+- all 36 files exist;
+- all tiles have one size;
+- background is transparent;
+- every pattern matches its 3x3 scheme;
+- red/blue/green versions of one pattern have identical geometry;
+- color does not exit through extra edges;
+- the starting v2 set has no `dot` tiles without an edge exit;
+- `corner` connects two neighboring sides through the center, not diagonally;
+- `tee` has exactly three exits;
+- `plus` has exactly four exits;
+- gray tile does not look like an active color;
+- tiles remain readable when scaled down to game-board size.
 
-## Частые ошибки, которых нельзя допустить
+## Common Mistakes To Avoid
 
-- Добавить лишний цветной штрих на край.
-- Нарисовать угол как диагональ без ортогонального соединения через центр.
-- Вернуть обычный `dot` с единственной цветной клеткой в центре.
-- Сделать разные формы для red/blue/green версий одного паттерна.
-- Слишком размыть края, из-за чего 3-сегментная подпись станет неоднозначной.
-- Слишком украсить серый тайл, чтобы он выглядел как особый боевой тип.
-- Сделать перспективу или изометрию, из-за которой сетка 3x3 перестает быть точной.
+- Add an extra colored stroke on an edge.
+- Draw a corner as a diagonal without orthogonal connection through the center.
+- Bring back an ordinary `dot` with a single colored cell in the center.
+- Make different shapes for red/blue/green versions of one pattern.
+- Blur edges so much that the 3-segment signature becomes ambiguous.
+- Overdecorate the gray tile so it looks like a special combat type.
+- Use perspective or isometry that stops the 3x3 grid from being exact.

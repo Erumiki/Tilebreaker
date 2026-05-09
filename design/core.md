@@ -1,176 +1,176 @@
 # Core Gameplay
 
-Tilebreaker — быстрый roguelite tile-placement battler: смесь азартного риска из Balatro и пространственной сборки из Carcassonne.
+Tilebreaker is a fast roguelite tile-placement battler: a mix of Balatro-style risky gambling and Carcassonne-style spatial building.
 
-Главная цель прототипа: за первые 3 минуты проверить, кайфово ли выкладывать тайлы под цветовую угрозу врага и понятно ли, почему зона закрылась и нанесла урон.
+The main prototype goal: in the first 3 minutes, check whether placing tiles under enemy color pressure is fun and whether it is clear why a zone closed and dealt damage.
 
-## Дизайн-стержень
+## Design Pillar
 
-Игрок каждый раунд получает руку тайлов и строит временную карту на фиксированном поле. Враг объявляет атаку тремя цветами и числами. Игрок пытается закрыть цветные зоны так, чтобы их сила перебила соответствующие цветовые атаки.
+Each round, the player receives a hand of tiles and builds a temporary map on a fixed board. The enemy declares attacks in three colors with numbers. The player tries to close colored zones so their strength beats the matching enemy color attacks.
 
-Главное решение хода:
-
-```text
-Закрыть маленькую безопасную зону сейчас
-или рискнуть вырастить большую зону ради огромного множителя.
-```
-
-## Главный кайф
-
-Игрок должен чувствовать:
-
-- азарт риска большой зоны;
-- удовольствие от сборки карты;
-- понятную цветовую задачу от врага;
-- взрывной множитель, когда большая зона закрылась;
-- желание сыграть ещё один короткий бой.
-
-## Ритм забега
-
-Основной цикл:
+The main turn decision:
 
 ```text
-Меню -> Битва -> Результат -> Улучшение -> Следующая битва -> Финал
+Close a small safe zone now
+or risk growing a large zone for a huge multiplier.
 ```
 
-После 5 побед игрок получает финальную победу в забеге. При поражении забег заканчивается.
+## Main Fun
 
-## Бой
+The player should feel:
 
-В каждом раунде боя враг объявляет атаку тремя цветами, например:
+- the thrill of risking a large zone;
+- the pleasure of assembling a map;
+- a clear color problem from the enemy;
+- an explosive multiplier when a large zone closes;
+- the desire to play one more short battle.
+
+## Run Rhythm
+
+Main loop:
 
 ```text
-Красный 5
-Синий 3
-Зеленый 7
+Menu -> Battle -> Result -> Upgrade -> Next battle -> Final
 ```
 
-Игрок получает новую руку тайлов, выкладывает тайлы на поле, затем закрытые цветные границы захватывают землю внутри себя. Захваченная площадь считается как цветной урон.
+After 5 victories, the player receives the final run victory. On defeat, the run ends.
 
-Для каждого цвета отдельно:
+## Battle
 
-- если закрытая сумма цвета больше атаки врага этого цвета, во врага идет вся закрытая сумма цвета;
-- если закрытая сумма цвета меньше атаки врага этого цвета, игрок получает недостающий урон;
-- избыток одного цвета пока не компенсирует недостачу другого цвета.
-
-Пример:
+In each battle round, the enemy declares attacks in three colors, for example:
 
 ```text
-Враг: красный 5, синий 3, зеленый 7
-Игрок закрыл: красный 8, синий 1, зеленый 9
-
-Во врага: 8 красного + 9 зеленого
-В игрока: 2 урона за недобор синего
+Red 5
+Blue 3
+Green 7
 ```
 
-Победа в бою: убить врага уроном. Поражение: HP игрока закончились.
+The player receives a new tile hand, places tiles on the board, then closed colored boundaries capture the land inside them. Captured area counts as colored damage.
 
-## Поле
+For each color separately:
 
-Для MVP поле фиксированное. Стартовая гипотеза: 6x6.
+- if the closed sum of the color is greater than that enemy color attack, the full closed sum of that color hits the enemy;
+- if the closed sum of the color is lower than that enemy color attack, the player takes the missing damage;
+- excess in one color does not currently compensate for a shortage in another color.
 
-Поле автообновляется каждый раунд боя: на новом раунде игрок заново выкладывает новую временную карту. Карта не сохраняется между раундами.
+Example:
 
-## Тайлы
+```text
+Enemy: red 5, blue 3, green 7
+Player closed: red 8, blue 1, green 9
 
-Цвета земли:
+To enemy: 8 red + 9 green
+To player: 2 damage for the blue shortage
+```
 
-- красный;
-- синий;
-- зеленый;
-- серый.
+Battle victory: kill the enemy with damage. Defeat: player HP runs out.
 
-Серый — четвертый нейтральный цвет. Он участвует в соединениях и балансе, но сам не наносит урон.
+## Board
 
-Правило выкладки для MVP: смежные края обязаны совпадать по цвету.
+For the MVP, the board is fixed. Starting hypothesis: 6x6.
 
-Активный набор тайлов для MVP: `assets/tiles_v2/tile_manifest.json`.
+The board refreshes automatically every battle round: on a new round, the player places a new temporary map from scratch. The map does not persist between rounds.
 
-На каждый боевой цвет в стартовом v2-наборе:
+## Tiles
+
+Land colors:
+
+- red;
+- blue;
+- green;
+- gray.
+
+Gray is the fourth neutral color. It participates in connections and balance, but does not deal damage by itself.
+
+MVP placement rule: adjacent edges must match by color.
+
+Active MVP tile set: `assets/tiles_v2/tile_manifest.json`.
+
+For each combat color in the starting v2 set:
 
 - `line_h`, `line_v`;
 - `corner_ur`, `corner_rd`, `corner_dl`, `corner_lu`;
 - `tee_u`, `tee_r`, `tee_d`, `tee_l`;
 - `plus`.
 
-`dot` и базовые `cap`-тайлы не входят в MVP-колоду. Их можно вернуть позже только как special/low-power слой с отдельным правилом.
+`dot` and base `cap` tiles are not part of the MVP deck. They may return later only as a special/low-power layer with a separate rule.
 
-Ротация — открытая гипотеза:
+Rotation is an open hypothesis:
 
-- сначала пробуем без ручного поворота;
-- если не играется, добавляем автоповорот при размещении;
-- если всё ещё не играется, разрешаем ручной поворот.
+- first try without manual rotation;
+- if it does not play well, add auto-rotation on placement;
+- if it still does not play well, allow manual rotation.
 
-## Захват земли
+## Land Capture
 
-Для MVP цветные micro-cells читаются как граница земли, а не как сама единственная scoring-площадь.
+For the MVP, colored micro-cells are read as land boundaries, not as the only scoring area themselves.
 
-Захват считается так:
+Capture is counted like this:
 
-1. Для каждого боевого цвета отдельно строится micro-grid всего поля.
-2. Micro-cells этого цвета считаются стеной/границей.
-3. Если эта граница полностью отрезала область от внешнего воздуха, область внутри захватывается этим цветом.
-4. Для визуала внутренняя область временно заливается цветом границы.
-5. Очки цвета считаются по площади: клетки границы + захваченные внутренние клетки.
+1. For each combat color separately, build the micro-grid for the full board.
+2. Micro-cells of that color count as walls/boundaries.
+3. If that boundary fully cuts an area off from outside air, the area inside is captured by that color.
+4. For visuals, the inner area is temporarily filled with the boundary color.
+5. Color score is counted by area: boundary cells + captured interior cells.
 
-Пример: если синяя линия полностью замкнула серую или пустую внутреннюю область, вся эта область становится синей для подсчета этого раунда.
+Example: if a blue line fully closes around a gray or empty inner area, that entire area becomes blue for scoring this round.
 
-Незамкнутые границы в конце раунда для MVP просто не считаются. Игрок уже наказан тем, что не получил урон с этой области.
+Unclosed boundaries at round end simply do not score in the MVP. The player is already punished by receiving no damage from that area.
 
-Правила уточнения для MVP:
+MVP clarification rules:
 
-- используется 4-соседство; диагональное касание не закрывает дыру;
-- пустое место, связанное с внешней областью, считается внешним воздухом;
-- пустое место внутри полностью замкнутой границы считается захваченной землей и дает очки;
-- захват считается отдельно для красного, синего и зеленого;
-- все поставленные micro-cells внутри замкнутой границы считаются захваченной внутренностью для этого цвета, включая серые и клетки других боевых цветов;
-- серый сам не наносит урон, но может быть захвачен цветной границей;
-- уже захваченные области не перекрашиваются навсегда между раундами, потому что поле каждый раунд временное.
+- use 4-neighborhood; diagonal touching does not close a hole;
+- empty space connected to the outside area counts as outside air;
+- empty space inside a fully closed boundary counts as captured land and scores;
+- capture is counted separately for red, blue and green;
+- all placed micro-cells inside a closed boundary count as captured interior for that color, including gray and cells of other combat colors;
+- gray does not deal damage by itself, but can be captured by a colored boundary;
+- already captured areas are not repainted permanently between rounds because the board is temporary every round.
 
-## Урон и множитель
+## Damage And Multiplier
 
-MVP должен проверить большой множитель: большая зона дает больший риск и большую награду.
+The MVP should test the large multiplier: a large zone creates more risk and more reward.
 
-Стартовая формула для прототипа:
+Starting prototype formula:
 
 ```text
-Площадь захвата = клетки цветной границы + клетки внутри
-Итоговая сила захвата = площадь захвата * 2
+Captured area = colored boundary cells + interior cells
+Final capture strength = captured area * 2
 ```
 
-Если формула окажется слишком резкой, баланс правится в конфиге.
+If the formula is too sharp, balance is adjusted in config.
 
-## Колода
+## Deck
 
-У игрока есть колода, рука и сброс.
+The player has a deck, hand and discard.
 
-Каждый раунд игрок получает новую руку. После розыгрыша тайлы уходят в сброс. Когда колода заканчивается, сброс перемешивается и становится новой колодой.
+Each round, the player receives a new hand. After play, tiles go to discard. When the deck is empty, discard is shuffled into a new deck.
 
-Для MVP игрок может разыграть все тайлы из руки без энергии и лимита действий.
+For the MVP, the player may play all tiles from the hand without energy or action limits.
 
-## Враги
+## Enemies
 
-Для MVP враги отличаются HP и числами цветовых атак. Особые правила врагов откладываются на будущие версии.
+For the MVP, enemies differ by HP and color attack numbers. Special enemy rules are postponed to future versions.
 
-Каждый раунд враг может давать новое соотношение цветов.
+Each round, the enemy may provide a new color ratio.
 
-## Между боями
+## Between Battles
 
-Для быстрого прототипа мета-слой минимальный:
+For a quick prototype, the meta layer is minimal:
 
-- после победы игрок выбирает одну из трех наград;
-- награды сначала могут быть простыми изменениями колоды;
-- артефакты и слом правил — слой после проверки базового боя.
+- after a win, the player chooses one of three rewards;
+- rewards can initially be simple deck changes;
+- artifacts and rule breaking are a layer after the base battle is validated.
 
-## Что пока не делаем
+## Not Doing Yet
 
-- Сложный сюжет.
-- Глубокую постоянную мета-прогрессию.
-- Много особых врагов.
-- Большой набор артефактов.
-- Долгие туториалы.
-- Фичи, которые не усиливают первый 3-минутный опыт.
+- Complex story.
+- Deep permanent meta-progression.
+- Many special enemies.
+- Large artifact set.
+- Long tutorials.
+- Features that do not strengthen the first 3-minute experience.
 
-## Правило
+## Rule
 
-Все числовые параметры геймплея должны храниться в `configs/`, а не в коде.
+All numeric gameplay parameters must live in `configs/`, not in code.

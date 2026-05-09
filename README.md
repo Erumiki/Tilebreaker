@@ -1,116 +1,125 @@
 # Tilebreaker
 
-Tilebreaker — быстрый roguelite tile-placement battler. Игрок выкладывает тайлы-границы, замыкает территории, захватывает землю цветом границы и отбивает цветовые атаки врага.
+Tilebreaker is a fast roguelite tile-placement battler. The player places boundary tiles, closes territories, captures land with the boundary color and counters enemy color attacks.
 
-Текущий MVP строится вокруг v3 two-color capture-fill эксперимента на v2-арте:
+The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank and with a full hand by default.
 
-- active gameplay variant: `gameplayVariant: "legacy"`; это сохраненный текущий `queue + two-color capture-fill`; Variant A (`placement_payoff`) реализует Focus за полезные setup-постановки, Variant B (`one_color_chain`) реализует один land-color и Chain за непрерывный рост, Variant C (`connect_targets`) реализует цели A/B, которые нужно соединить землей, а Variant D пока остается каркасом до отдельной задачи;
-- тайлы: `assets/tiles_v2/tile_manifest.json`;
-- активные стартовые боевые цвета: `red` и `blue`; `green` остается в manifest, но не входит в стартовую колоду и ранние атаки;
-- поле: 6x6 macro-тайлов, каждый тайл — 3x3 micro-cells;
-- легальность: если у клетки есть прямые соседи, соседние края должны совпадать по 3-cell edge signature; свободная клетка без прямых соседей валидна как новый остров;
-- серые тайлы — нейтральная земля: при включенном `grayWildcardPlacement` серый blank можно ставить как fill рядом с серым или боевым тайлом, а боевой тайл рядом с уже лежащим серым должен приходить пустым краем;
-- scoring: замкнутая цветная граница захватывает пустую или заполненную внутренность;
-- урон считается от площади захвата через формулу из `configs/game.json`: area damage, бонус за размер зоны сверх минимума, бонус за серые тайлы внутри зоны и множитель цвета в текущем забеге;
-- активный MVP-режим выдачи — `drawMode: "queue"`: игрок видит текущий тайл и preview следующего, ставить можно только текущий;
-- старт боя использует `drawBag`: раннее окно добора переставляется из текущего draw pile так, чтобы ограничить `corner` до 2, не давать ранний `plus`, дать больше `line`/`tee` продолжателей и не превращаться в hidden loop guarantee;
-- queue-раунд заранее берет до 7 тайлов из draw pile, но показывает только текущий и preview; несыгранный хвост очереди уходит в discard при конце раунда;
-- между раундами закрытые/засчитанные тайлы очищаются, а незакрытая территория остается для достраивания;
-- в Variant A полезная постановка без закрытия рядом с существующей землей дает `Focus +1`; Focus не наносит прямой урон, копится до cap и тратится как бонус к следующему захвату;
-- в Variant B все combat-тайлы считаются одной землей для правил выкладки/захвата, атаки сводятся в одну land-линию, а продолжение того же connected region растит `Chain xN`; chain тратится как bonus damage на следующий захват;
-- в Variant C все combat-тайлы тоже считаются одной землей, но вместо Chain на поле есть цели A/B: если connected land связывает обе клетки, раунд получает разовый `connectTargets.bonusDamage`, а новая пара появляется в следующем раунде;
-- забег использует стартовую колоду из `startingDeckRecipe`, draw pile, discard pile и награды между боями; стартовая v3-колода сейчас 25 тайлов: red/blue lines x2, red/blue tees/corners x1, один gray blank, без plus.
+- active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + two-color capture-fill + hearts/pick-pressure`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
+- tiles: `assets/tiles_v2/tile_manifest.json`;
+- active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
+- board: 6x6 macro tiles, each tile is 3x3 micro-cells;
+- legality: if a cell has direct neighbors, adjacent edges must match by 3-cell edge signature; an empty cell with no direct neighbors is valid as a new island;
+- gray blank tiles remain in the manifest as technical/future material, but are removed from the active starting deck and opening tests;
+- scoring: a closed colored boundary captures the empty or filled interior;
+- legacy damage is shown as hearts: the first monster has 3 hearts, a minimal 2x2 capture deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`;
+- a new hand pick in `legacy` has an explicit cost: before confirmation, the UI shows incoming damage from the base cost and unplayed tiles;
+- active MVP draw mode is `drawMode: "hand"`: the player sees the full hand because queue/playtest too often turned planning into waiting for the right card;
+- battle start uses `drawBag`: the early draw window is reordered from the current draw pile to cap `corner` at 2, prevent early `plus`, provide more `line`/`tee` continuation pieces and avoid becoming a hidden loop guarantee;
+- queue mode remains available as debug/comparison through `?drawMode=queue`;
+- between rounds, closed/scored tiles are cleared and unclosed territory stays for future completion;
+- in Variant A, a useful placement without closure next to existing land gives `Focus +1`; Focus does not deal direct damage, accumulates to a cap and is spent as a bonus on the next capture;
+- in Variant B, all combat tiles count as one land color for placement/capture rules, attacks are merged into one land lane, and continuing the same connected region increases `Chain xN`; chain is spent as bonus damage on the next capture;
+- in Variant C, all combat tiles also count as one land color, but the board has A/B targets instead of Chain: if connected land links both cells, the round gains one-time `connectTargets.bonusDamage`, and a new pair appears next round;
+- in Variant D, all combat tiles count as one land color, the board has S/E gates, area-capture payoff is disabled, a short bridge gives a weak finish bonus, and a completed road deals its main damage from extra route length: `roadMode.completeBonus + min(extraLength, roadMode.maxScoredExtraLength) * roadMode.damagePerTile`;
+- the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile and rewards between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank.
 
-## Где Что Хранится
+## Where Things Live
 
-- `configs/game.json` — глобальные настройки tile-battle: размер поля, размер руки, `drawMode`, `gameplayVariant`, `activeCombatColors`, стартовое HP игрока, размер стартовой колоды/recipe, opening `drawBag`, формула урона, `placementPayoff` для Variant A, `oneColorChain` для Variant B, `connectTargets` для Variant C, бонусы за большую зону и серые тайлы внутри закрытия, путь к активному tile manifest, debug-сглаживание добора, gray wildcard placement, очистка доски между раундами, восстановление после dead-end, legacy-настройки off-color leap и число битв в забеге.
-- `configs/levels.json` — список битв, HP врагов и цветовые атаки по раундам.
-- `assets/tiles_v2/tile_manifest.json` — активный набор тайлов MVP.
-- `src/entities/run.js` — состояние забега: колода, добор, сброс, награды и цветовые множители.
-- `todo/tasks.md` — единственный backlog, порядок работы, next-step, acceptance и статусы.
-- `todo/current.md` — снимок текущей версии и дизайн-контекст без списка задач.
+- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player hearts, heart conversion and pick-pressure settings, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
+- `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
+- `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
+- `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.
+- `todo/tasks.md` - the only backlog, work order, next-step, acceptance and status list.
+- `todo/current.md` - current version snapshot and design context without a task list.
 
-## Запуск
+## Run
 
-Проект запускается через Vite. Node.js LTS установлен локально в `.tools/`, поэтому используй wrapper-скрипт:
+The project runs through Vite. Node.js LTS is installed locally in `.tools/`, so use the wrapper script:
 
 ```sh
 ./scripts/npm.sh run dev
 ```
 
-Затем открой адрес, который покажет Vite. По умолчанию:
+Then open the address Vite prints. By default:
 
 ```sh
 http://127.0.0.1:5173
 ```
 
-## Проверки
+## Checks
 
 ```sh
 ./scripts/npm.sh run check
 ./scripts/npm.sh run test:e2e
 ```
 
-Обычный запуск создает новый seed для каждого забега. Для стабильного debug/smoke-прогона можно открыть:
+A normal run creates a new seed for every run. For a stable debug/smoke run, open:
 
 ```sh
 http://127.0.0.1:5173/?seed=20260508&guaranteedLoopHands=true
 ```
 
-Hand-режим для сравнения можно открыть так:
+Queue mode for comparison:
 
 ```sh
-http://127.0.0.1:5173/?seed=20260508&drawMode=hand
+http://127.0.0.1:5173/?seed=20260508&drawMode=queue
 ```
 
-Gameplay-вариант для ручного сравнения можно открыть так:
+Gameplay variant for manual comparison:
 
 ```sh
 http://127.0.0.1:5173/?seed=20260508&gameplayVariant=placement_payoff
 ```
 
-Variant B можно открыть так:
+Variant B:
 
 ```sh
 http://127.0.0.1:5173/?seed=20260508&variant=b
 ```
 
-Variant C можно открыть так:
+Variant C:
 
 ```sh
 http://127.0.0.1:5173/?seed=20260508&variant=c
 ```
 
-Или прогнать симуляцию:
+Variant D:
 
 ```sh
-DRAW_MODE=queue ./scripts/node.sh scripts/simulate-tiles.js 20260508
+http://127.0.0.1:5173/?seed=20260508&variant=d
 ```
 
-С variant id:
+Or run the simulation:
 
 ```sh
-GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simulate-tiles.js 20260508
+DRAW_MODE=hand ./scripts/node.sh scripts/simulate-tiles.js 20260508
 ```
 
-На стартовом экране временно есть выбор `LEG/A/B/C/D`; позже этот picker можно убрать, когда будет выбран новый core.
+With a variant id:
 
-## Стек
+```sh
+GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=hand ./scripts/node.sh scripts/simulate-tiles.js 20260508
+```
+
+The start screen temporarily keeps only variants that are active for discussion; modes removed after playtest remain available through URL/debug, but do not add noise to the menu.
+
+## Stack
 
 - HTML + Vanilla JS + Pixi.js
-- Рендеринг и UI через canvas/Pixi.js
-- Баланс и настройки через JSON-конфиги
-- Документация и рабочие правила в Markdown
+- Rendering and UI through canvas/Pixi.js
+- Balance and settings through JSON configs
+- Documentation and working rules in Markdown
+- All repository records are written in English, regardless of conversation language
 
-## Структура
+## Structure
 
+```text
+src/       - game code
+assets/    - assets
+configs/   - balance, levels, UI settings
+design/    - game design and architectural decisions
+techspec/  - technical specifications
+todo/      - tasks and bugs
 ```
-src/       — код игры
-assets/    — ассеты
-configs/   — баланс, уровни, UI-настройки
-design/    — геймдизайн и архитектурные решения
-techspec/  — технические спецификации
-todo/      — задачи и баги
-```
 
-Перед началом работы читай `CLAUDE.md`, `todo/tasks.md`, `todo/current.md`, `todo/bugs.md` и `design/decisions.md`. Порядок задач и next-step есть только в `todo/tasks.md`.
+Before starting work, read `CLAUDE.md`, `todo/tasks.md`, `todo/current.md`, `todo/bugs.md` and `design/decisions.md`. Task order and next-step live only in `todo/tasks.md`.

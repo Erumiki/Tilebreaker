@@ -1,10 +1,10 @@
-# Пайплайн рендеринга
+# Rendering Pipeline
 
-Техническая спецификация системы рендеринга Tilebreaker.
+Technical specification for Tilebreaker's rendering system.
 
-## Обзор
+## Overview
 
-Весь игровой рендеринг идёт через Pixi.js внутри одного `canvas`. DOM-элементы не используются для игровых визуалов, включая UI.
+All game rendering goes through Pixi.js inside a single `canvas`. DOM elements are not used for game visuals, including UI.
 
 ```text
 JSON/configs -> Pixi Application -> Scene containers -> Screen
@@ -12,15 +12,15 @@ JSON/configs -> Pixi Application -> Scene containers -> Screen
 
 ## Pixi Application
 
-`src/core/renderer.js` создаёт `PIXI.Application`, привязывает его к `canvas#game`, включает resize на окно и задаёт базовый цвет фона.
+`src/core/renderer.js` creates `PIXI.Application`, attaches it to `canvas#game`, enables window resize and sets the base background color.
 
-`src/main.js` использует `app.ticker` как главный frame loop: обновляет текущую сцену и просит её перерисовать Pixi UI.
+`src/main.js` uses `app.ticker` as the main frame loop: it updates the current scene and asks it to redraw the Pixi UI.
 
-## Сцены
+## Scenes
 
-Каждая сцена отвечает за свою структуру экрана и не должна напрямую создавать DOM.
+Each scene owns its screen structure and must not create DOM directly.
 
-Текущий минимальный цикл:
+Current minimum loop:
 
 ```text
 menu -> battle -> result -> upgrades -> next battle -> final
@@ -28,29 +28,29 @@ menu -> battle -> result -> upgrades -> next battle -> final
 
 ## UI
 
-`src/render/ui.js` — тонкий helper поверх Pixi:
+`src/render/ui.js` is a thin helper over Pixi:
 
-- `PIXI.Container` для UI-слоя;
-- `PIXI.Graphics` для панелей, фонов и кнопок;
-- `PIXI.Text` для текста;
-- hit testing через прямоугольники, пока не нужен полноценный Pixi event pipeline.
+- `PIXI.Container` for the UI layer;
+- `PIXI.Graphics` for panels, backgrounds and buttons;
+- `PIXI.Text` for text;
+- hit testing through rectangles until the full Pixi event pipeline is needed.
 
-## Ассеты
+## Assets
 
-Будущие спрайты, тайлы, частицы и эффекты должны добавляться через Pixi assets/sprites. Не возвращаться к ручному WebGL для игровых визуалов без отдельного архитектурного решения.
+Future sprites, tiles, particles and effects should be added through Pixi assets/sprites. Do not return to manual WebGL for game visuals without a separate architectural decision.
 
-Актуальный набор тайлов для боевого MVP лежит в:
+The current tile set for the battle MVP lives in:
 
 ```text
 assets/tiles_v2/
 assets/tiles_v2/tile_manifest.json
 ```
 
-Боевой код должен читать матрицы и edge signatures из manifest, а не дублировать список тайлов в JS. `assets/tiles/` — архив первого арт-пакета.
+Battle code must read matrices and edge signatures from the manifest instead of duplicating the tile list in JS. `assets/tiles/` is the first art pack archive.
 
-## Конвенция именования ассетов
+## Asset Naming Convention
 
-Все файлы ассетов именуются в нижнем регистре с подчёркиваниями:
+All asset files are named in lowercase with underscores:
 
 ```text
 tile_blue_plus.png
@@ -60,8 +60,8 @@ ball_default.png
 button_start.png
 ```
 
-Не использовать пробелы, дефисы, CamelCase, UPPERCASE и смешанный регистр.
+Do not use spaces, hyphens, CamelCase, UPPERCASE or mixed case.
 
-## UI-конфиги
+## UI Configs
 
-UI-значения не хардкодятся в JS. Размеры, позиции, цвета, шрифты, отступы и пути к текстурам должны постепенно выноситься в JSON-конфиги по мере стабилизации интерфейса.
+UI values are not hardcoded in JS. Sizes, positions, colors, fonts, spacing and texture paths should gradually move into JSON configs as the interface stabilizes.

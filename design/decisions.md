@@ -1,253 +1,285 @@
-# Лог архитектурных решений
+# Architectural Decision Log
 
-Фиксируем важные решения с датой и обоснованием, чтобы любой член команды или Claude понимал, почему что-то сделано именно так.
+Important decisions are recorded with date and rationale so any team member or Claude can understand why something was done this way.
 
-## Формат
+## Format
 
-```
-### ГГГГ-ММ-ДД — Название решения
+```text
+### YYYY-MM-DD - Decision title
 
-**Контекст:** Что послужило причиной.
-**Решение:** Что было решено.
-**Причина:** Почему выбран именно этот вариант.
+**Context:** What caused it.
+**Decision:** What was decided.
+**Rationale:** Why this option was chosen.
 ```
 
 ---
 
-### 2026-05-08 — Стартовая структура проекта
+### 2026-05-09 - Core 1 Rescue uses hearts and new-pick cost
 
-**Контекст:** Tilebreaker запускается как отдельный игровой проект с правилами работы, похожими на Mercatante.
+**Context:** Manual playtest showed that `legacy + hand` remains the most playable core, but large numbers and extra green UI noise make battle tempo hard to read. The player needs a simple goal: kill the monster in fewer hand picks.
 
-**Решение:** Использовать модульную структуру `src/core`, `src/entities`, `src/render`, `src/scenes`, `src/utils`, хранить баланс в `configs/`, дизайн в `design/`, технические спецификации в `techspec/`, задачи и баги в `todo/`.
+**Decision:** In active `legacy`, convert HP/damage to hearts: first monster has 3 hearts, minimal 2x2 capture is 1 heart, larger zones convert through `tileBattle.hearts.zoneDamagePerHeart`. Visible combat rows are limited to active red/blue colors. A new hand pick deals previewed damage `newPickBaseDamage + floor(unplayedTiles / unplayedTilesPerDamage)` and is applied only after confirming the new pick. Pick-pressure and heart conversion are scoped to `legacy` so hidden variants do not inherit the new tempo rule.
 
-**Причина:** Такая структура снижает конфликты при параллельной работе, помогает быстро находить нужный контекст и делает проект удобным для Claude Code.
+**Rationale:** This is the shortest way to test the main Core 1 Rescue playtest question: does a clear tempo of "close now or take a costly new pick" appear without adding hold, rotate, double-color and starting universal center.
 
-### 2026-05-08 — Прототип забега через битвы и мета-улучшения
+### 2026-05-08 - Starting project structure
 
-**Контекст:** Игра уходит от текущего примера и будет строиться как уровневый забег: битва, результат битвы, затем улучшение после победы.
+**Context:** Tilebreaker starts as a separate game project with working rules similar to Mercatante.
 
-**Решение:** Ввести состояние забега в `src/entities/run.js`, отдельные сцены битвы, результата и улучшений, а список битв и улучшений хранить в `configs/levels.json`.
+**Decision:** Use modular structure `src/core`, `src/entities`, `src/render`, `src/scenes`, `src/utils`; store balance in `configs/`, design in `design/`, technical specifications in `techspec/`, tasks and bugs in `todo/`.
 
-**Причина:** Такой цикл близок к структуре Balatro: короткая проверка билда, явный исход, затем мета-выбор перед следующей битвой. Это дает понятную основу для будущих правил, наград и поражений.
+**Rationale:** This structure reduces conflicts during parallel work, makes the needed context easy to find and keeps the project convenient for Claude Code.
 
-### 2026-05-08 — Трехрольный процесс геймджема
+### 2026-05-08 - Run prototype through battles and meta upgrades
 
-**Контекст:** Во время геймджема новые идеи должны быстро становиться playable-решениями, но без потери целостности дизайна.
+**Context:** The game moves away from the current example and will be built as a level-based run: battle, battle result, then upgrade after victory.
 
-**Решение:** Все новые идеи прогонять через ГД, разработчика и лида. ГД усиливает фантазию и проверяет целостность, разработчик режет скоуп и формулирует MVP, лид принимает финальное решение и назначает слой `MVP`, `Jam Stretch` или `Post-jam`.
+**Decision:** Introduce run state in `src/entities/run.js`, separate battle/result/upgrade scenes, and store battle and upgrade lists in `configs/levels.json`.
 
-**Причина:** Такой процесс оставляет место сильным идеям, но защищает проект от расползания скоупа и помогает каждый день завершать рабочим билдом.
+**Rationale:** This loop is close to Balatro's structure: short build check, explicit outcome, then a meta choice before the next battle. It gives a clear base for future rules, rewards and defeats.
 
-### 2026-05-08 — Закрытие завершенных агентских тредов
+### 2026-05-08 - Three-role game jam process
 
-**Контекст:** Обсуждения через ГД и разработчика используют фоновых агентов. Если не закрывать завершенные треды, можно быстро упереться в лимит активных агентов.
+**Context:** During the game jam, new ideas need to quickly become playable decisions without losing design coherence.
 
-**Решение:** После получения финального ответа от фонового агента закрывать его тред.
+**Decision:** Run all new ideas through Game Designer, Developer and Lead. The Game Designer strengthens the fantasy and checks coherence, the Developer cuts scope and defines MVP, and the Lead makes the final decision and assigns the layer `MVP`, `Jam Stretch` or `Post-jam`.
 
-**Причина:** Это сохраняет рабочий процесс быстрым и предотвращает блокировку следующих параллельных обсуждений.
+**Rationale:** This process leaves room for strong ideas while protecting the project from scope creep and helps end every day with a working build.
 
-### 2026-05-08 — Обязательные агентские проверки для рабочих задач
+### 2026-05-08 - Close completed agent threads
 
-**Контекст:** Для джема важно не только быстро писать код, но и постоянно проверять, что фича остается игрой, а реализация не разрастается быстрее playable build.
+**Context:** Discussions with the Game Designer and Developer use background agents. If completed threads are not closed, the active agent limit can be reached quickly.
 
-**Решение:** При начале любой новой фичи, балансовой итерации или крупной UI-правки Codex работает как лид и поднимает минимум двух фоновых агентов: ГД-агента для проверки playable-фантазии, риска/награды и читаемости результата; разработчика-упростителя для проверки скоупа, технической простоты и защиты основного цикла. Дополнительные постоянные агенты добавляются только после записи роли в `CLAUDE.md`.
+**Decision:** After receiving the final answer from a background agent, close its thread.
 
-**Причина:** Так процесс не зависит от памяти конкретного треда: каждое значимое изменение получает игровую и техническую проверку, а финальное решение остается за лидом.
+**Rationale:** This keeps the workflow fast and prevents blocking future parallel discussions.
 
-### 2026-05-08 — v0.2 Pixi foundation
+### 2026-05-08 - Required agent checks for work tasks
 
-**Контекст:** Ручной WebGL быстро становится дорогим для UI, текста, спрайтов и будущего juice. Текущая база ещё маленькая, поэтому перенос рендер-слоя дешёвый.
+**Context:** For the jam, it is important not only to write code quickly, but also to constantly check that a feature remains a game and that implementation does not grow faster than the playable build.
 
-**Решение:** Перевести рендеринг и игровой UI на Pixi.js, установленный как локальная npm-зависимость и запускаемый через Vite, сохранив текущий цикл `menu -> battle -> result -> upgrades -> final` без новых фич.
+**Decision:** When starting any new feature, balance iteration or major UI change, Codex acts as lead and starts at least two background agents: a Game Design Agent to check playable fantasy, risk/reward and result readability; and a Developer Simplifier to check scope, technical simplicity and protection of the main loop. Additional permanent agents are added only after their role is recorded in `CLAUDE.md`.
 
-**Причина:** Pixi.js даёт готовые контейнеры, текст, графику, спрайты и ticker, что ускоряет 2D-разработку и снижает риск утонуть в самописном рендерере во время геймджема.
+**Rationale:** This makes the process independent of a particular thread's memory: every meaningful change receives a game and technical check, while the final decision remains with the lead.
 
-### 2026-05-08 — Pivot to tile-placement battle MVP
+### 2026-05-08 - v0.2 Pixi foundation
 
-**Контекст:** Пользователь сформулировал новую игровую идею: смесь Balatro и Carcassonne, где враг атакует тремя цветами, а игрок собирает захваченные цветные территории из тайлов.
+**Context:** Manual WebGL quickly becomes expensive for UI, text, sprites and future juice. The current base is still small, so moving the render layer is cheap.
 
-**Решение:** Для MVP заменить аркадную заглушку боя на tile-placement combat: фиксированное поле, рука тайлов, цветовые атаки врага, замкнутые цветные границы, захват земли, множитель от площади захвата и HP-бой.
+**Decision:** Move rendering and game UI to Pixi.js, installed as a local npm dependency and served through Vite, while preserving the current loop `menu -> battle -> result -> upgrades -> final` without new features.
 
-**Причина:** Эта механика напрямую проверяет главный риск проекта: закрыть маленькую область сейчас или растить большую ради сильного множителя.
+**Rationale:** Pixi.js provides containers, text, graphics, sprites and ticker, which speeds up 2D development and reduces the risk of drowning in a custom renderer during the game jam.
 
-### 2026-05-08 — Auto-approval for project edits during jam work
+### 2026-05-08 - Pivot to tile-placement battle MVP
 
-**Контекст:** Пользователь хочет отходить от компьютера и не подтверждать каждый обычный шаг изменения проекта.
+**Context:** The user formulated a new game idea: a mix of Balatro and Carcassonne where the enemy attacks in three colors and the player assembles captured colored territories from tiles.
 
-**Решение:** В рамках текущего джем-процесса Codex считает, что пользователь заранее одобрил обычные изменения файлов проекта, нужные для выполнения согласованного плана: документацию, конфиги, код, тесты и локальные проверки.
+**Decision:** For the MVP, replace the arcade battle placeholder with tile-placement combat: fixed board, tile hand, enemy color attacks, closed colored boundaries, land capture, multiplier from captured area and HP battle.
 
-**Причина:** Это ускоряет работу в 40-часовом окне и снижает простой. Исключения: destructive-действия, внешние системные разрешения среды, сетевые установки или операции, которые требуют явного approval по правилам sandbox.
+**Rationale:** This mechanic directly tests the main project risk: close a small area now or grow a large one for a strong multiplier.
 
-### 2026-05-08 — Center-exit tiles vs land-mass tiles
+### 2026-05-08 - Auto-approval for project edits during jam work
 
-**Контекст:** Первый пакет тайл-арта по `design/tile-art-brief.md` визуально показал риск: некоторые `corner`-тайлы, например `tile_blue_corner_lu`, могут читаться как цветная дорога на сером фоне, а не как участок земли. Идея залить внутренний серый угол тем же цветом делает тайл похожим на цельный массив земли.
+**Context:** The user wants to step away from the computer and not confirm every normal project edit.
 
-**Решение:** Не менять текущий пакет ассетов без повторной симуляции. Зафиксировать это как отдельную гипотезу `land mass` для следующей итерации: заполненные углы/формы должны быть спроектированы как новый согласованный набор edge signatures, а не как точечная художественная правка.
+**Decision:** Within the current jam process, Codex treats ordinary project file changes needed to execute an agreed plan as pre-approved by the user: documentation, configs, code, tests and local checks.
 
-**Причина:** Заливка "сиротского" серого угла меняет края тайла: например `corner_lu` из `.X.`/`.X.` превращается в `XX.`/`XX.`. Это влияет на совместимость с `cap`, `line` и другими `corner`-тайлами, а значит меняет частоту закрытий, размер зон и баланс стартовой колоды.
+**Rationale:** This speeds work in the 40-hour window and reduces idle time. Exceptions: destructive actions, external system permissions, network installs or operations that require explicit approval under sandbox rules.
 
-### 2026-05-08 — Closed boundary captures enclosed land
+### 2026-05-08 - Center-exit tiles vs land-mass tiles
 
-**Контекст:** Обсуждение center-exit тайлов показало, что текущие ассеты лучше работают как цветные границы территории. Пользователь предложил: если синяя линия полностью закрывается, то все внутри красится в синий и считается в очки.
+**Context:** The first tile art pack from `design/tile-art-brief.md` showed a visual risk: some `corner` tiles, such as `tile_blue_corner_lu`, can read as a colored road on gray background rather than a piece of land. Filling the inner gray corner with the same color makes the tile look more like a solid land mass.
 
-**Решение:** Принять это как MVP-правило scoring/fill. Цветные micro-cells остаются границей. Когда граница боевого цвета полностью отрезает внутреннюю область от внешнего воздуха, эта область временно захватывается этим цветом. Очки считаются по площади `граница + захваченная внутренность`.
+**Decision:** Do not change the current asset pack without another simulation. Record this as a separate `land mass` hypothesis for the next iteration: filled corners/shapes must be designed as a new consistent set of edge signatures, not as a point art fix.
 
-**Причина:** Это делает фантазию ближе к земле и захвату территории, а не к прокладыванию дорог. При этом не нужно срочно менять edge signatures и первый пакет ассетов: строгая совместимость краев остается правилом выкладки, а захват считается отдельным слоем после размещения. Риск: формула `площадь * площадь` станет сильнее, поэтому баланс атак и симуляцию нужно пересчитать.
+**Rationale:** Filling the "orphan" gray corner changes the tile edges: for example, `corner_lu` changes from `.X.`/`.X.` to `XX.`/`XX.`. This affects compatibility with `cap`, `line` and other `corner` tiles, changing closure frequency, zone size and starting deck balance.
 
-### 2026-05-08 — Empty interior scores and dot leaves MVP deck
+### 2026-05-08 - Closed boundary captures enclosed land
 
-**Контекст:** Пересимуляция строгой трактовки, где пустая внутренняя область не давала очков, показала 0 урона в 100/100 случайных рук. Пользователь принял, что замкнутая пустая внутренность тоже становится землей, и указал на проблему `dot`: цветная клетка в центре не касается края и не помогает строить границу.
+**Context:** Discussion of center-exit tiles showed that current assets work better as colored territory boundaries. The user suggested: if a blue line fully closes, everything inside is painted blue and counts as score.
 
-**Решение:** Для MVP считать пустую область внутри полностью замкнутой цветной границы захваченной землей. Убрать `dot` из стартового набора боевых тайлов. Обновить арт-задачу v2 на набор `line_h`, `line_v`, четыре `corner`, четыре `tee` и `plus` на каждый боевой цвет.
+**Decision:** Accept this as the MVP scoring/fill rule. Colored micro-cells remain boundaries. When a combat color boundary fully cuts an inner area off from outside air, that area is temporarily captured by that color. Score is counted by area `boundary + captured interior`.
 
-**Причина:** Новое правило позволяет игроку строить кольцо вокруг пустоты, а не предварительно заполнять внутренность тайлами. `dot` был полезен для старой модели "цветная клетка сама дает очки", но в capture-fill модели он засоряет руку. `plus` и `tee` повышают связность колоды и помогают создавать реальные замыкания.
+**Rationale:** This makes the fantasy closer to land and territory capture, not road building. It also avoids urgent edge signature and first asset pack changes: strict edge compatibility remains the placement rule, and capture is counted as a separate layer after placement. Risk: the `area * area` formula becomes stronger, so attacks and simulation need to be recalculated.
 
-### 2026-05-08 — v2 tile set is active, volatility is next risk
+### 2026-05-08 - Empty interior scores and dot leaves MVP deck
 
-**Контекст:** Пользователь подготовил `assets/tiles_v2`, и симуляция была переключена на `assets/tiles_v2/tile_manifest.json`. В строгой модели первый бой проходит 69/100 раз, но 94/100 случайных рук не наносят урон, а редкий захват дает до 144.
+**Context:** Resimulation of the strict interpretation where empty interior gave no points showed 0 damage in 100/100 random hands. The user accepted that closed empty interior also becomes land and pointed out the `dot` problem: a colored cell in the center does not touch an edge and does not help build a boundary.
 
-**Решение:** Считать `assets/tiles_v2/tile_manifest.json` активным источником тайлов для MVP. Следующий must-шаг перед реализацией боя — сгладить волатильность v2 capture-fill через формулу урона, стартовую руку/редроу, обучающий маленький захват или баланс первого боя.
+**Decision:** For the MVP, count empty area inside a fully closed colored boundary as captured land. Remove `dot` from the starting combat tile set. Update the v2 art task to the set `line_h`, `line_v`, four `corner`, four `tee` and `plus` for each combat color.
 
-**Причина:** v2 уже доказывает, что capture-fill может работать, но текущая динамика слишком похожа на jackpot: много пустых рук и редкие ваншоты. Для первого 3-минутного опыта нужен более частый маленький payoff.
+**Rationale:** The new rule lets the player build a ring around emptiness instead of filling the inside with tiles first. `dot` was useful for the old "colored cell itself scores" model, but in capture-fill it pollutes the hand. `plus` and `tee` increase deck connectivity and help create real closures.
 
-### 2026-05-08 — Deck/discard run progression
+### 2026-05-08 - v2 tile set is active, volatility is next risk
 
-**Контекст:** После playable tile-battle MVP бой все еще был изолированной головоломкой: каждая рука создавалась заново из manifest, а экран улучшений показывал старые заглушки.
+**Context:** The user prepared `assets/tiles_v2`, and the simulation switched to `assets/tiles_v2/tile_manifest.json`. In the strict model, the first battle passes 69/100 times, but 94/100 random hands deal no damage and a rare capture can hit for up to 144.
 
-**Решение:** Хранить колоду, draw pile, discard pile, RNG и цветовые множители в `src/entities/run.js`. Стартовый забег строит 36-tile deck из активного v2 manifest. Раунд добирает руку из draw pile через best-of-3 smoothing, сбрасывает сыгранные и оставшиеся тайлы, а пустой draw pile перемешивает из discard. После победы динамически предлагаются три награды: добавить тайл, удалить тайл или усилить цветовой множитель.
+**Decision:** Treat `assets/tiles_v2/tile_manifest.json` as the active tile source for the MVP. The next must step before implementing battle is smoothing v2 capture-fill volatility through damage formula, starting hand/redraw, tutorial small capture or first-battle balance.
 
-**Причина:** Это переводит прототип из одиночного боя в Balatro-like run loop без тяжелой меты: игрок видит, что решение после победы меняет следующие руки, а реализация остается локальной и проверяемой smoke-тестом.
+**Rationale:** v2 already proves that capture-fill can work, but the current dynamics feel too much like a jackpot: many empty hands and rare one-shots. The first 3-minute experience needs more frequent small payoff.
 
-### 2026-05-08 — Persistent board между раундами
+### 2026-05-08 - Deck/discard run progression
 
-**Контекст:** В строгой edge-signature модели игрок мог поставить стартовый тайл и получить руку без валидного продолжения. Полная очистка доски каждый раунд усиливала проблему: незакрытые контуры не имели будущего payoff.
+**Context:** After playable tile-battle MVP, combat was still an isolated puzzle: every hand was generated fresh from manifest, and the upgrade screen showed old placeholders.
 
-**Решение:** Для MVP после результата раунда удалять только тайлы, участвовавшие в засчитанных capture-зонах, а незакрытые тайлы оставлять на доске. Если следующая рука вообще не может продолжить сохраненную доску, включается `freshStart`: поле очищается и игрок начинает новый остров этой же рукой.
+**Decision:** Store deck, draw pile, discard pile, RNG and color multipliers in `src/entities/run.js`. A starting run builds a 36-tile deck from the active v2 manifest. A round draws a hand from draw pile through best-of-3 smoothing, discards played and remaining tiles, and reshuffles empty draw pile from discard. After victory, dynamically offer three rewards: add tile, remove tile or boost color multiplier.
 
-**Причина:** Это сохраняет ценность долгого достраивания территории и одновременно убирает жесткий dead-end. Симуляция показывает, что первые бои остаются щадящими, поздние бои требуют HP/апгрейдов, а тупиковые раунды становятся редким recoverable-состоянием.
+**Rationale:** This moves the prototype from a single battle into a Balatro-like run loop without heavy meta: the player sees that the post-victory decision changes future hands, and implementation remains local and smoke-testable.
 
-**Уточнение:** Нулевой урон в первом раунде не считается провалом сам по себе. Это валидный setup-раунд, если сохраненный контур остается читаемым, достраиваемым и конвертируется в закрытия в следующих 2-3 раундах. Оценивать нужно не одиночный `zero damage`, а нулевые серии, dead-end/freshStart и будущую конверсию незакрытой доски.
+### 2026-05-08 - Persistent board between rounds
 
-### 2026-05-08 — Off-color leap как выход из блокировки
+**Context:** In the strict edge-signature model, the player could place a starting tile and receive a hand with no valid continuation. Clearing the whole board every round amplified the problem: unclosed contours had no future payoff.
 
-**Контекст:** Даже с persistent board строгая совместимость краев может блокировать конкретный выбранный тайл: у него нет прямой валидной клетки, хотя на поле есть место для нового цветового острова.
+**Decision:** For the MVP, after round result remove only tiles that participated in scored capture zones, and keep unclosed tiles on the board. If the next hand cannot continue the saved board at all, enable `freshStart`: clear the board and let the player start a new island with the same hand.
 
-**Решение:** Если выбранный боевой тайл не имеет ни одной прямой edge-match позиции, разрешить поставить его через одну пустую клетку от тайла другого боевого цвета. Серые тайлы не используют это правило. В конфиге правило хранится как `offColorLeapPlacement`, `offColorLeapDistance` и `offColorLeapOnlyWhenBlocked`.
+**Rationale:** This preserves the value of building territory over several turns while removing hard dead-ends. Simulation shows that early battles remain forgiving, late battles need HP/upgrades, and dead-end rounds become a rare recoverable state.
 
-**Причина:** Это дает игроку понятный escape из блокировки доски, но не заменяет основной контурный геймплей. Проверка варианта "leap всегда" ухудшила симуляцию: доска распылялась на острова, поэтому правило ограничено случаем, когда выбранный тайл реально заблокирован.
+**Clarification:** Zero damage in the first round is not failure by itself. It is a valid setup round if the saved contour remains readable, buildable and converts into closures in the next 2-3 rounds. Evaluate not an isolated `zero damage`, but zero streaks, dead-end/freshStart and future conversion of the unclosed board.
 
-### 2026-05-08 — Честный normal run без loop autocomplete
+### 2026-05-08 - Off-color leap as a way out of blocking
 
-**Контекст:** После deck/discard-прогрессии обычный забег ощущался слишком управляемым: фиксированный seed и `guaranteedLoopHands=true` часто подталкивали игрока к одному и тому же красному квадрату, а генератор достраивал готовую петлю из draw pile.
+**Context:** Even with persistent board, strict edge compatibility can block a specific selected tile: it has no direct valid cell, even though the board has space for a new color island.
 
-**Решение:** Для normal run выключить `guaranteedLoopHands` по умолчанию. Рука теперь добирается одним честным draw из run draw pile без best-of-3 выбора и без автодостройки петли. Каждый обычный старт получает новый random seed. Детерминизм сохранен только как debug/smoke-путь через URL overrides: `?seed=20260508&guaranteedLoopHands=true`. При равных цветовых атаках primary color больше не выбирает красный автоматически.
+**Decision:** If the selected combat tile has no direct edge-match position, allow placing it through one empty cell away from a tile of another combat color. Gray tiles do not use this rule. In config, the rule is stored as `offColorLeapPlacement`, `offColorLeapDistance` and `offColorLeapOnlyWhenBlocked`.
 
-**Причина:** MVP должен сначала проверить интерес честной выкладки, а не демонстрировать заранее собранный loop. Persistent board, `freshStart` и off-color leap остаются safety valve, а стабильный smoke-тест остается возможным без влияния на обычный прогон.
+**Rationale:** This gives the player a clear escape from board blocking without replacing the main contour gameplay. The "always leap" variant worsened simulation: the board scattered into islands, so the rule is limited to the case where the selected tile is truly blocked.
 
-### 2026-05-08 — Playtest: минимальный квадрат доминирует из-за payoff structure
+### 2026-05-08 - Fair normal run without loop autocomplete
 
-**Контекст:** Ручной тест показал, что оптимальная стратегия сейчас — не выкладывать лишние тайлы, почти никогда не играть серые и закрывать контур как можно быстрее. В результате минимальный квадрат становится единственной стабильной фигурой, а обещание `маленькое сейчас или большая зона потом` не раскрывается.
+**Context:** After deck/discard progression, the normal run felt too controlled: fixed seed and `guaranteedLoopHands=true` often pushed the player toward the same red square, and the generator completed a ready loop from draw pile.
 
-**Решение:** Следующий must-эксперимент должен менять payoff, а не только выдачу тайлов: проверить бонус за размер закрытой зоны и простую полезность серых тайлов внутри зоны. Queue-режим и color/pattern bag остаются важными, но идут после проверки стимула строить больше минимального квадрата.
+**Decision:** Turn off `guaranteedLoopHands` by default for normal run. A hand is now drawn with one fair draw from run draw pile without best-of-3 selection and without loop autocompletion. Every normal start gets a new random seed. Determinism remains only as a debug/smoke path through URL overrides: `?seed=20260508&guaranteedLoopHands=true`. When color attacks tie, primary color no longer selects red automatically.
 
-**Причина:** Если награда за риск и площадь не видна, любой режим выдачи все равно будет толкать игрока к самому короткому закрытию. Серые должны стать понятной подготовкой или усилителем, иначе они останутся мусором в руке.
+**Rationale:** The MVP should first test the interest of fair placement, not demonstrate a preassembled loop. Persistent board, `freshStart` and off-color leap remain safety valves, and stable smoke testing remains possible without affecting normal runs.
 
-**Дополнение:** Можно проверить чуть более редкую выдачу `corner` и 4-way/`plus` тайлов как второй рычаг против готовых минимальных квадратов. Это нельзя считать заменой payoff-фиксу: если просто урезать замыкатели, игрок будет хотеть тот же минимальный квадрат, но дольше ждать нужные куски. Успех такого изменения измерять не только снижением частоты минимальных квадратов, но и ростом средней площади закрытий без роста dead-end/пустых рук.
+### 2026-05-08 - Playtest: minimal square dominates because of payoff structure
 
-### 2026-05-08 — Большая зона и серые тайлы получают явный payoff
+**Context:** Manual testing showed that the optimal strategy is now to avoid extra tiles, almost never play gray, and close the contour as quickly as possible. As a result, the minimal square becomes the only stable figure, and the promise of `small now or big zone later` does not emerge.
 
-**Контекст:** Минимальный 2x2 corner-loop оказался площадью 12 и давал 24 урона при `areaMultiplier = 2`. Без дополнительного стимула игроку выгоднее закрывать такой квадрат сразу, а серые blanks почти всегда воспринимались как мусор.
+**Decision:** The next must experiment should change payoff, not only tile draw: test a bonus for closed zone size and simple usefulness for gray tiles inside a zone. Queue mode and color/pattern bag remain important, but come after checking the incentive to build beyond the minimal square.
 
-**Решение:** Расширить `damageFormula` в `configs/game.json`: зоны больше `largeZoneBonus.minArea = 12` получают дополнительный урон за каждую extra micro-cell, а micro-cells серых тайлов внутри закрытой зоны дают фиксированный `grayInteriorBonus`. Итоговая base damage зоны затем умножается на цветовой множитель забега.
+**Rationale:** If the reward for risk and area is not visible, any draw mode will still push the player toward the shortest closure. Gray must become understandable preparation or an amplifier, otherwise it remains trash in hand.
 
-**Причина:** Это сохраняет минимальный квадрат как безопасный базовый ход, но делает достраивание крупной зоны и подготовку серым тайлом очевидно читаемой ставкой. Симулятор теперь отдельно печатает сценарий минимального 2x2 loop против 3x3 loop с серым fill, стратегию `close ASAP` против `payoff`, а также метрики минимальных захватов и deck-mix пресеты.
+**Addition:** A slightly rarer draw of `corner` and 4-way/`plus` tiles can be tested as a second lever against ready minimal squares. It cannot be treated as a replacement for payoff fixes: if we simply cut closers, the player will still want the same minimal square, just wait longer for the pieces. Success should be measured not only by lower minimal-square frequency, but also by higher average capture area without more dead-end/empty hands.
 
-### 2026-05-08 — Серые blanks как wildcard fill
+### 2026-05-08 - Large zone and gray tiles get explicit payoff
 
-**Контекст:** После добавления `grayInteriorBonus` выяснилось, что серый blank с edge `...` нельзя поставить рядом с `plus` и многими цветными boundary-тайлами, потому что строгая edge-signature модель требует полного совпадения края. Серый получал payoff, но не мог нормально попасть внутрь будущей зоны.
+**Context:** The minimal 2x2 corner loop had area 12 and dealt 24 damage with `areaMultiplier = 2`. Without additional incentive, closing that square immediately was optimal, and gray blanks almost always felt like trash.
 
-**Решение:** Добавить `grayWildcardPlacement` в `configs/game.json`. Когда правило включено, серые тайлы могут касаться серого или пустого края цветного тайла, а цветные тайлы могут касаться серого только пустым краем. Серый не может закрывать цветной выход границы. Остальные цвет-цвет совпадения остаются строгими.
+**Decision:** Extend `damageFormula` in `configs/game.json`: zones larger than `largeZoneBonus.minArea = 12` receive extra damage for every extra micro-cell, and gray tile micro-cells inside a closed zone give fixed `grayInteriorBonus`. The zone's final base damage is then multiplied by the run color multiplier.
 
-**Причина:** Серый в MVP должен быть нейтральной землей/fill, а не отдельной дорожной геометрией. Wildcard-правило делает его понятным setup-тайлом для больших зон, не ломая основной цветной boundary puzzle.
+**Rationale:** This keeps the minimal square as a safe base move, but makes growing a large zone and preparing with a gray tile a clearly readable bet. The simulator now separately prints the minimal 2x2 loop versus 3x3 loop with gray fill scenario, `close ASAP` versus `payoff`, and minimal capture/deck-mix preset metrics.
 
-**Уточнение 2026-05-09:** Playtest показал, что серый blank должен вставляться в клетки как fill даже рядом с цветной геометрией. Правило стало асимметричным: когда ставится серый, он может касаться боевого тайла любым краем; когда ставится боевой тайл рядом с уже лежащим серым, боевой тайл должен приходить пустым краем. Это сохраняет роль серого как земли/fill, но не делает его продолжением цветного пути.
+### 2026-05-08 - Gray blanks as wildcard fill
 
-### 2026-05-08 — Стартовая колода собирается через recipe
+**Context:** After adding `grayInteriorBonus`, it turned out that a gray blank with edge `...` could not be placed next to `plus` and many colored boundary tiles because the strict edge-signature model requires a full edge match. Gray had payoff, but could not reliably enter a future zone.
 
-**Контекст:** Baseline показал, что стартовая колода "по одному тайлу из manifest" оставляет доминирование малых `area <= 12` закрытий. При этом жесткое удаление `corner/plus` резко сушит первый бой и ломает ощущение, что игрок почти всегда может строить полезный контур.
+**Decision:** Add `grayWildcardPlacement` to `configs/game.json`. When the rule is enabled, gray tiles can touch gray or empty edges of colored tiles, and colored tiles can touch gray only with an empty edge. Gray cannot close a colored boundary output. All other color-color matches remain strict.
 
-**Решение:** Добавить `startingDeckRecipe` в `configs/game.json` и использовать его как единый источник стартовой колоды в игре и `scripts/simulate-tiles.js`. Recipe разворачивается в массив tile id и поддерживает дубли. Активный MVP-рецепт оставляет combat-тайлы v2 по одному экземпляру и добавляет одну дополнительную копию `tile_gray_blank_01`, не меняя manifest и арт.
+**Rationale:** In the MVP, gray should be neutral land/fill, not separate road geometry. The wildcard rule makes it an understandable setup tile for large zones without breaking the main colored boundary puzzle.
 
-**Причина:** Это вводит нужную инфраструктуру для контролируемого состава колоды и проверяет мягкий anti-small-square сдвиг без провала smoke/debug. Симуляция показала, что recipe сам по себе недостаточен: следующий рычаг должен ограничивать раннее окно выдачи через opening shape-bag/caps, а не пытаться решить проблему только общей частотой тайлов.
+**Clarification 2026-05-09:** Playtest showed that gray blank should be insertable as fill even next to colored geometry. The rule became asymmetric: when placing gray, it can touch a combat tile on any edge; when placing a combat tile next to already placed gray, the combat tile must arrive with an empty edge. This preserves gray's role as land/fill without making it a continuation of a colored path.
 
-### 2026-05-09 — Opening draw bag без hidden solver
+### 2026-05-08 - Starting deck is built through recipe
 
-**Контекст:** Playtest показал, что честный shuffle стартовой колоды может давать либо готовые замыкатели, либо слишком мутный набор без понятного продолжения. При этом возвращать `guaranteedLoopHands` нельзя: он делает игру невидимо управляемой и снова собирает решение за игрока.
+**Context:** Baseline showed that the starting deck "one tile from manifest each" preserved dominance of small `area <= 12` closures. At the same time, harsh removal of `corner/plus` quickly dried out the first battle and broke the feeling that the player can almost always build a useful contour.
 
-**Решение:** Добавить `tileBattle.drawBag` в `configs/game.json` и применять его один раз на старте боя к ближайшим будущим доборам из текущего draw pile. Bag переставляет уже существующие тайлы: ограничивает ранние `corner`/`plus`, требует минимум `line`/`tee`, держит минимум по боевым цветам и лимитирует серые. Он не добавляет тайлы, не гарантирует закрытую петлю и не смотрит на доску как solver.
+**Decision:** Add `startingDeckRecipe` to `configs/game.json` and use it as the single source for the starting deck in the game and `scripts/simulate-tiles.js`. Recipe expands into an array of tile ids and supports duplicates. Active MVP recipe keeps one copy of each combat v2 tile and adds one extra copy of `tile_gray_blank_01`, without changing manifest or art.
 
-**Причина:** Это самый короткий способ снизить раннюю волатильность и дать игроку больше продолжателей контура, не меняя core-loop, discard-экономику и smoke/debug путь. Симуляция после правки показывает корректный opening composition, но не снимает риск длинных zero-damage streak; если ощущение все еще сухое, следующий рычаг — queue-режим или ценность малого контура, а не усложнение bag до скрытой автосборки.
+**Rationale:** This introduces the needed infrastructure for controlled deck composition and tests a gentle anti-small-square shift without failing smoke/debug. Simulation showed that recipe alone is not enough: the next lever should constrain the early draw window through opening shape-bag/caps, not only through total tile frequency.
 
-### 2026-05-09 — Queue draw включен как активный MVP-режим
+### 2026-05-09 - Opening draw bag without hidden solver
 
-**Контекст:** Нужно было проверить, снизит ли режим "текущий тайл + следующий preview" доминирование полной руки, где игрок сразу ищет готовый малый контур.
+**Context:** Playtest showed that a fair starting-deck shuffle can give either ready closers or a murky set with no clear continuation. Returning `guaranteedLoopHands` is not allowed: it makes the game invisibly controlled and again assembles the solution for the player.
 
-**Решение:** Добавить `tileBattle.drawMode` со значениями `hand` и `queue`, включить `queue` как активный MVP-режим, оставить full-hand режим доступным через `?drawMode=hand`, добавить queue UI и поддержку queue в симуляторе через `DRAW_MODE=queue`. Для queue-симуляции использовать beam AI: при текущем тайле и preview пространство решений меньше, поэтому его можно тестировать сильнее, чем случайный порядок полной руки.
+**Decision:** Add `tileBattle.drawBag` to `configs/game.json` and apply it once at battle start to the nearest future draws from the current draw pile. Bag reorders already existing tiles: caps early `corner`/`plus`, requires minimum `line`/`tee`, keeps combat color minimums and limits gray. It does not add tiles, guarantee a closed loop or look at the board as a solver.
 
-**Причина:** По ручной проверке важно видеть queue в обычном билде, а не только через debug URL. Queue делает выбор более последовательным и действительно проще для тестового AI. После замены greedy-оценки на beam метрики queue стали заметно честнее: ранняя конверсия в некоторых прогонах лучше. Основная дизайн-проблема остается: закрытия по-прежнему чаще всего малые `area <= 12`, поэтому следующая задача все еще должна сравнить queue и hand перед финальным выбором режима.
+**Rationale:** This is the shortest way to reduce early volatility and give the player more contour continuations without changing the core loop, discard economy and smoke/debug path. Simulation after the change shows correct opening composition, but does not remove the risk of long zero-damage streaks; if the feel is still dry, the next lever is queue mode or small-contour value, not making the bag into hidden autocomplete.
 
-### 2026-05-09 — Off-color leap доступен не только при полной блокировке
+### 2026-05-09 - Queue draw enabled as active MVP mode
 
-**Контекст:** В queue-режиме игрок может видеть на доске несколько островов разных цветов. Если выбранный тайл имеет хотя бы один прямой ход рядом со своим островом, старое правило `offColorLeapOnlyWhenBlocked = true` запрещало начать новый остров через одну клетку от другого цвета, хотя визуально такие клетки выглядят свободными и полезными.
+**Context:** We needed to test whether "current tile + next preview" would reduce full-hand dominance, where the player immediately searches for a ready small contour.
 
-**Решение:** Выключить `offColorLeapOnlyWhenBlocked`: боевой тайл может использовать off-color leap даже при наличии прямых edge-match ходов в другой части доски. Ограничения остаются: нужен другой боевой цвет на расстоянии 2 и пустая gap-клетка между ними.
+**Decision:** Add `tileBattle.drawMode` with values `hand` and `queue`, enable `queue` as active MVP mode, keep full-hand available through `?drawMode=hand`, add queue UI and simulator support for queue through `DRAW_MODE=queue`. Use beam AI for queue simulation: with current tile and preview, the decision space is smaller, so it can be tested more strongly than a random full-hand order.
 
-**Причина:** Это делает подсветку валидных клеток ближе к ожиданию игрока и снижает ощущение, что игра искусственно запрещает очевидные setup-позиции. Риск распыления доски принимается как часть queue-эксперимента и будет измеряться в следующем сравнении режимов.
+**Rationale:** Manual checking needs queue visible in the normal build, not only through debug URL. Queue makes choice more sequential and is genuinely easier for the test AI. After replacing greedy evaluation with beam, queue metrics became noticeably fairer: early conversion is better in some runs. The main design problem remains: closures are still most often small `area <= 12`, so the next task must still compare queue and hand before choosing the final active `drawMode`.
 
-### 2026-05-09 — Tiles v3 стартует с двух боевых цветов
+### 2026-05-09 - Off-color leap is available beyond full blocking
 
-**Контекст:** Симуляции и playtest v2 показали, что три боевых цвета в стартовой колоде дробят план игрока, серые blanks часто ощущаются мусором, а почти все реальные закрытия остаются минимальными `area 12` петлями. Простое добавление rotation рискованно: оно сильнее бафает углы и делает малый квадрат еще стабильнее.
+**Context:** In queue mode, the player can see several islands of different colors on the board. If the selected tile has at least one direct move near its own island, the old rule `offColorLeapOnlyWhenBlocked = true` forbade starting a new island one cell away from another color, even though those cells look visually free and useful.
 
-**Решение:** Включить v3-эксперимент без нового арта: `activeCombatColors = ["red", "blue"]`, стартовая колода 25 тайлов из v2 manifest (`line_h/line_v x2` на active color, каждый `tee` и `corner` x1, `plus x0`, `gray_blank x1`). Первые две битвы больше не атакуют green. Opening bag для v3 держит `corner <= 2`, `plus <= 0`, `line >= 4`, `tee >= 4`, red/blue минимум по 4 и `grayMax = 1`. Награды add/boost ограничены active colors, чтобы green не возвращался случайно до отдельного решения.
+**Decision:** Turn off `offColorLeapOnlyWhenBlocked`: a combat tile can use off-color leap even when direct edge-match moves exist elsewhere on the board. Restrictions remain: another combat color is needed at distance 2 and an empty gap cell must be between them.
 
-**Причина:** Два цвета дают игроку больше продолжений одного плана и меньше "налога без инструмента". В quick sim на seed `20260508` активный `queue + opening bag` с `corner cap 2` дал для battle_01: 21/40 побед, `64%` малых закрытий и `avg area 17.1`, против прежних v2-значений около `98%` малых закрытий и `avg area` около 12. Rotation оставлен как будущий reward/артефакт, а не базовый MVP-фикс.
+**Rationale:** This makes valid-cell highlighting closer to player expectation and reduces the feeling that the game artificially forbids obvious setup positions. The risk of scattering the board is accepted as part of the queue experiment and will be measured in the next mode comparison.
 
-### 2026-05-09 — Gameplay variants сравниваются через один переключатель
+### 2026-05-09 - Tiles v3 starts with two combat colors
 
-**Контекст:** Playtest v3 показал, что точечные баланс-рычаги больше не отвечают на главный вопрос: какая базовая фантазия хода реально заставляет хотеть строить землю больше 4 клеток.
+**Context:** Simulations and v2 playtest showed that three combat colors in the starting deck fragment the player's plan, gray blanks often feel like trash, and almost all real closures remain minimal `area 12` loops. Simple rotation is risky: it buffs corners and makes the small square even more stable.
 
-**Решение:** Добавить `tileBattle.gameplayVariant` и общий реестр id: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Текущий `queue + two-color capture-fill` сохранен как `legacy`; старый термин `baseline` остается URL-алиасом. Вариант выбирается из config, через URL `?gameplayVariant=...`/`?variant=a` или временно на main menu, показывается в combat UI/debug и печатается в симуляторе вместе с единым порядком сравнения. Scorecard ручного плейтеста хранится в `design/gameplay-variants.md`.
+**Decision:** Enable a v3 experiment without new art: `activeCombatColors = ["red", "blue"]`, 25-tile starting deck from v2 manifest (`line_h/line_v x2` per active color, each `tee` and `corner` x1, `plus x0`, `gray_blank x1`). The first two battles no longer attack green. Opening bag for v3 keeps `corner <= 2`, `plus <= 0`, `line >= 4`, `tee >= 4`, red/blue minimum 4 each and `grayMax = 1`. Add/boost rewards are limited to active colors so green does not return randomly before a separate decision.
 
-**Причина:** Один переключатель позволяет тестировать разные core-feel гипотезы в том же playable build без форка кода и без путаницы в ручных наблюдениях. Legacy фиксирует текущее ощущение игры как контрольный режим, а temporary picker ускоряет ручное сравнение. На первом шаге не-legacy варианты являются каркасом; их механики добавляются отдельными задачами.
+**Rationale:** Two colors give the player more continuations for one plan and less "tax without tool." In a quick sim on seed `20260508`, active `queue + opening bag` with `corner cap 2` gave battle_01: 21/40 wins, `64%` small captures and `avg area 17.1`, compared to prior v2 values near `98%` small captures and `avg area` near 12. Rotation is kept as a future reward/artifact, not the base MVP fix.
 
-### 2026-05-09 — Variant A использует Focus вместо урона за placement
+### 2026-05-09 - Gameplay variants are compared through one switch
 
-**Контекст:** Playtest показал, что рост земли до 5+ клеток ощущается как потеря темпа: игрок вкладывает тайлы в план, но до закрытия не получает видимого результата.
+**Context:** v3 playtest showed that point balance levers no longer answer the main question: which base turn fantasy actually makes the player want to build land larger than 4 cells.
 
-**Решение:** В `placement_payoff` полезная постановка рядом с существующей землей без закрытия зоны дает `Focus +1`. Focus имеет cap, не наносит прямой урон и тратится только при следующем захвате, добавляя flat bonus к самой большой закрытой зоне.
+**Decision:** Add `tileBattle.gameplayVariant` and shared id registry: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Current `queue + two-color capture-fill` is preserved as `legacy`; the old term `baseline` remains a URL alias. Variant is selected from config, through URL `?gameplayVariant=...`/`?variant=a` or temporarily on the main menu, shown in combat UI/debug and printed by the simulator with one shared comparison order. Manual playtest scorecard lives in `design/gameplay-variants.md`.
 
-**Причина:** Так setup-ход сразу получает читаемый feedback, но главный payoff остается за closure/capture. Cap и конвертация только через захват защищают вариант от бесконечного фарма "урона за каждый клик".
+**Rationale:** One switch lets us test different core-feel hypotheses in the same playable build without forking code and without confusing manual observations. Legacy records the current game feel as the control mode, and the temporary picker speeds manual comparison. At the first step, non-legacy variants are scaffolds; their mechanics are added as separate tasks.
 
-### 2026-05-09 — Свободные клетки без соседей валидны для placement
+### 2026-05-09 - Variant A uses Focus instead of placement damage
 
-**Контекст:** Известный баг сужал поле: после постановки тайла подсветка иногда оставляла только 1-2 клетки, хотя удаленные свободные клетки физически не конфликтовали ни с одним краем.
+**Context:** Playtest showed that growing land to 5+ cells feels like losing tempo: the player invests tiles into a plan but gets no visible result until closure.
 
-**Решение:** Считать валидной любую пустую клетку без прямых соседей. Если прямые соседи есть, все touching edges по-прежнему должны совпасть. Старый off-color leap больше не является основным способом начать новый остров.
+**Decision:** In `placement_payoff`, a useful placement next to existing land without closing a zone gives `Focus +1`. Focus has a cap, does not deal direct damage and is spent only on the next capture, adding a flat bonus to the largest closed zone.
 
-**Причина:** Gameplay-варианты A-D должны сравнивать core-feel, а не бороться со скрытым ограничением placement. Широкая легальность делает намерение игрока понятнее, сохраняя edge puzzle только там, где реально есть соседство.
+**Rationale:** The setup move gets immediate readable feedback, while the main payoff still belongs to closure/capture. Cap and conversion only through capture protect the variant from infinite "damage per click" farming.
 
-### 2026-05-09 — Variant B проверяет один land-color через Chain
+### 2026-05-09 - Free cells without neighbors are valid for placement
 
-**Контекст:** Variant A сделал setup-ход видимым через Focus, но два цвета все еще могут дробить план игрока и возвращать ощущение "я строю неправильно", когда хочется вырастить один большой участок.
+**Context:** A known bug narrowed the board: after placing a tile, highlighting sometimes left only 1-2 cells, even though distant free cells physically conflicted with no edge.
 
-**Решение:** Реализовать `one_color_chain` как отдельный gameplay variant: все combat-символы считаются одной землей для edge-match и capture-fill, активные угрозы складываются в одну land-линию, а продолжение того же connected region растит `Chain xN`. Chain дает flat bonus к следующему захвату и сбрасывается до базового состояния после scoring closure.
+**Decision:** Treat any empty cell with no direct neighbors as valid. If direct neighbors exist, all touching edges must still match. The old off-color leap is no longer the main way to start a new island.
 
-**Причина:** Это самый короткий MVP для проверки гипотезы "форма и непрерывный рост важнее цвета" без новых ассетов, новой колоды и отдельного боевого режима. Legacy и Variant A остаются рядом для сравнения, а баланс Chain живет в `configs/game.json`.
+**Rationale:** Gameplay variants A-D should compare core feel, not fight a hidden placement restriction. Broad legality makes the player's intent clearer while preserving the edge puzzle only where actual adjacency exists.
 
-### 2026-05-09 — Variant C дает внешнюю цель через connect targets
+### 2026-05-09 - Variant B tests one land-color through Chain
 
-**Контекст:** Variant A и B проверяют внутренние бонусы за setup и непрерывный рост, но игроку все еще нужна видимая причина растить землю в конкретном направлении.
+**Context:** Variant A made setup turns visible through Focus, but two colors can still fragment the player's plan and bring back the feeling of "I am building wrong" when the player wants to grow one large plot.
 
-**Решение:** Реализовать `connect_targets` как отдельный gameplay variant: на поле появляется пара целей A/B, все combat-тайлы считаются одной землей для edge-match/capture-fill, активные угрозы складываются в одну land-линию, а connected land между A/B дает разовый flat bonus из `configs/game.json` (`connectTargets.bonusDamage`). После scoring новая пара появляется в следующем раунде.
+**Decision:** Implement `one_color_chain` as a separate gameplay variant: all combat symbols count as one land for edge-match and capture-fill, active threats are summed into one land lane, and continuing the same connected region grows `Chain xN`. Chain gives a flat bonus to the next capture and resets to base after scoring closure.
 
-**Причина:** Это минимальная проверка фантазии "дотянуться до маяка" без новых ассетов и без отдельной road-системы. Цель читается на доске, payoff не требует закрытия контура, а legacy/A/B остаются доступными для сравнения через тот же variant switch.
+**Rationale:** This is the shortest MVP for testing "shape and continuous growth matter more than color" without new assets, new deck or separate battle mode. Legacy and Variant A remain next to it for comparison, and Chain balance lives in `configs/game.json`.
+
+### 2026-05-09 - Variant C provides an external goal through connect targets
+
+**Context:** Variant A and B test internal bonuses for setup and continuous growth, but the player still needs a visible reason to grow land in a specific direction.
+
+**Decision:** Implement `connect_targets` as a separate gameplay variant: the board receives a pair of A/B targets, all combat tiles count as one land for edge-match/capture-fill, active threats are summed into one land lane, and connected land between A/B gives a one-time flat bonus from `configs/game.json` (`connectTargets.bonusDamage`). After scoring, a new pair appears next round.
+
+**Rationale:** This is the minimum test of the "reach the beacon" fantasy without new assets and without a separate road system. The target is readable on the board, payoff does not require contour closure, and legacy/A/B remain available for comparison through the same variant switch.
+
+### 2026-05-09 - Variant D tests road-mode through S/E gates
+
+**Context:** After Variant C, a separate hypothesis remained: it may be clearer for the player to build an actual road between start and end, not just connect two targets for a bonus. Full road tiles, end pieces, turns, forks and route purity are too large for MVP.
+
+**Decision:** Implement `road_mode` as a route-to-target MVP over one-color land: the board has S/E gates, area-capture payoff is disabled, active threats are summed into one land lane, and a completed connected road deals a weak finish bonus plus main damage for extra route length. Formula from `configs/game.json`: `roadMode.completeBonus + min(extraLength, roadMode.maxScoredExtraLength) * roadMode.damagePerTile`, where `extraLength = max(0, routeEdges - gateDistance)`. Length is counted by the shortest placed S/E path, and scored road-path tiles are cleared between rounds.
+
+**Rationale:** This is the shortest way to test the "I am building a road" fantasy in the same playable build. The variant keeps the existing placement, queue, deck/discard and UI infrastructure, but removes the main contour-fill incentive so manual playtest can fairly compare route payoff with A-C.
+
+### 2026-05-09 - Playtest pivot to Core 1 Rescue
+
+**Context:** Manual run through five gameplay directions showed that `legacy` remains the most playable, but current queue-flow too often feels like waiting for the right card. Variant A does not feel standalone, one-color has no strong stake yet, the road/target branch needs scoring/rotation review, and one tested mode is uninteresting.
+
+**Decision:** Narrow the next MVP to Core 1 Rescue: keep default `gameplayVariant: "legacy"`, switch default `drawMode` to `hand`, remove gray blank from the active starting deck, set `drawBag.grayMax = 0`, and make the next must step a starting universal red/blue tile in the center. Record Kingdomino-like combat as a separate spike and do not mix it with capture-fill.
+
+**Rationale:** This preserves the liveliest direction and targets the main playtest risk: the player should have a plan from the first moves. Full-hand and starting center are cheaper and easier to test than adding rotate, double-color tiles, Fiords-like maps or a new Kingdomino core all at once.
+
+### 2026-05-09 - Legacy moves to hearts and new-pick cost
+
+**Context:** Manual playtest after switching `legacy` to full-hand showed that the game immediately improved: visible hand restores planning to the player. The next pain is that combat is still read through large numbers and extra green UI noise, and a new hand draw does not have a clear enough cost.
+
+**Decision:** For the next legacy iteration, remove the third/green color from active legacy interfaces, replace large damage numbers with a hearts scale, start the first monster with 3 hearts, count minimal 2x2 capture as 1 heart, and make every new pick/refill a source of incoming damage. Unplayed tiles should increase this damage, but only with explicit preview before the action.
+
+**Rationale:** This turns battle from abstract damage accounting into a clear tempo race: kill the monster in fewer picks. New-pick cost ties hand, tempo and health together, but preview is mandatory so the player feels responsible for the decision instead of secretly punished.
