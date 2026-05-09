@@ -84,6 +84,19 @@ export function createUiRenderer(PIXI, stage) {
         return label;
     }
 
+    function drawImage(texture, rect, options = {}) {
+        const sprite = useDrawItem('image', () => new PIXI.Sprite());
+        sprite.texture = texture;
+        sprite.x = rect.x;
+        sprite.y = rect.y;
+        sprite.width = rect.width;
+        sprite.height = rect.height;
+        sprite.alpha = options.alpha ?? 1;
+        sprite.tint = options.tint ? colorToPixi(options.tint) : 0xffffff;
+
+        return sprite;
+    }
+
     function drawButton(rect, label, options = {}) {
         const hovered = options.mouse ? contains(rect, options.mouse) : false;
         drawRect(rect, hovered ? options.hoverColor ?? '#6ed4ff' : options.color ?? '#24364d');
@@ -111,6 +124,7 @@ export function createUiRenderer(PIXI, stage) {
         },
         drawRect,
         drawText,
+        drawImage,
         drawButton,
         contains,
     };

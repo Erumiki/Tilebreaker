@@ -2,13 +2,14 @@ import { discardTileIds, drawTileIds } from './run.js';
 import { getGameplayVariant } from './gameplayVariants.js';
 
 export const COMBAT_COLORS = ['red', 'blue', 'green'];
-export const TILE_COLORS = ['red', 'blue', 'green', 'gray'];
+export const TILE_COLORS = ['red', 'blue', 'green', 'gray', 'universal'];
 
 const COLOR_SYMBOLS = {
     red: 'R',
     blue: 'B',
     green: 'G',
     gray: '.',
+    universal: '*',
 };
 
 const DIRECTIONS = [
@@ -27,9 +28,11 @@ function colorSymbol(color) {
 }
 
 function isCombatSymbol(symbol) {
-    return Object.values(COLOR_SYMBOLS)
-        .filter((value) => value !== COLOR_SYMBOLS.gray)
-        .includes(symbol);
+    return COMBAT_COLORS.some((color) => colorSymbol(color) === symbol);
+}
+
+function isUniversalSymbol(symbol) {
+    return symbol === COLOR_SYMBOLS.universal;
 }
 
 function isOneColorChainVariant(settings = {}) {
@@ -94,6 +97,35 @@ function ruleEdge(tileDef, direction, settings) {
         .split('')
         .map((symbol) => normalizeRuleSymbol(symbol, settings))
         .join('');
+}
+
+function getActiveCombatSymbols(settings = {}) {
+    const colors = Array.isArray(settings.activeCombatColors)
+        ? settings.activeCombatColors.filter((color) => COMBAT_COLORS.includes(color))
+        : COMBAT_COLORS;
+
+    return new Set((colors.length > 0 ? colors : COMBAT_COLORS).map(colorSymbol));
+}
+
+function symbolMatches(left, right, settings) {
+    if (left === right) {
+        return true;
+    }
+
+    const activeCombatSymbols = getActiveCombatSymbols(settings);
+
+    return (isUniversalSymbol(left) && activeCombatSymbols.has(right))
+        || (isUniversalSymbol(right) && activeCombatSymbols.has(left));
+}
+
+function ruleEdgesMatch(leftEdge, rightEdge, settings) {
+    return leftEdge.split('').every((symbol, index) => (
+        symbolMatches(symbol, rightEdge[index], settings)
+    ));
+}
+
+function isBoundaryForColor(symbol, colorSymbolValue) {
+    return symbol === colorSymbolValue || isUniversalSymbol(symbol);
 }
 
 function boardKey(x, y) {
@@ -184,7 +216,11 @@ function edgesMatch(tileDef, neighbor, direction, settings) {
         return isBlankEdge(tileDef, direction.name);
     }
 
-    return ruleEdge(tileDef, direction.name, settings) === ruleEdge(neighbor, direction.opposite, settings);
+    return ruleEdgesMatch(
+        ruleEdge(tileDef, direction.name, settings),
+        ruleEdge(neighbor, direction.opposite, settings),
+        settings,
+    );
 }
 
 function canPlaceAdjacentTile(board, tileDef, x, y, settings) {
@@ -879,7 +915,7 @@ function floodOutsideForColor(grid, colorSymbolValue) {
             const gridY = nextY - 1;
             const isOriginalCell = gridX >= 0 && gridY >= 0 && gridX < size && gridY < size;
 
-            if (isOriginalCell && grid[gridY][gridX] === colorSymbolValue) {
+            if (isOriginalCell && isBoundaryForColor(grid[gridY][gridX], colorSymbolValue)) {
                 continue;
             }
 
@@ -923,7 +959,7 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
             const nextColor = grid[nextY][nextX];
             const nextIndex = originalIndex(size, nextX, nextY);
 
-            if (nextColor === colorSymbolValue) {
+            if (isBoundaryForColor(nextColor, colorSymbolValue)) {
                 if (!boundary[nextIndex]) {
                     boundary[nextIndex] = 1;
                     boundaryCells.push({ x: nextX, y: nextY });
@@ -963,7 +999,7 @@ function findCapturedAreas(board, settings) {
                 const cellColor = grid[y][x];
                 const cellIndex = originalIndex(grid.length, x, y);
 
-                if (cellColor === colorSymbolValue
+                if (isBoundaryForColor(cellColor, colorSymbolValue)
                     || isReachable(reachable, grid.length, x, y)
                     || visited[cellIndex]) {
                     continue;
@@ -976,7 +1012,11 @@ function findCapturedAreas(board, settings) {
                     { x, y },
                     visited,
                 );
-                const area = region.interiorCells.length + region.boundaryCells.length;
+                const wildcardBoundaryCells = region.boundaryCells.filter((cell) => (
+                    grid[cell.y][cell.x] === COLOR_SYMBOLS.universal
+                )).length;
+                const coloredBoundaryCells = region.boundaryCells.length - wildcardBoundaryCells;
+                const area = region.interiorCells.length + coloredBoundaryCells;
                 const grayInteriorCells = region.interiorCells.filter((cell) => {
                     const tileDef = board[Math.floor(cell.y / 3)]?.[Math.floor(cell.x / 3)];
 
@@ -991,7 +1031,8 @@ function findCapturedAreas(board, settings) {
                 zones.push({
                     color,
                     interiorSize: region.interiorCells.length,
-                    boundarySize: region.boundaryCells.length,
+                    boundarySize: coloredBoundaryCells,
+                    wildcardBoundarySize: wildcardBoundaryCells,
                     area,
                     areaDamage: damage.areaDamage,
                     areaBonus: damage.areaBonus,
@@ -1526,11 +1567,21 @@ function applyRoadModeToScore(state, score, settings, run = null) {
     };
 }
 
+function createSpecialTile(entry) {
+    return {
+        id: entry.id,
+        file: entry.file ?? null,
+        color: entry.color ?? 'universal',
+        pattern: entry.pattern ?? entry.id,
+        cells: pattern(entry.matrix),
+        special: entry.special ?? null,
+    };
+}
+
 export function createTilesFromManifest(manifest, settings = {}) {
     const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
     const oneColorLand = isOneColorLandVariant(settings);
-
-    return manifest.tiles.slice(0, deckSize).map((entry) => {
+    const manifestTiles = manifest.tiles.slice(0, deckSize).map((entry) => {
         const symbol = oneColorLand && COMBAT_COLORS.includes(entry.color)
             ? colorSymbol('red')
             : colorSymbol(entry.color);
@@ -1544,6 +1595,13 @@ export function createTilesFromManifest(manifest, settings = {}) {
             cells: pattern(rows),
         };
     });
+    const specialTiles = Array.isArray(settings.specialTiles)
+        ? settings.specialTiles
+            .filter((entry) => shouldUseStartingBoardTile(entry, settings))
+            .map(createSpecialTile)
+        : [];
+
+    return [...manifestTiles, ...specialTiles];
 }
 
 function getTilePattern(tileDef) {
@@ -1716,6 +1774,8 @@ export function placeTile(state, settings, x, y) {
     const placedBefore = countPlacedTiles(state.board);
     const hadDirectNeighbor = hasDirectNeighbor(state.board, x, y, settings);
     state.board[y][x] = tileDef;
+    state.lastPlacedTileColor = tileDef.color;
+    state.lastPlacedTileId = tileDef.id;
     const postPlacementScore = scoreTileBoard(state.board, settings);
     state.lastPlacementClosedZones = postPlacementScore.zones.length;
     state.lastPlacementFocusDelta = 0;
@@ -1785,8 +1845,40 @@ export function holdSelectedTile(state, settings) {
     return true;
 }
 
-export function scoreTileBoard(board, settings, run = null) {
-    const zones = isRoadModeVariant(settings) ? [] : findCapturedAreas(board, settings);
+function getZoneInteriorKey(zone) {
+    return zone.interiorCells
+        .map((cell) => boardKey(cell.x, cell.y))
+        .sort()
+        .join('|');
+}
+
+function filterWildcardSharedZones(zones, placedColor) {
+    if (!COMBAT_COLORS.includes(placedColor)) {
+        return zones;
+    }
+
+    const groups = new Map();
+
+    for (const zone of zones) {
+        const key = getZoneInteriorKey(zone);
+        groups.set(key, [...groups.get(key) ?? [], zone]);
+    }
+
+    return [...groups.values()].flatMap((group) => {
+        const colors = new Set(group.map((zone) => zone.color));
+        const usesWildcard = group.some((zone) => (zone.wildcardBoundarySize ?? 0) > 0);
+
+        if (!usesWildcard || colors.size <= 1) {
+            return group;
+        }
+
+        return group.filter((zone) => zone.color === placedColor);
+    });
+}
+
+export function scoreTileBoard(board, settings, run = null, options = {}) {
+    const capturedAreas = isRoadModeVariant(settings) ? [] : findCapturedAreas(board, settings);
+    const zones = filterWildcardSharedZones(capturedAreas, options.placedColor);
     const damageByColor = Object.fromEntries(TILE_COLORS.map((color) => [color, 0]));
 
     for (const zone of zones) {
@@ -1930,7 +2022,9 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
     }
 
     const attack = getRoundAttack(battle, state.round, settings);
-    const score = scoreTileBoard(state.board, settings, run);
+    const score = scoreTileBoard(state.board, settings, run, {
+        placedColor: state.lastPlacedTileColor,
+    });
     state.lastPlacementClosedZones = score.zones.length;
 
     if (score.zones.length === 0) {

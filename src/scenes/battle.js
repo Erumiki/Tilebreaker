@@ -270,13 +270,41 @@ function drawTile(ui, tileDef, rect, options = {}) {
         return;
     }
 
+    const texture = options.tileTextures?.get(tileDef.id);
     const gap = Math.max(1, Math.floor(rect.width * 0.035));
     const microSize = (rect.width - gap * 4) / 3;
     ui.drawRect(rect, options.background ?? '#202b34', options.alpha ?? 1);
 
+    if (texture && !options.oneColorLand) {
+        ui.drawImage(texture, rect, {
+            alpha: options.alpha ?? 1,
+        });
+        return;
+    }
+
     for (let y = 0; y < 3; y += 1) {
         for (let x = 0; x < 3; x += 1) {
             const symbol = tileDef.cells[y][x];
+            const cellRect = {
+                x: rect.x + gap + x * (microSize + gap),
+                y: rect.y + gap + y * (microSize + gap),
+                width: microSize,
+                height: microSize,
+            };
+
+            if (symbol === '*') {
+                ui.drawRect({
+                    ...cellRect,
+                    width: microSize / 2,
+                }, COLOR_HEX.red, 0.95);
+                ui.drawRect({
+                    ...cellRect,
+                    x: cellRect.x + microSize / 2,
+                    width: microSize / 2,
+                }, COLOR_HEX.blue, 0.95);
+                continue;
+            }
+
             const color = options.oneColorLand && symbol !== '.'
                 ? COLOR_HEX.land
                 : symbol === 'R'
@@ -286,12 +314,7 @@ function drawTile(ui, tileDef, rect, options = {}) {
                     : symbol === 'G'
                         ? COLOR_HEX.green
                         : COLOR_HEX.gray;
-            ui.drawRect({
-                x: rect.x + gap + x * (microSize + gap),
-                y: rect.y + gap + y * (microSize + gap),
-                width: microSize,
-                height: microSize,
-            }, color, symbol === '.' ? 0.52 : 0.95);
+            ui.drawRect(cellRect, color, symbol === '.' ? 0.52 : 0.95);
         }
     }
 }
@@ -339,7 +362,7 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     });
 }
 
-function drawBoard(ui, layout, settings, state, mouse) {
+function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
     const selectedTile = state.hand[state.selectedHandIndex];
 
     for (let y = 0; y < settings.boardSize; y += 1) {
@@ -365,6 +388,7 @@ function drawBoard(ui, layout, settings, state, mouse) {
             drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
             drawTile(ui, state.board[y][x], insetRect(rect, 5), {
                 oneColorLand: isOneColorLandVariant(settings),
+                tileTextures,
             });
 
             const targets = state.connectTargets;
@@ -403,7 +427,7 @@ function drawBoard(ui, layout, settings, state, mouse) {
     }
 }
 
-function drawHand(ui, layout, settings, state, mouse) {
+function drawHand(ui, layout, settings, state, mouse, tileTextures) {
     const isQueue = isQueueDrawMode(settings);
 
     layout.hand.forEach((rect, index) => {
@@ -418,6 +442,7 @@ function drawHand(ui, layout, settings, state, mouse) {
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
         drawTile(ui, tileDef, insetRect(rect, 8), {
             oneColorLand: isOneColorLandVariant(settings),
+            tileTextures,
         });
 
         if (label) {
@@ -429,7 +454,7 @@ function drawHand(ui, layout, settings, state, mouse) {
     });
 }
 
-function drawHold(ui, layout, settings, state, mouse) {
+function drawHold(ui, layout, settings, state, mouse, tileTextures) {
     if (!layout.hold) {
         return;
     }
@@ -442,6 +467,7 @@ function drawHold(ui, layout, settings, state, mouse) {
     drawBorder(ui, rect, tileDef ? '#f3d991' : '#38536a', tileDef ? 3 : 2, tileDef ? 1 : 0.8);
     drawTile(ui, tileDef, insetRect(rect, 8), {
         oneColorLand: isOneColorLandVariant(settings),
+        tileTextures,
     });
     ui.drawText('Запас', rect.x, rect.y - 24, {
         size: 14,
@@ -887,6 +913,7 @@ export function createBattleScene({
     ui,
     run,
     battle,
+    tileTextures = new Map(),
     onFinish,
 }) {
     const settings = config.game.tileBattle;
@@ -1045,10 +1072,10 @@ export function createBattleScene({
                 color: '#98b4c8',
             });
 
-            drawBoard(ui, this.layout, settings, state, mouse);
+            drawBoard(ui, this.layout, settings, state, mouse, tileTextures);
             drawSidePanel(ui, this.layout, battle, run, settings, state);
-            drawHold(ui, this.layout, settings, state, mouse);
-            drawHand(ui, this.layout, settings, state, mouse);
+            drawHold(ui, this.layout, settings, state, mouse, tileTextures);
+            drawHand(ui, this.layout, settings, state, mouse, tileTextures);
             if (state.feedback) {
                 ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
                     size: 16,
@@ -1102,6 +1129,7 @@ export function createBattleScene({
                 gameplayVariant: getGameplayVariant(settings).id,
                 gameplayVariantLabel: getGameplayVariant(settings).shortLabel,
                 drawMode: settings.drawMode ?? 'hand',
+                tileImageIds: [...tileTextures.keys()],
                 gold: run.gold ?? 0,
                 submitCost: getHandSubmitCostPreview(state, settings),
                 handSubmitLocked: state.handSubmitLocked ?? false,
@@ -1132,6 +1160,7 @@ export function createBattleScene({
                         areaBonus: zone.areaBonus,
                         grayBonus: zone.grayBonus,
                         grayInteriorCells: zone.grayInteriorCells,
+                        wildcardBoundarySize: zone.wildcardBoundarySize ?? 0,
                         focusBonus: zone.focusBonus ?? 0,
                         chainBonus: zone.chainBonus ?? 0,
                     })),

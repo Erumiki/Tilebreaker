@@ -14,6 +14,12 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Core 1 uses one universal red-blue center starter
+
+**Context:** The two temporary center anchors made the opening playable, but they looked like ordinary deck tiles and split the "start either color here" rule across two objects. The card GD pass already narrowed the next control card test to one board-only universal vertical starter.
+**Decision:** Replace the two ordinary center anchors with `starter_universal_line_v`, defined in config as a special board-only tile with matrix `.*. / .*. / .*.`. The `*` symbol matches active combat colors on edges, blocks flood-fill for the evaluated color, does not add wildcard cells to score area and does not let red and blue match directly. Active immediate scoring keeps only the placed tile's color if a shared wildcard-assisted closure would otherwise score both colors.
+**Rationale:** This tests the desired opening communication without adding the shop, rotation or broader wildcard deck power. The starter should improve first-turn direction while staying a connector, not a free damage source.
+
 ### 2026-05-09 - Card GD pass defines universal starter and buyable controls
 
 **Context:** Core 1 Rescue now has full-hand planning, hold, heart-scale hand submit, immediate closure scoring and visible gold. The remaining problem is control: the temporary two-tile center bridge communicates poorly, and gold will not matter until the between-battle card pool gives the player meaningful purchases.

@@ -226,7 +226,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Day 4: Core 1 universal red/blue center card
+### ~~[2026-05-09] Day 4: Core 1 universal red/blue center card~~ DONE
 
 **Idea:** replace the temporary two-card center anchor with one universal red/blue center card that can support both color plans.
 
@@ -241,6 +241,8 @@ The single list of planned features, improvements, work order and statuses for T
 - update placement/scoring tests and the first-battle smoke check.
 
 **Acceptance:** `legacy` starts with one visible universal red/blue center card, both red and blue plans can continue from it, and the two-card bridge is removed.
+
+**Status:** implemented `starter_universal_line_v` as a board-only `specialTiles` config entry at `(3,3)`, replacing the two temporary center anchors, and exported its PNG art at `assets/tiles_v2/starter_universal_line_v.png`. The `*` rule matches active combat colors on edges, blocks flood-fill for the evaluated color, excludes wildcard boundary cells from capture area/damage, and prevents direct red-blue matching. Active immediate scoring keeps the placed tile color for shared wildcard-assisted closures. Unit/check/e2e pass, including the full 5-battle smoke loop.
 
 **Priority:** must
 

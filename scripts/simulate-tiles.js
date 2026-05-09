@@ -15,6 +15,7 @@ const SYMBOLS = {
     blue: 'B',
     green: 'G',
     gray: '.',
+    universal: '*',
 };
 
 const GAME_CONFIG = JSON.parse(fs.readFileSync('configs/game.json', 'utf8'));
@@ -85,6 +86,37 @@ function pattern(rows) {
 
 function colorSymbol(color) {
     return SYMBOLS[color];
+}
+
+function isUniversalSymbol(symbol) {
+    return symbol === SYMBOLS.universal;
+}
+
+function getActiveCombatSymbols() {
+    const colors = Array.isArray(TILE_SETTINGS.activeCombatColors)
+        ? TILE_SETTINGS.activeCombatColors.filter((color) => DAMAGE_COLORS.includes(color))
+        : DAMAGE_COLORS;
+
+    return new Set((colors.length > 0 ? colors : DAMAGE_COLORS).map(colorSymbol));
+}
+
+function symbolMatches(left, right) {
+    if (left === right) {
+        return true;
+    }
+
+    const activeCombatSymbols = getActiveCombatSymbols();
+
+    return (isUniversalSymbol(left) && activeCombatSymbols.has(right))
+        || (isUniversalSymbol(right) && activeCombatSymbols.has(left));
+}
+
+function edgesMatchSymbols(leftEdge, rightEdge) {
+    return leftEdge.split('').every((symbol, index) => symbolMatches(symbol, rightEdge[index]));
+}
+
+function isBoundaryForColor(symbol, colorSymbolValue) {
+    return symbol === colorSymbolValue || isUniversalSymbol(symbol);
 }
 
 function tile(id, color, kind, rows) {
@@ -172,16 +204,41 @@ function tileFromManifest(entry) {
     };
 }
 
+function shouldUseSpecialTile(entry) {
+    if (!Array.isArray(entry.gameplayVariants) || entry.gameplayVariants.length === 0) {
+        return true;
+    }
+
+    return entry.gameplayVariants.includes(GAMEPLAY_VARIANT.id);
+}
+
+function createSpecialTile(entry) {
+    return {
+        id: entry.id,
+        color: entry.color ?? 'universal',
+        kind: entry.pattern ?? entry.id,
+        pattern: entry.pattern ?? entry.id,
+        cells: pattern(entry.matrix),
+    };
+}
+
+function createSpecialTiles() {
+    return Array.isArray(TILE_SETTINGS.specialTiles)
+        ? TILE_SETTINGS.specialTiles.filter(shouldUseSpecialTile).map(createSpecialTile)
+        : [];
+}
+
 function createStartingDeck() {
     if (fs.existsSync(TILE_MANIFEST_PATH)) {
         const manifest = JSON.parse(fs.readFileSync(TILE_MANIFEST_PATH, 'utf8'));
-        const tiles = manifest.tiles.map(tileFromManifest);
-        const tileMap = new Map(tiles.map((tileDef) => [tileDef.id, tileDef]));
-        const deckIds = createStartingDeckIds(tiles, TILE_SETTINGS);
+        const manifestTiles = manifest.tiles.map(tileFromManifest);
+        const scenarioTiles = [...manifestTiles, ...createSpecialTiles()];
+        const tileMap = new Map(scenarioTiles.map((tileDef) => [tileDef.id, tileDef]));
+        const deckIds = createStartingDeckIds(scenarioTiles, TILE_SETTINGS);
 
         return {
             label: manifest.tileSetVersion ?? TILE_MANIFEST_PATH,
-            scenarioTiles: tiles,
+            scenarioTiles,
             tiles: deckIds.map((tileId) => {
                 const tileDef = tileMap.get(tileId);
 
@@ -319,7 +376,7 @@ function edgesMatch(tileDef, neighbor, direction) {
         return isBlankEdge(tileDef, direction.name);
     }
 
-    return edge(tileDef, direction.name) === edge(neighbor, direction.opposite);
+    return edgesMatchSymbols(edge(tileDef, direction.name), edge(neighbor, direction.opposite));
 }
 
 function isBlankEdge(tileDef, directionName) {
@@ -362,7 +419,7 @@ function shouldUseStartingBoardTile(entry) {
 
 function createStartingPlacements(deck, strictEdges = true) {
     const placements = new Map();
-    const tileMap = new Map(deck.map((tileDef) => [tileDef.id, tileDef]));
+    const tileMap = new Map([...deck, ...createSpecialTiles()].map((tileDef) => [tileDef.id, tileDef]));
     const entries = Array.isArray(TILE_SETTINGS.startingBoardTiles)
         ? TILE_SETTINGS.startingBoardTiles
         : [];
@@ -485,7 +542,7 @@ function floodOutsideForColor(grid, colorSymbolValue) {
             const gridY = nextY - 1;
             const isOriginalCell = gridX >= 0 && gridY >= 0 && gridX < size && gridY < size;
 
-            if (isOriginalCell && grid[gridY][gridX] === colorSymbolValue) {
+            if (isOriginalCell && isBoundaryForColor(grid[gridY][gridX], colorSymbolValue)) {
                 continue;
             }
 
@@ -529,7 +586,7 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
             const nextColor = grid[nextY][nextX];
             const nextIndex = originalIndex(size, nextX, nextY);
 
-            if (nextColor === colorSymbolValue) {
+            if (isBoundaryForColor(nextColor, colorSymbolValue)) {
                 if (!boundary[nextIndex]) {
                     boundary[nextIndex] = 1;
                     boundaryCells.push({ x: nextX, y: nextY });
@@ -568,14 +625,18 @@ function findCapturedAreas(placements) {
                 const cellColor = grid[y][x];
                 const cellIndex = originalIndex(grid.length, x, y);
 
-                if (cellColor === colorSymbolValue
+                if (isBoundaryForColor(cellColor, colorSymbolValue)
                     || isReachable(reachable, grid.length, x, y)
                     || visited[cellIndex]) {
                     continue;
                 }
 
                 const region = collectEnclosedRegion(grid, colorSymbolValue, reachable, { x, y }, visited);
-                const area = region.interiorCells.length + region.boundaryCells.length;
+                const wildcardBoundaryCells = region.boundaryCells.filter((cell) => (
+                    grid[cell.y][cell.x] === SYMBOLS.universal
+                )).length;
+                const coloredBoundaryCells = region.boundaryCells.length - wildcardBoundaryCells;
+                const area = region.interiorCells.length + coloredBoundaryCells;
                 const grayInteriorCells = countGrayInteriorCells(placements, region.interiorCells);
                 const damage = captureDamage(area, grayInteriorCells);
 
@@ -586,7 +647,8 @@ function findCapturedAreas(placements) {
                 zones.push({
                     color: colorSymbolValue,
                     interiorSize: region.interiorCells.length,
-                    boundarySize: region.boundaryCells.length,
+                    boundarySize: coloredBoundaryCells,
+                    wildcardBoundarySize: wildcardBoundaryCells,
                     size: area,
                     areaDamage: damage.areaDamage,
                     areaBonus: damage.areaBonus,

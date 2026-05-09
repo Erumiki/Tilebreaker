@@ -31,11 +31,54 @@ const input = initInput(canvas);
 const ui = createUiRenderer(PIXI, app.stage);
 const battles = config.levels.battles;
 const tiles = createTilesFromManifest(config.tileManifest, config.game.tileBattle);
+const tileTextures = await loadTileTextures(PIXI, tiles, config.game.tileBattle);
 const totalBattles = Math.min(config.game.run.totalBattles, battles.length);
 const debugOverrides = getDebugOverrides();
 let run = null;
 let scene = null;
 let lastRunSeed = null;
+
+function getTileAssetUrl(file, tileSettings) {
+    if (!file) {
+        return null;
+    }
+
+    if (/^(https?:)?\/\//.test(file) || file.startsWith('data:')) {
+        return file;
+    }
+
+    if (file.includes('/')) {
+        return file.replace(/^\/+/, '');
+    }
+
+    const manifestPath = tileSettings.manifestPath ?? 'assets/tiles_v2/tile_manifest.json';
+    const basePath = manifestPath.split('/').slice(0, -1).join('/');
+
+    return basePath ? `${basePath}/${file}` : file;
+}
+
+async function loadTileTextures(PIXI, tileDefs, tileSettings) {
+    const textureRequests = new Map();
+
+    for (const tileDef of tileDefs) {
+        const url = getTileAssetUrl(tileDef.file, tileSettings);
+
+        if (url) {
+            textureRequests.set(tileDef.id, url);
+        }
+    }
+
+    const entries = await Promise.all([...textureRequests].map(async ([tileId, url]) => {
+        try {
+            return [tileId, await PIXI.Assets.load(url)];
+        } catch (error) {
+            console.warn(`Failed to load tile texture ${url}`, error);
+            return null;
+        }
+    }));
+
+    return new Map(entries.filter(Boolean));
+}
 
 function parseSeed(value) {
     if (value === null || value === undefined || value === '') {
@@ -118,6 +161,7 @@ function showBattle() {
         ui,
         run,
         battle: getCurrentBattle(run, battles),
+        tileTextures,
         onFinish: showResult,
     });
 }

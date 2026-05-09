@@ -1,12 +1,12 @@
 # Card Pool GD Pass
 
-Status 2026-05-09: design accepted, no code or asset changes yet.
+Status 2026-05-09: universal starter implemented; buyable shop cards remain design-only.
 
 This pass defines the next card vocabulary before the game spends gold on real card buys. The goal is to give Core 1 Rescue more planning control without turning the closure puzzle into an always-wildcard deck.
 
 ## Goals
 
-- Replace the temporary two-card center bridge with one readable red-blue universal starter.
+- Keep one readable red-blue universal starter in place of the temporary two-card center bridge.
 - Make gold matter between battles through card buys, not only passive scoring.
 - Add controlled rescue tools for blocked hands.
 - Keep the first 3-minute experience focused on closing territory, hand submit pressure and gold/strike rewards.
@@ -55,7 +55,7 @@ Accepted candidate: `starter_universal_line_v`.
 Role:
 
 - Board-only starter for active `legacy`.
-- Replaces the current two ordinary center anchors.
+- Replaces the former two ordinary center anchors.
 - Communicates "start either red or blue from here" with one visible rule.
 
 Proposed 3x3 rule matrix:
@@ -90,8 +90,17 @@ Visual brief:
 
 Decision:
 
-- First implementation: board-only special starter.
+- First implementation: board-only special starter. Implemented in `configs/game.json` as `specialTiles[]` plus one `startingBoardTiles` entry at `(3,3)`.
 - Later possibility: a rare buyable universal line can reuse the same rule, but only after the starter proves readable.
+
+Implementation notes:
+
+- `*` matches only active combat-color symbols on touching edge cells.
+- Red and blue still do not match each other unless the actual touching cells include `*`.
+- For capture checks, `*` blocks flood-fill for the evaluated color.
+- `*` boundary cells are excluded from capture area/damage so the starter gives access, not free score.
+- If a wildcard-assisted closure would score the same enclosed space for both colors, active `legacy` keeps the placed tile's color for the immediate score.
+- The first readable visual is code-rendered and exported as `assets/tiles_v2/starter_universal_line_v.png`: each `*` micro-cell is split red/blue.
 
 ## Buyable Card Candidates
 
@@ -146,6 +155,8 @@ Price read:
 ### Step 1: Universal Starter Only
 
 Compare current two-anchor baseline with `starter_universal_line_v`.
+
+Status 2026-05-09: implemented and passed technical smoke. The remaining validation is manual feel: first 3-5 turns should be clearer than the old two-anchor bridge without making a repeated starter loop the default plan.
 
 Automated checks:
 
@@ -210,4 +221,4 @@ Each candidate needs one clear answer: does it create a better plan, or only mak
 
 ## Current Lead Decision
 
-The next implementation can safely take only `starter_universal_line_v`. The buyable pool is designed but should remain out of the active deck until the universal starter is playable and checked. The first shop build should then start with ordinary red-blue cards plus `joker_line`, not with every wildcard and split card at once.
+The active build now takes only `starter_universal_line_v`. The buyable pool is designed but should remain out of the active deck until the universal starter is manually checked. The first shop build should then start with ordinary red-blue cards plus `joker_line`, not with every wildcard and split card at once.

@@ -2,13 +2,14 @@
 
 Tilebreaker is a fast roguelite tile-placement battler. The player places boundary tiles, closes territories, captures land with the boundary color and turns those closures into monster damage, gold and tempo.
 
-The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, two colored center anchors, one hold slot and accepted design for the future universal starter/shop cards.
+The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, one universal red-blue center starter, one hold slot and staged design for future shop cards.
 
-- active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + two-color capture-fill + hearts + hand-submit economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
+- active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + universal starter + two-color capture-fill + hearts + hand-submit economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
 - tiles: `assets/tiles_v2/tile_manifest.json`;
 - active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
 - board: 7x7 macro tiles, each tile is 3x3 micro-cells;
-- legacy battles still start with two regular center anchors from the existing tile set: red vertical line at `(3,3)` and blue vertical line at `(4,3)`; the accepted universal replacement is a board-only `starter_universal_line_v` wildcard starter documented in `design/card-pool.md`, but it is not implemented yet;
+- legacy battles start with one board-only `starter_universal_line_v` at `(3,3)`: a vertical `*` boundary with matrix `.*. / .*. / .*.` that red or blue vertical continuations can attach to;
+- universal `*` matches active combat colors for edge legality, blocks flood-fill for the evaluated color, does not make red and blue match directly, and does not add its wildcard cells to capture area/damage;
 - legality: if a cell has direct neighbors, adjacent edges must match by 3-cell edge signature; an empty cell with no direct neighbors is valid as a new island;
 - gray blank tiles remain in the manifest as technical/future material, but are removed from the active starting deck and opening tests;
 - scoring: a closed colored boundary captures the empty or filled interior;
@@ -30,7 +31,7 @@ The current MVP after the manual playtest pass is built around the `legacy` resc
 
 ## Where Things Live
 
-- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
+- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
 - `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
 - `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.

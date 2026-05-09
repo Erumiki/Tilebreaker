@@ -98,16 +98,18 @@ Later card/shop pass:
 - define shop prices, reroll/remove costs and reward pacing after gold income is visible;
 - revisit card pool, universal red/blue card, rotate tools or double-color cards only after the new closure/submit loop is tested.
 
-Card GD pass status 2026-05-09: accepted design lives in `design/card-pool.md`.
+Card GD / universal starter status 2026-05-09: accepted design lives in `design/card-pool.md`, and the board-only starter is now implemented in active `legacy`.
 
-- The universal starter candidate is a board-only vertical wildcard boundary, `starter_universal_line_v`, with rule matrix `.*. / .*. / .*.`, placed at center instead of the two ordinary anchors.
+- The universal starter is a board-only vertical wildcard boundary, `starter_universal_line_v`, with rule matrix `.*. / .*. / .*.`, placed at center instead of the two ordinary anchors.
 - The wildcard boundary matches active combat colors for edge legality and blocks flood-fill for the evaluated color, but is not itself red/blue scoring area and does not let red and blue match directly.
+- If a wildcard-assisted placement would give the same enclosed space to both colors, active immediate scoring keeps only the placed tile's color for this MVP.
 - Buyable card candidates are priced as rough gold bands: common colored lines/tees/corners at 2-4 gold, joker line at 5, red-blue split corner at 5, joker corner at 6, joker tee at 7, with stronger cards capped or postponed.
-- Validation order is universal starter first, then a minimal shop pool of colored line/tee/corner plus joker line, then split/joker/payoff experiments one family at a time.
+- Validation order is manual universal-starter feel first, then a minimal shop pool of colored line/tee/corner plus joker line, then split/joker/payoff experiments one family at a time.
 
 Implementation status:
 
 - active `legacy` uses `Сдать руку` instead of old end-round damage;
+- active `legacy` starts from one universal red-blue center tile instead of two ordinary anchors;
 - closed zones score immediately after placement and use the existing scored-tile cleanup;
 - active `legacy` no longer applies separate monster attack damage;
 - run gold starts at 0 and closure/strike gold is visible in UI/debug;

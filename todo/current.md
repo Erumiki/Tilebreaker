@@ -1,15 +1,15 @@
 # Current Version
 
-## v0.20 Core 1 Rescue + Card GD Pass
+## v0.21 Core 1 Rescue + Universal Starter
 
-**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, a larger board, two ready center anchors, one hold slot, the implemented hand-submit/immediate-closure/gold loop, and an accepted design for the universal starter plus later buyable control cards.
+**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, a larger board, one universal red-blue center starter, one hold slot, the implemented hand-submit/immediate-closure/gold loop, and staged design for later buyable control cards.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, `roadMode`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
+- `configs/game.json` stores board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, `roadMode`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
 - Active default `gameplayVariant` is `legacy`. It is the preserved two-color capture-fill ruleset and the main rescue candidate.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
 - URL overrides accept `?gameplayVariant=placement_payoff` and short aliases `?variant=a`, `?variant=b`, `?variant=c`, `?variant=d`.
@@ -37,9 +37,9 @@
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The active tile catalog still has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blank ids in the manifest.
 - Active MVP `activeCombatColors` are `red` and `blue`. Green remains in the manifest and UI model, but is not in the starting deck, early reward color cycle or the first two battle attack tables.
-- Active MVP board size is 7x7 macro tiles. Legacy battles start with two ordinary pre-placed center anchors from the existing v2 set: `tile_red_line_v` at `(3,3)` and `tile_blue_line_v` at `(4,3)`. They are not a universal card and do not consume cards from the run deck.
-- The card GD pass is recorded in `design/card-pool.md`. The accepted universal starter candidate is `starter_universal_line_v`, a board-only vertical wildcard boundary with matrix `.*. / .*. / .*.` that matches active combat colors for edge legality and blocks flood-fill for the evaluated color, but does not count as red/blue scoring area and does not let red and blue match directly.
-- The current two anchors remain implemented until the universal starter implementation task replaces them. The anchors are intentionally a quick playable bridge: two colors are already visible in the center, and both can be continued vertically with normal matching edges.
+- Active MVP board size is 7x7 macro tiles. Legacy battles start with one board-only `starter_universal_line_v` at `(3,3)`. It is a special config tile, not a run-deck card.
+- The universal starter uses matrix `.*. / .*. / .*.`. Its `*` boundary matches active combat colors for edge legality and blocks flood-fill for the evaluated color, but it does not count as red/blue scoring area and does not let red and blue match directly.
+- If a wildcard-assisted placement produces a shared dual-color closure, active `legacy` keeps only the closure matching the placed tile's color for the immediate score. This keeps simultaneous red/blue wildcard scoring out of the MVP.
 - A new run starts with a recipe-built 24-tile rescue deck: for red and blue, `line_h x2`, `line_v x2`, each `tee` x1, each `corner` x1, no `plus`, no gray blank. The recipe supports duplicate tile ids without changing art or manifest.
 - Active MVP `drawMode` is `hand`. The player sees the full `handSize` hand because queue made the best mode feel too much like waiting for a card instead of planning.
 - Active MVP `holdEnabled` is true in hand mode. The selected hand card can move into one hold slot; clicking the hold slot again swaps the selected hand card with the held card. The held card survives a hand submit and avoids the unplayed-hand discard, but returns to discard when the battle ends.
@@ -74,8 +74,8 @@
 - Color multipliers are stored on the run and multiply the zone's configured base damage after area and gray bonuses.
 - Combat UI shows player hearts, monster hearts, gold, round/variant, deck/discard counts, board, hold, hand, `Сдать руку` cost, battle-log rows, strike/gold feedback and active red/blue closure rows. In active `legacy`, red/blue rows no longer present monster attacks as incoming damage; old attack-resolution UI remains for archived variants.
 - A minimal 2x2 corner loop scores area 12 with no size bonus; a larger closed zone can beat it through the large-zone bonus, but the gray-fill route is no longer part of active tests.
-- The simulator reads the same `startingDeckRecipe`, `startingBoardTiles` and `drawBag` as the game and reports small-capture diagnostics: `minimal capture share`, `avg capture area`, `placements before capture`, zero-damage hands/rounds, zero-damage streak, captures in 3 rounds, quick 4-corner loops, and opening draw/hand composition by color and shape. It can be forced into queue simulation with `DRAW_MODE=queue`; queue uses a small beam AI because the decision space is narrower than full-hand play.
+- The simulator reads the same `specialTiles`, `startingDeckRecipe`, `startingBoardTiles` and `drawBag` as the game and reports small-capture diagnostics: `minimal capture share`, `avg capture area`, `placements before capture`, zero-damage hands/rounds, zero-damage streak, captures in 3 rounds, quick 4-corner loops, and opening draw/hand composition by color and shape. It can be forced into queue simulation with `DRAW_MODE=queue`; queue uses a small beam AI because the decision space is narrower than full-hand play.
 - Interpret `zero damage` over a multi-round window, not as an isolated first-round failure. Watch zero-damage streaks, captures within the next 2-3 rounds, dead-end/freshStart rate, win rate and player damage.
 - Manual playtest result on 2026-05-09: `legacy` is the most playable variant, but still collapses into waiting for the right card. Two colors helped but did not fully fix it. Variant A did not feel meaningfully different and is not a standalone direction; Variant B lacks a strong one-color idea; Variant D/road-style scoring needs rethinking/rotation before more tests; the fifth tested direction is cut. Current favorites are Core 1 rescue and a separate Kingdomino-like combat spike.
-- Updated legacy target after center anchors + hold: judge whether the first 3-5 turns feel less like waiting for one card before adding the universal card, rotate or double-color control tools.
-- Latest implementation pass completed `Сдать руку`, immediate closure scoring, strike/gold feedback and battle-log/debug language. The card GD pass completed the universal starter semantics, rough buyable card costs/rarities and the validation protocol; actual card shop buying remains unimplemented.
+- Updated legacy target after universal starter + hold: judge whether the first 3-5 turns feel less like waiting for one card before adding rotate or double-color control tools.
+- Latest implementation pass replaced the temporary two-anchor bridge with `starter_universal_line_v` and added playable wildcard semantics/rendering/tests plus exported PNG art at `assets/tiles_v2/starter_universal_line_v.png`. Actual card shop buying remains unimplemented.

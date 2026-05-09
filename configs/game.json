@@ -11,9 +11,19 @@
         "holdEnabled": true,
         "gameplayVariant": "legacy",
         "activeCombatColors": ["red", "blue"],
+        "specialTiles": [
+            {
+                "id": "starter_universal_line_v",
+                "file": "starter_universal_line_v.png",
+                "color": "universal",
+                "pattern": "universal_line_v",
+                "matrix": [".*.", ".*.", ".*."],
+                "special": "universal_boundary",
+                "gameplayVariants": ["legacy"]
+            }
+        ],
         "startingBoardTiles": [
-            { "id": "tile_red_line_v", "x": 3, "y": 3, "gameplayVariants": ["legacy"] },
-            { "id": "tile_blue_line_v", "x": 4, "y": 3, "gameplayVariants": ["legacy"] }
+            { "id": "starter_universal_line_v", "x": 3, "y": 3, "gameplayVariants": ["legacy"] }
         ],
         "startingPlayerHp": 18,
         "startingDeckSize": 24,

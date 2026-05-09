@@ -104,16 +104,26 @@ test('free cells without direct neighbors stay valid after the first tile', () =
     assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 0, 0, settings), true);
 });
 
-test('legacy starts on a 7x7 board with two regular colored center anchors', () => {
+test('legacy starts on a 7x7 board with one universal red-blue center anchor', () => {
     const startSettings = {
         ...settings,
         boardSize: 7,
         handSize: 7,
         drawMode: 'hand',
         gameplayVariant: 'legacy',
+        activeCombatColors: ['red', 'blue'],
+        specialTiles: [
+            {
+                id: 'starter_universal_line_v',
+                color: 'universal',
+                pattern: 'universal_line_v',
+                matrix: ['.*.', '.*.', '.*.'],
+                special: 'universal_boundary',
+                gameplayVariants: ['legacy'],
+            },
+        ],
         startingBoardTiles: [
-            { id: 'tile_red_line_v', x: 3, y: 3, gameplayVariants: ['legacy'] },
-            { id: 'tile_blue_line_v', x: 4, y: 3, gameplayVariants: ['legacy'] },
+            { id: 'starter_universal_line_v', x: 3, y: 3, gameplayVariants: ['legacy'] },
         ],
         startingDeckRecipe: [
             { pattern: 'line_h', colors: ['red', 'blue'], count: 2 },
@@ -145,14 +155,64 @@ test('legacy starts on a 7x7 board with two regular colored center anchors', () 
 
     assert.equal(state.board.length, 7);
     assert.equal(state.board.every((row) => row.length === 7), true);
-    assert.equal(placedTiles.length, 2);
-    assert.equal(state.board[3][3].id, 'tile_red_line_v');
-    assert.equal(state.board[3][4].id, 'tile_blue_line_v');
-    assert.deepEqual(placedTiles.map((tileDef) => tileDef.color).sort(), ['blue', 'red']);
-    assert.equal(placedTiles.every((tileDef) => tileDef.pattern === 'line_v'), true);
+    assert.equal(placedTiles.length, 1);
+    assert.equal(state.board[3][3].id, 'starter_universal_line_v');
+    assert.equal(state.board[3][3].color, 'universal');
+    assert.equal(state.board[3][3].pattern, 'universal_line_v');
     assert.equal(canPlaceTile(state.board, startTile('tile_red_line_v'), 3, 3, startSettings), false);
     assert.equal(canPlaceTile(state.board, startTile('tile_red_line_v'), 3, 2, startSettings), true);
-    assert.equal(canPlaceTile(state.board, startTile('tile_blue_line_v'), 4, 2, startSettings), true);
+    assert.equal(canPlaceTile(state.board, startTile('tile_blue_line_v'), 3, 2, startSettings), true);
+    assert.equal(canPlaceTile(state.board, startTile('tile_red_line_h'), 3, 2, startSettings), false);
+
+    const directColorBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
+    directColorBoard[3][3] = startTile('tile_red_line_v');
+    assert.equal(canPlaceTile(directColorBoard, startTile('tile_blue_line_v'), 3, 2, startSettings), false);
+});
+
+test('universal boundary assists closure without adding wildcard cells to score area', () => {
+    const universalSettings = {
+        ...settings,
+        boardSize: 7,
+        gameplayVariant: 'legacy',
+        activeCombatColors: ['red', 'blue'],
+        specialTiles: [
+            {
+                id: 'starter_universal_line_v',
+                color: 'universal',
+                pattern: 'universal_line_v',
+                matrix: ['.*.', '.*.', '.*.'],
+                special: 'universal_boundary',
+                gameplayVariants: ['legacy'],
+            },
+        ],
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+    };
+    const universalTiles = createTilesFromManifest(manifest, universalSettings);
+    const startTile = (id) => universalTiles.find((tileDef) => tileDef.id === id);
+    const board = Array.from({ length: 7 }, () => Array(7).fill(null));
+    board[2][3] = startTile('tile_red_corner_rd');
+    board[2][4] = startTile('tile_red_corner_dl');
+    board[3][3] = startTile('starter_universal_line_v');
+    board[3][4] = startTile('tile_red_line_v');
+    board[4][3] = startTile('tile_red_corner_ur');
+    board[4][4] = startTile('tile_red_corner_lu');
+
+    const universalScore = scoreTileBoard(board, universalSettings);
+    const redOnlyBoard = board.map((row) => [...row]);
+    redOnlyBoard[3][3] = startTile('tile_red_line_v');
+    const redOnlyScore = scoreTileBoard(redOnlyBoard, universalSettings);
+
+    assert.equal(universalScore.zones.length, 1);
+    assert.equal(universalScore.zones[0].color, 'red');
+    assert.equal(universalScore.zones[0].wildcardBoundarySize, 3);
+    assert.equal(redOnlyScore.zones[0].area - universalScore.zones[0].area, 3);
 });
 
 test('hold slot stores one hand tile, swaps it, and keeps it through a new pick', () => {

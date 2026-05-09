@@ -392,17 +392,13 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   expect(battleDebug.board).toHaveLength(7);
   expect(battleDebug.board.every((row) => row.length === 7)).toBe(true);
   expect(battleDebug.layout.cellSize).toBeCloseTo(battleDebug.layout.board.width / 7);
-  expect(battleDebug.placedCount).toBe(2);
+  expect(battleDebug.placedCount).toBe(1);
   expect(battleDebug.board[3][3]).toEqual(expect.objectContaining({
-    id: 'tile_red_line_v',
-    color: 'red',
-    pattern: 'line_v',
+    id: 'starter_universal_line_v',
+    color: 'universal',
+    pattern: 'universal_line_v',
   }));
-  expect(battleDebug.board[3][4]).toEqual(expect.objectContaining({
-    id: 'tile_blue_line_v',
-    color: 'blue',
-    pattern: 'line_v',
-  }));
+  expect(battleDebug.tileImageIds).toContain('starter_universal_line_v');
   expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
   expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
   expect(
@@ -506,8 +502,11 @@ test('player can choose a kept experiment from the temporary variant picker', as
   ));
   await clickRect(page, targetsButton.rect);
 
+  await expect.poll(() => page.evaluate(() => (
+    window.__tilebreakerDebug.getMainMenuDebug().selectedVariant
+  ))).toBe('connect_targets');
+
   menuDebug = await getMainMenuDebug(page);
-  expect(menuDebug.selectedVariant).toBe('connect_targets');
 
   await clickRect(page, menuDebug.layout.startButton);
   await expectScene(page, 'battle');

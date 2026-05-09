@@ -59,6 +59,16 @@ const patterns = {
 
 const blankPattern = ['...', '...', '...'];
 
+const specialPatterns = [
+    {
+        color: 'universal',
+        pattern: 'universal_line_v',
+        filename: 'starter_universal_line_v.png',
+        matrix: ['.*.', '.*.', '.*.'],
+        variantSeed: 97,
+    },
+];
+
 const font = {
     '0': ['111', '101', '101', '101', '111'],
     '1': ['010', '110', '010', '010', '111'],
@@ -253,6 +263,10 @@ function drawPattern(bitmap, rect, colorKey, seed) {
 }
 
 function cellColor(matrix, colorKey, row, col) {
+    if (matrix[row][col] === '*') {
+        return 'universal';
+    }
+
     return matrix[row][col] === 'X' ? colorKey : 'gray';
 }
 
@@ -272,6 +286,26 @@ function drawCell(bitmap, col, row, colorKey, seed) {
     bitmap.fillRect(x, y, width, 2, withAlpha(colors.light, 26));
     bitmap.fillRect(x, y + height - 2, width, 2, withAlpha(colors.dark, 24));
     drawPattern(bitmap, { x, y, width, height }, colorKey, seed + col * 7 + row * 13);
+}
+
+function drawUniversalCell(bitmap, col, row, seed) {
+    const bounds = [0, 85, 171, 256];
+    const x = bounds[col];
+    const y = bounds[row];
+    const width = bounds[col + 1] - bounds[col];
+    const height = bounds[row + 1] - bounds[row];
+    const split = Math.floor(width / 2);
+    const rightWidth = width - split;
+    const redBase = mix(palette.red.base, palette.red.light, 0.04);
+    const blueBase = mix(palette.blue.base, palette.blue.light, 0.04);
+
+    bitmap.fillRect(x, y, split, height, redBase);
+    bitmap.fillRect(x + split, y, rightWidth, height, blueBase);
+    bitmap.fillRect(x, y, width, 2, [255, 255, 255, 30]);
+    bitmap.fillRect(x, y + height - 2, width, 2, [0, 0, 0, 30]);
+    drawPattern(bitmap, { x, y, width: split, height }, 'red', seed + col * 7 + row * 13);
+    drawPattern(bitmap, { x: x + split, y, width: rightWidth, height }, 'blue', seed + col * 11 + row * 17);
+    bitmap.fillRect(x + split - 1, y + 7, 2, height - 14, [245, 222, 145, 164]);
 }
 
 function drawCellBoundaries(bitmap, matrix, colorKey) {
@@ -308,7 +342,7 @@ function drawActiveRidge(bitmap, matrix, colorKey) {
 
     for (let row = 0; row < 3; row += 1) {
         for (let col = 0; col < 3; col += 1) {
-            if (matrix[row][col] !== 'X') {
+            if (matrix[row][col] !== 'X' && matrix[row][col] !== '*') {
                 continue;
             }
 
@@ -316,6 +350,17 @@ function drawActiveRidge(bitmap, matrix, colorKey) {
             const y = bounds[row];
             const width = bounds[col + 1] - bounds[col];
             const height = bounds[row + 1] - bounds[row];
+
+            if (matrix[row][col] === '*') {
+                const split = Math.floor(width / 2);
+                bitmap.fillRect(x + 8, y + 8, split - 10, 3, withAlpha(palette.red.light, 58));
+                bitmap.fillRect(x + split + 2, y + 8, width - split - 10, 3, withAlpha(palette.blue.light, 58));
+                bitmap.fillRect(x + 8, y + height - 11, split - 10, 3, withAlpha(palette.red.dark, 46));
+                bitmap.fillRect(x + split + 2, y + height - 11, width - split - 10, 3, withAlpha(palette.blue.dark, 46));
+                bitmap.fillRect(x + 8, y + 8, 3, height - 16, withAlpha(palette.red.light, 34));
+                bitmap.fillRect(x + width - 11, y + 8, 3, height - 16, withAlpha(palette.blue.dark, 38));
+                continue;
+            }
 
             bitmap.fillRect(x + 8, y + 8, width - 16, 3, withAlpha(colors.light, 50));
             bitmap.fillRect(x + 8, y + height - 11, width - 16, 3, withAlpha(colors.dark, 46));
@@ -330,6 +375,11 @@ function drawTile(matrix, colorKey, seed = 0) {
 
     for (let row = 0; row < 3; row += 1) {
         for (let col = 0; col < 3; col += 1) {
+            if (matrix[row][col] === '*') {
+                drawUniversalCell(bitmap, col, row, seed);
+                continue;
+            }
+
             drawCell(bitmap, col, row, cellColor(matrix, colorKey, row, col), seed);
         }
     }
@@ -414,6 +464,10 @@ function buildEntries() {
     return entries;
 }
 
+function buildSpecialEntries() {
+    return specialPatterns.map((entry) => ({ ...entry }));
+}
+
 function writeBitmap(filename, bitmap) {
     fs.writeFileSync(path.join(OUT_DIR, filename), encodePng(bitmap));
 }
@@ -487,9 +541,10 @@ function parsePngHeader(buffer) {
     };
 }
 
-function validate(entries) {
+function validate(entries, specialEntries = []) {
     const expectedFiles = new Set([
         ...entries.map((entry) => entry.filename),
+        ...specialEntries.map((entry) => entry.filename),
         'tile_sprite_sheet_6x6.png',
         'tile_contact_sheet.png',
         'tile_manifest.json',
@@ -502,7 +557,7 @@ function validate(entries) {
         }
     }
 
-    for (const entry of entries) {
+    for (const entry of [...entries, ...specialEntries]) {
         const header = parsePngHeader(fs.readFileSync(path.join(OUT_DIR, entry.filename)));
         if (header.width !== TILE_SIZE || header.height !== TILE_SIZE || header.colorType !== 6) {
             throw new Error(`Bad PNG metadata for ${entry.filename}`);
@@ -532,6 +587,7 @@ function validate(entries) {
 
     return {
         tileFiles: entries.length,
+        specialFiles: specialEntries.length,
         previewFiles: 2,
         manifestFiles: 1,
     };
@@ -543,8 +599,16 @@ const entries = buildEntries().map((entry, index) => ({
     ...entry,
     bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? index + 1),
 }));
+const specialEntries = buildSpecialEntries().map((entry, index) => ({
+    ...entry,
+    bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? entries.length + index + 1),
+}));
 
 for (const entry of entries) {
+    writeBitmap(entry.filename, entry.bitmap);
+}
+
+for (const entry of specialEntries) {
     writeBitmap(entry.filename, entry.bitmap);
 }
 
@@ -555,5 +619,5 @@ fs.writeFileSync(
     `${JSON.stringify(createManifest(entries), null, 2)}\n`,
 );
 
-const result = validate(entries);
-console.log(`Generated ${result.tileFiles} v2 tile PNGs, ${result.previewFiles} sheets, and ${result.manifestFiles} manifest.`);
+const result = validate(entries, specialEntries);
+console.log(`Generated ${result.tileFiles} v2 tile PNGs, ${result.specialFiles} special tile PNG, ${result.previewFiles} sheets, and ${result.manifestFiles} manifest.`);
