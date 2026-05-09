@@ -474,54 +474,125 @@ function drawPanelSurface(bitmap, asset) {
     drawOrnateFrame(bitmap, inset, accent, 210);
 }
 
+function drawCellCornerBrackets(bitmap, color, alpha, options = {}) {
+    const inset = options.inset ?? Math.max(10, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.12));
+    const length = options.length ?? Math.max(16, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.2));
+    const thickness = options.thickness ?? Math.max(2, Math.floor(Math.min(bitmap.width, bitmap.height) * 0.025));
+    const c = withAlpha(color, alpha);
+    const left = inset;
+    const right = bitmap.width - inset;
+    const top = inset;
+    const bottom = bitmap.height - inset;
+
+    bitmap.fillRect(left, top, length, thickness, c);
+    bitmap.fillRect(left, top, thickness, length, c);
+    bitmap.fillRect(right - length, top, length, thickness, c);
+    bitmap.fillRect(right - thickness, top, thickness, length, c);
+    bitmap.fillRect(left, bottom - thickness, length, thickness, c);
+    bitmap.fillRect(left, bottom - length, thickness, length, c);
+    bitmap.fillRect(right - length, bottom - thickness, length, thickness, c);
+    bitmap.fillRect(right - thickness, bottom - length, thickness, length, c);
+}
+
+function drawBoardEtching(bitmap, seed, color, alpha) {
+    const size = Math.min(bitmap.width, bitmap.height);
+    const inner = size * 0.18;
+    const cx = bitmap.width / 2;
+    const cy = bitmap.height / 2;
+
+    drawCompass(bitmap, cx, cy, size * 0.18, color, alpha);
+    for (let index = 0; index < 6; index += 1) {
+        const x = bitmap.width * (0.18 + noise01(seed, index * 3) * 0.64);
+        const y = bitmap.height * (0.18 + noise01(seed, index * 3 + 1) * 0.64);
+        const dotSize = Math.max(1.2, size * (0.008 + noise01(seed, index * 3 + 2) * 0.008));
+        bitmap.fillCircle(x, y, dotSize, withAlpha(color, alpha * 0.45));
+    }
+
+    bitmap.fillRect(inner, cy - 0.75, bitmap.width - inner * 2, 1.5, withAlpha(color, alpha * 0.18));
+    bitmap.fillRect(cx - 0.75, inner, 1.5, bitmap.height - inner * 2, withAlpha(color, alpha * 0.16));
+}
+
 function drawBoardSurface(bitmap, asset) {
     const [, , accent] = palettes.board_cell;
-    bitmap.fillRect(0, 0, bitmap.width, bitmap.height, [0, 0, 0, 0]);
-    bitmap.fillRect(6, 6, bitmap.width - 12, bitmap.height - 12, [20, 16, 14, 205]);
-    bitmap.fillRect(9, 9, bitmap.width - 18, bitmap.height - 18, [82, 70, 58, 235]);
-    drawStoneTexture(bitmap, {
+    const seed = hashString(asset.id);
+    const state = asset.state;
+    const size = Math.min(bitmap.width, bitmap.height);
+    const stoneRect = {
         x: 10,
         y: 10,
         width: bitmap.width - 20,
         height: bitmap.height - 20,
-    }, hashString(asset.id), {
-        base: [78, 68, 57, 235],
+    };
+    const brass = [221, 168, 94, 255];
+    const pale = [255, 231, 171, 255];
+    const red = [255, 84, 92, 255];
+    bitmap.fillRect(0, 0, bitmap.width, bitmap.height, [0, 0, 0, 0]);
+
+    bitmap.fillRect(5, 5, bitmap.width - 10, bitmap.height - 10, [15, 12, 11, 214]);
+    bitmap.fillRect(8, 8, bitmap.width - 16, bitmap.height - 16, [77, 63, 49, 236]);
+    drawStoneTexture(bitmap, stoneRect, seed, {
+        base: state === 'scored' ? [88, 73, 52, 235] : [72, 63, 54, 236],
         warm: [148, 118, 78, 255],
         cool: [31, 31, 34, 255],
-        grain: 28,
+        grain: state === 'hover' ? 24 : 30,
         tileSize: Math.max(18, Math.floor(bitmap.width / 4)),
     });
-    bitmap.fillRect(11, 11, bitmap.width - 22, 3, [180, 139, 86, 72]);
-    bitmap.fillRect(11, bitmap.height - 14, bitmap.width - 22, 3, [8, 7, 7, 90]);
-    bitmap.fillRect(11, 11, 3, bitmap.height - 22, [173, 132, 82, 44]);
-    bitmap.fillRect(bitmap.width - 14, 11, 3, bitmap.height - 22, [8, 7, 7, 84]);
+
+    bitmap.fillRect(11, 11, bitmap.width - 22, 3, [194, 143, 82, 82]);
+    bitmap.fillRect(11, bitmap.height - 14, bitmap.width - 22, 3, [8, 7, 7, 98]);
+    bitmap.fillRect(11, 11, 3, bitmap.height - 22, [184, 135, 82, 54]);
+    bitmap.fillRect(bitmap.width - 14, 11, 3, bitmap.height - 22, [8, 7, 7, 92]);
+
     for (let line = 22; line < bitmap.width - 16; line += 21) {
-        bitmap.fillRect(line, 13, 1, bitmap.height - 26, [22, 18, 16, 72]);
-        bitmap.fillRect(line + 1, 13, 1, bitmap.height - 26, [159, 129, 88, 24]);
+        bitmap.fillRect(line, 13, 1, bitmap.height - 26, [22, 18, 16, 58]);
+        bitmap.fillRect(line + 1, 13, 1, bitmap.height - 26, [159, 129, 88, 18]);
     }
     for (let line = 22; line < bitmap.height - 16; line += 21) {
-        bitmap.fillRect(13, line, bitmap.width - 26, 1, [22, 18, 16, 72]);
-        bitmap.fillRect(13, line + 1, bitmap.width - 26, 1, [159, 129, 88, 24]);
+        bitmap.fillRect(13, line, bitmap.width - 26, 1, [22, 18, 16, 58]);
+        bitmap.fillRect(13, line + 1, bitmap.width - 26, 1, [159, 129, 88, 18]);
     }
-    if (asset.state === 'valid') {
-        bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [158, 111, 60, 42]);
-        bitmap.fillRect(12, 12, bitmap.width - 24, 3, [235, 184, 105, 105]);
-        bitmap.fillRect(12, bitmap.height - 15, bitmap.width - 24, 3, [235, 184, 105, 68]);
-        bitmap.fillRect(12, 12, 3, bitmap.height - 24, [235, 184, 105, 68]);
-        bitmap.fillRect(bitmap.width - 15, 12, 3, bitmap.height - 24, [235, 184, 105, 68]);
+
+    drawBoardEtching(bitmap, seed, brass, state === 'empty' ? 34 : 44);
+
+    if (state === 'valid') {
+        bitmap.fillRect(13, 13, bitmap.width - 26, bitmap.height - 26, [211, 151, 78, 28]);
+        drawCellCornerBrackets(bitmap, pale, 118, {
+            inset: size * 0.11,
+            length: size * 0.16,
+            thickness: size * 0.022,
+        });
+        bitmap.fillCircle(bitmap.width / 2, bitmap.height / 2, size * 0.17, [232, 176, 92, 24]);
     }
-    if (asset.state === 'invalid') {
-        bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [178, 46, 52, 58]);
-        bitmap.fillRect(12, 12, bitmap.width - 24, 3, [255, 82, 82, 130]);
-        bitmap.fillRect(12, bitmap.height - 15, bitmap.width - 24, 3, [255, 82, 82, 82]);
-        bitmap.fillRect(12, 12, 3, bitmap.height - 24, [255, 82, 82, 82]);
-        bitmap.fillRect(bitmap.width - 15, 12, 3, bitmap.height - 24, [255, 82, 82, 82]);
+
+    if (state === 'invalid') {
+        bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [138, 26, 32, 74]);
+        drawCellCornerBrackets(bitmap, red, 172, {
+            inset: size * 0.1,
+            length: size * 0.2,
+            thickness: size * 0.032,
+        });
+        drawLine(bitmap, size * 0.28, size * 0.28, bitmap.width - size * 0.28, bitmap.height - size * 0.28, size * 0.03, withAlpha(red, 135));
+        drawLine(bitmap, bitmap.width - size * 0.28, size * 0.28, size * 0.28, bitmap.height - size * 0.28, size * 0.03, withAlpha(red, 135));
     }
-    if (asset.state === 'hover' || asset.state === 'scored') {
-        bitmap.fillRect(10, 10, bitmap.width - 20, bitmap.height - 20, asset.state === 'scored' ? [255, 205, 108, 55] : [214, 166, 92, 42]);
+
+    if (state === 'hover') {
+        bitmap.fillRect(10, 10, bitmap.width - 20, bitmap.height - 20, [214, 166, 92, 38]);
+        drawCellCornerBrackets(bitmap, pale, 145, {
+            inset: size * 0.09,
+            length: size * 0.22,
+            thickness: size * 0.025,
+        });
     }
-    drawOrnateFrame(bitmap, 4, accent, 180);
-    bitmap.fillCircle(bitmap.width / 2, bitmap.height / 2, Math.min(bitmap.width, bitmap.height) * 0.025, [202, 162, 99, 70]);
+
+    if (state === 'scored') {
+        bitmap.fillRect(10, 10, bitmap.width - 20, bitmap.height - 20, [255, 204, 108, 62]);
+        bitmap.fillCircle(bitmap.width / 2, bitmap.height / 2, size * 0.31, [255, 202, 99, 38]);
+        drawCompass(bitmap, bitmap.width / 2, bitmap.height / 2, size * 0.28, pale, 150);
+        drawStar(bitmap, bitmap.width / 2, bitmap.height / 2, size * 0.12, pale, 172);
+    }
+
+    drawOrnateFrame(bitmap, 4, state === 'invalid' ? red : accent, state === 'empty' ? 162 : 205);
+    bitmap.fillCircle(bitmap.width / 2, bitmap.height / 2, size * 0.018, [227, 181, 105, 76]);
 }
 
 function drawButtonSurface(bitmap, asset) {
@@ -865,33 +936,92 @@ function drawZoneFilledOverlay(bitmap, asset) {
     const cy = height / 2;
     const size = Math.min(width, height);
     const seed = hashString(asset.id);
+    const inset = size * 0.115;
+    const inner = inset + size * 0.07;
+    const sealGold = asset.state.endsWith('_land') ? color : [238, 190, 116, 255];
+    const dimColor = mix(color, [8, 7, 12, 255], 0.18);
 
-    bitmap.fillEllipse(cx, cy, width * 0.44, height * 0.42, withAlpha(color, 62));
-    bitmap.fillEllipse(cx + width * 0.06, cy - height * 0.04, width * 0.29, height * 0.25, withAlpha(color, 48));
-    bitmap.fillEllipse(cx - width * 0.08, cy + height * 0.05, width * 0.23, height * 0.2, withAlpha(ember, 28));
-    bitmap.fillCircle(cx, cy, size * 0.085, withAlpha(ember, 108));
+    bitmap.fillRect(inset, inset, width - inset * 2, height - inset * 2, withAlpha(dimColor, 68));
+    bitmap.fillRect(inner, inner, width - inner * 2, height - inner * 2, withAlpha(color, 34));
 
-    for (let index = -1; index <= 1; index += 1) {
-        const offset = index * size * 0.22;
+    for (let y = inner; y < height - inner; y += Math.max(1, size * 0.06)) {
+        bitmap.fillRect(inner, y, width - inner * 2, Math.max(1, size * 0.005), withAlpha(ember, 16));
+    }
+    for (let x = inner; x < width - inner; x += Math.max(1, size * 0.06)) {
+        bitmap.fillRect(x, inner, Math.max(1, size * 0.005), height - inner * 2, withAlpha(ember, 14));
+    }
+
+    bitmap.fillEllipse(cx, cy, width * 0.36, height * 0.3, withAlpha(color, 58));
+    bitmap.fillEllipse(cx + width * 0.08, cy - height * 0.05, width * 0.21, height * 0.18, withAlpha(ember, 28));
+    bitmap.fillEllipse(cx - width * 0.08, cy + height * 0.08, width * 0.26, height * 0.16, withAlpha(color, 36));
+
+    drawGlowLine(bitmap, inset, inset, width - inset, inset, sealGold);
+    drawGlowLine(bitmap, width - inset, inset, width - inset, height - inset, sealGold);
+    drawGlowLine(bitmap, width - inset, height - inset, inset, height - inset, sealGold);
+    drawGlowLine(bitmap, inset, height - inset, inset, inset, sealGold);
+
+    for (const [x, y] of [
+        [inset, inset],
+        [width - inset, inset],
+        [inset, height - inset],
+        [width - inset, height - inset],
+    ]) {
+        drawStar(bitmap, x, y, size * 0.085, ember, 205);
+    }
+
+    for (let index = 0; index < 4; index += 1) {
+        const offset = (index - 1.5) * size * 0.15;
         drawLine(
             bitmap,
-            width * 0.16 + offset,
-            height * 0.78,
-            width * 0.77 + offset,
-            height * 0.18,
-            Math.max(1.8, size * 0.014),
-            withAlpha(color, index === 0 ? 126 : 42),
+            inner + offset,
+            height - inner,
+            width - inner + offset * 0.4,
+            inner,
+            Math.max(1.5, size * 0.009),
+            withAlpha(color, index === 1 ? 96 : 42),
         );
     }
 
-    for (let index = 0; index < 9; index += 1) {
-        const x = width * (0.18 + noise01(seed, index * 3) * 0.64);
-        const y = height * (0.18 + noise01(seed, index * 3 + 1) * 0.64);
-        const dotSize = size * (0.012 + noise01(seed, index * 3 + 2) * 0.016);
-        bitmap.fillCircle(x, y, dotSize, withAlpha(index % 3 === 0 ? ember : color, 82 + index * 5));
+    drawCompass(bitmap, cx, cy, size * 0.18, ember, 128);
+    drawStar(bitmap, cx, cy, size * 0.105, color, 170);
+
+    for (let index = 0; index < 18; index += 1) {
+        const x = width * (0.16 + noise01(seed, index * 3) * 0.68);
+        const y = height * (0.16 + noise01(seed, index * 3 + 1) * 0.68);
+        const dotSize = size * (0.007 + noise01(seed, index * 3 + 2) * 0.012);
+        const dotColor = index % 4 === 0 ? ember : index % 3 === 0 ? sealGold : color;
+        bitmap.fillCircle(x, y, dotSize, withAlpha(dotColor, 66 + index * 2));
+    }
+}
+
+function drawPlacementOverlay(bitmap, asset) {
+    const width = bitmap.width;
+    const height = bitmap.height;
+    const size = Math.min(width, height);
+    const valid = asset.state === 'valid_cell';
+    const color = valid ? [255, 221, 145, 255] : [255, 82, 92, 255];
+    const inner = size * 0.14;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    bitmap.fillRect(inner, inner, width - inner * 2, height - inner * 2, withAlpha(color, valid ? 16 : 42));
+    drawCellCornerBrackets(bitmap, color, valid ? 150 : 230, {
+        inset: size * 0.12,
+        length: size * (valid ? 0.2 : 0.24),
+        thickness: size * (valid ? 0.025 : 0.04),
+    });
+
+    if (valid) {
+        drawCompass(bitmap, cx, cy, size * 0.22, color, 92);
+        bitmap.fillEllipse(cx, cy, width * 0.26, height * 0.2, withAlpha([255, 235, 180, 255], 28));
+        drawStar(bitmap, cx, cy, size * 0.08, color, 118);
+        return;
     }
 
-    drawStar(bitmap, cx, cy, size * 0.12, ember, 182);
+    drawLine(bitmap, width * 0.25, height * 0.25, width * 0.75, height * 0.75, size * 0.075, withAlpha(color, 220));
+    drawLine(bitmap, width * 0.75, height * 0.25, width * 0.25, height * 0.75, size * 0.075, withAlpha(color, 220));
+    drawLine(bitmap, width * 0.25, height * 0.25, width * 0.75, height * 0.75, size * 0.028, [255, 218, 190, 230]);
+    drawLine(bitmap, width * 0.75, height * 0.25, width * 0.25, height * 0.75, size * 0.028, [255, 218, 190, 230]);
 }
 
 function drawCaptureFlashEffect(bitmap) {
@@ -905,8 +1035,9 @@ function drawCaptureFlashEffect(bitmap) {
     const white = [255, 244, 215, 255];
     const gold = [242, 184, 100, 255];
 
-    bitmap.fillEllipse(cx, cy, width * 0.42, height * 0.42, withAlpha(warm, 36));
-    bitmap.fillEllipse(cx, cy, width * 0.26, height * 0.25, withAlpha(white, 22));
+    bitmap.fillRect(inset, inset, width - inset * 2, height - inset * 2, withAlpha(warm, 22));
+    bitmap.fillEllipse(cx, cy, width * 0.42, height * 0.32, withAlpha(warm, 34));
+    bitmap.fillEllipse(cx, cy, width * 0.24, height * 0.2, withAlpha(white, 28));
 
     drawGlowLine(bitmap, inset, inset, width - inset, inset, white);
     drawGlowLine(bitmap, width - inset, inset, width - inset, height - inset, white);
@@ -918,7 +1049,7 @@ function drawCaptureFlashEffect(bitmap) {
     drawStar(bitmap, inset, height - inset, size * 0.12, white, 235);
     drawStar(bitmap, width - inset, height - inset, size * 0.12, white, 235);
 
-    drawCompass(bitmap, cx, cy, size * 0.2, gold, 185);
+    drawCompass(bitmap, cx, cy, size * 0.2, gold, 150);
     drawStar(bitmap, cx, cy, size * 0.15, white, 210);
 
     for (let index = 0; index < 8; index += 1) {
@@ -1003,6 +1134,11 @@ function drawPlaceholder(asset) {
 
         if (asset.state.includes('zone_filled')) {
             drawZoneFilledOverlay(bitmap, asset);
+            return bitmap;
+        }
+
+        if (asset.state === 'valid_cell' || asset.state === 'invalid_cell') {
+            drawPlacementOverlay(bitmap, asset);
             return bitmap;
         }
 

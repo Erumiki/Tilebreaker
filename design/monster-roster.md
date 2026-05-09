@@ -16,7 +16,7 @@ This roster is the art-facing source for the five MVP monsters used by `configs/
 
 ## UIX Monster Asset Usage
 
-This is the current UIX inventory for where monster art appears or is planned to appear. Required assets should be drawn first; optional assets can wait until result/shop polish.
+This is the current UIX inventory for where monster art appears or is planned to appear. Required assets should be drawn first; optional assets can wait until result/shop polish, now that the shop route itself exists.
 
 | Screen / slot | Required art | Runtime/source | Current status | UIX constraint |
 | --- | --- | --- | --- | --- |
@@ -24,8 +24,8 @@ This is the current UIX inventory for where monster art appears or is planned to
 | Battle intro, desktop | 512px portrait + 128px icon + level backdrop | `src/scenes/battleIntro.js`, `layout.backdrop`, `layout.portrait`, `layout.icon` | Implemented now | Portrait sits in the board-sized visual field. Icon appears in the details panel at roughly 86px. |
 | Battle HUD / monster banner | 128px icon | `src/scenes/battleLayout.js`, `monsterBanner` | Planned for Art Track 2 | Icon should read at 32-48px and support quick battle identity while the board stays dominant. |
 | Battle side panel, desktop | 128px icon or cropped portrait | `src/scenes/battleLayout.js`, `sidePanel` | Planned for Art Track 2 | Use icon first. Avoid large portrait here unless it does not steal space from combat math. |
-| Result screen | 128px icon | `src/scenes/result.js` | Optional polish | Can echo the defeated monster, but not required before economy/shop work. |
-| Future shop / next-battle preview | 128px icon | future shop scene | Optional later | Use the next monster icon only if it helps route clarity. No new asset size needed. |
+| Result screen | 128px icon | `src/scenes/result.js` | Optional polish | Can echo the defeated monster, but not required before battle readability is solid. |
+| Shop / next-battle preview | 128px icon | `src/scenes/upgrades.js` or later shop preview slot | Optional polish | Use the next monster icon only if it helps route clarity. No new asset size needed. |
 
 Icon readability target: each `monster_icon_battle_0N.png` must remain recognizable as a flat silhouette at 32px, 48px and 86px. Avoid tiny eyes, thin constellation lines or details that vanish in the battle HUD.
 
@@ -48,6 +48,8 @@ Icon readability target: each `monster_icon_battle_0N.png` must remain recogniza
 | `battle_03` | Dome chamber | Shell visibly under pressure, cracks around the ward floor. |
 | `battle_04` | Broken archive stacks | Shelves, tablets and star charts fractured by intrusion. |
 | `battle_05` | Central archive engine | Bright central mechanism, strong contrast, final breach above/behind it. |
+
+Balance note: current `configs/levels.json` tunes the final battle to `enemyHp: 4`; the art should still read as a final escalation even though the heart count is intentionally compact for MVP pacing.
 
 ## First Replacement Slice
 
@@ -84,7 +86,7 @@ Deliverables:
 
 Priority order:
 
-1. All five 128px icons first, because they support intro, future battle HUD and future result/shop previews.
+1. All five 128px icons first, because they support intro, future battle HUD, result polish and optional shop previews.
 2. `battle_01` portrait next, to prove the style on the first player-facing monster.
 3. Remaining portraits in battle order.
 4. Level backdrops only after the monster silhouettes are stable.

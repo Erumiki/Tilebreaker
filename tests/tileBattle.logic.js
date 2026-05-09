@@ -15,7 +15,10 @@ import {
 } from '../src/entities/gameplayVariants.js';
 import {
     BattleOutcome,
+    buyShopOffer,
+    createShopState,
     createRunState,
+    finishShop,
     getRewardChoices,
     resolveBattle,
 } from '../src/entities/run.js';
@@ -86,6 +89,112 @@ test('card catalog exposes enabled special tile definitions for future shop use'
     assert.equal(specialTiles[0].matrix.join('/'), '.*./.*./.*.');
     assert.equal(specialTiles[0].special, 'universal_boundary');
     assert.equal(specialTiles[0].sourceCardId, 'card_joker_line_v');
+});
+
+test('shop generation creates deterministic card offers for the next battle', () => {
+    const run = createRunState({
+        totalBattles: 5,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h', 'tile_blue_line_h'],
+        seed: 20260508,
+        settings: { activeCombatColors: ['red', 'blue'] },
+    });
+
+    run.completedBattles = 1;
+    run.gold = 9;
+
+    const shop = createShopState(run, cardCatalog);
+    const counts = new Map();
+
+    assert.equal(shop.nextBattle, 2);
+    assert.equal(shop.offers.length, cardCatalog.shop.offerCount);
+    assert.equal(shop.balanceStatus, 'unverified');
+
+    for (const offer of shop.offers) {
+        counts.set(offer.cardId, (counts.get(offer.cardId) ?? 0) + 1);
+        assert.equal(offer.type, 'shop_card');
+        assert.equal(offer.balanceStatus, 'unverified');
+        assert.equal(offer.enabledFromBattle <= 2, true);
+        assert.equal(!offer.color || ['red', 'blue'].includes(offer.color), true);
+        assert.equal(offer.cost > 0, true);
+        assert.equal(offer.bought, false);
+    }
+
+    for (const [cardId, count] of counts) {
+        const catalogCard = cardCatalog.cards.find((card) => card.id === cardId);
+        assert.equal(count <= catalogCard.maxPerShop, true);
+    }
+});
+
+test('buying shop offers spends gold and sends cards to discard', () => {
+    const run = createRunState({
+        totalBattles: 5,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h', 'tile_blue_line_h'],
+        seed: 20260508,
+        settings: { activeCombatColors: ['red', 'blue'] },
+    });
+
+    run.completedBattles = 1;
+    run.gold = 20;
+
+    const shop = createShopState(run, cardCatalog);
+    const offer = shop.offers.find((candidate) => candidate.cost <= run.gold);
+    const deckBefore = run.deck.length;
+    const discardBefore = run.discardPile.length;
+    const result = buyShopOffer(run, shop, offer.offerId);
+
+    assert.equal(result.bought, true);
+    assert.equal(offer.bought, true);
+    assert.equal(run.gold, 20 - offer.cost);
+    assert.equal(run.deck.length, deckBefore + 1);
+    assert.equal(run.discardPile.length, discardBefore + 1);
+    assert.equal(run.deck.at(-1), offer.tileId);
+    assert.equal(run.discardPile.at(-1), offer.tileId);
+    assert.equal(run.purchasedCards.at(-1).cardId, offer.cardId);
+    assert.equal(run.purchasedCards.at(-1).balanceStatus, 'unverified');
+
+    const secondOffer = shop.offers.find((candidate) => !candidate.bought && candidate.cost <= run.gold);
+    const secondResult = buyShopOffer(run, shop, secondOffer.offerId);
+
+    assert.equal(secondResult.bought, true);
+    assert.equal(run.deck.length, deckBefore + 2);
+    assert.equal(run.discardPile.length, discardBefore + 2);
+    assert.equal(run.deck.at(-1), secondOffer.tileId);
+    assert.equal(run.discardPile.at(-1), secondOffer.tileId);
+    assert.equal(shop.boughtCards.length, 2);
+
+    const repeated = buyShopOffer(run, shop, offer.offerId);
+    assert.equal(repeated.bought, false);
+    assert.equal(repeated.reason, 'already_bought');
+
+    const finished = finishShop(run, shop);
+    assert.equal(finished.nextBattle, 2);
+    assert.equal(run.currentBattle, 2);
+    assert.equal(run.shopHistory.length, 1);
+    assert.equal(run.shopHistory[0].boughtCards.length, 2);
+});
+
+test('unaffordable shop offers stay visible and cannot be bought', () => {
+    const run = createRunState({
+        totalBattles: 5,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h', 'tile_blue_line_h'],
+        seed: 20260508,
+        settings: { activeCombatColors: ['red', 'blue'] },
+    });
+
+    run.completedBattles = 1;
+    run.gold = 0;
+
+    const shop = createShopState(run, cardCatalog);
+    const result = buyShopOffer(run, shop, shop.offers[0].offerId);
+
+    assert.equal(result.bought, false);
+    assert.equal(result.reason, 'not_enough_gold');
+    assert.equal(shop.offers[0].bought, false);
+    assert.equal(run.deck.length, 2);
+    assert.equal(run.discardPile.length, 0);
 });
 
 test('gameplay variants keep one comparison order and URL aliases', () => {

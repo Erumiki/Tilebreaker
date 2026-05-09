@@ -1,8 +1,8 @@
 # Card Pool GD Pass
 
-Status 2026-05-09: universal starter implemented; buyable shop cards now have validated data in `configs/cards.json`; shop UI and buying remain unimplemented.
+Status 2026-05-09: universal starter implemented; buyable shop cards have validated data in `configs/cards.json`; the between-battle shop now sells catalog offers for gold and sends bought cards to the persistent deck and discard.
 
-This pass defines the next card vocabulary before the game spends gold on real card buys. The goal is to give Core 1 Rescue more planning control without turning the closure puzzle into an always-wildcard deck.
+This pass records the current card vocabulary used by the implemented gold card shop. The goal is to give Core 1 Rescue more planning control without turning the closure puzzle into an always-wildcard deck.
 
 ## Goals
 
@@ -14,9 +14,9 @@ This pass defines the next card vocabulary before the game spends gold on real c
 
 ## Guardrails
 
-- The GD pass does not change the active deck, shop, configs or assets.
-- The first implementation should test the universal starter alone before adding buyable cards.
-- Buyable cards go to discard first, matching existing add-tile reward behavior. They should not appear directly in hand unless a later shop rule explicitly says so.
+- The implemented shop consumes `configs/cards.json`; buys change the persistent deck and discard pile during the run.
+- The universal starter is implemented as the opening-control baseline; buyable cards now need balance validation as live shop content.
+- Buyable cards go to discard first while also increasing the persistent deck. They should not appear directly in hand unless a later shop rule explicitly says so.
 - Prices assume current visible gold income: `+1 gold` per closure and `+strikeCount gold` on strike. Common buys should usually be affordable after one won battle; rare buys should require saving or strong gold play.
 - Early shops should offer red-blue cards only. Green stays out of the active economy until a separate task reintroduces it.
 - Wildcards should solve "I am one connector short", not make every contour close itself.
@@ -104,7 +104,7 @@ Implementation notes:
 
 ## Buyable Card Candidates
 
-Costs are first-pass targets. They are deliberately coarse because gold income still needs manual playtest after the shop exists.
+Costs are first-pass targets. They are deliberately coarse because gold income and card value still need manual playtest with the live shop.
 
 | Card family | Rarity | Rough cost | Intended role | MVP limit |
 | --- | --- | ---: | --- | --- |
@@ -134,14 +134,14 @@ Postpone for now:
 
 ## Shop Shape
 
-First shop target:
+Current shop shape:
 
 - Appears after a won battle.
-- Shows 3 card offers.
-- Offer mix: 2 common cards, 1 uncommon slot. Rare cards can replace the uncommon slot after battle 2.
+- Shows 5 catalog-driven card offers.
+- Offer mix is generated from `configs/cards.json` using rarity weights, offer weights, active colors, unlock battle and `maxPerShop`.
 - Player may buy zero or more affordable cards.
 - Bought cards enter discard.
-- Existing non-shop victory rewards can remain until the implementation pass decides whether to replace or coexist with them.
+- The old free `1 of 3` victory rewards are no longer the normal path.
 
 Price read:
 
@@ -174,7 +174,7 @@ Simulation:
 
 Manual test:
 
-- Play 5 first battles with the starter and no shop.
+- Play 5 shop-enabled first battles with the starter.
 - The player should identify where red and blue can begin without reading a rule note.
 - Stop signal: if the starter mostly creates the same minimal vertical loop every time, it needs a weaker shape or different placement.
 
@@ -197,7 +197,7 @@ Initial shop pool now represented in `configs/cards.json`:
 
 Automated checks:
 
-- Buying spends gold and sends the card to discard.
+- Buying spends gold and sends the card to the persistent deck and discard.
 - Unaffordable cards cannot be bought.
 - Deck, draw pile and discard counts stay consistent.
 - Bought cards can appear after reshuffle, not immediately for free.
@@ -222,4 +222,4 @@ Each candidate needs one clear answer: does it create a better plan, or only mak
 
 ## Current Lead Decision
 
-The active battle deck still starts only with ordinary red/blue rescue cards and the board-only `starter_universal_line_v`; no shop buying is live yet. The future shop should consume `configs/cards.json`: ordinary red/blue lines, tees and corners are active from battle 1; red/blue plus and `joker_line_v` unlock from battle 2; stronger joker corner/tee and double line/curve candidates stay staged until their placement/scoring UX is implemented.
+The active battle deck starts with ordinary red/blue rescue cards and the board-only `starter_universal_line_v`. The live shop consumes `configs/cards.json`: ordinary red/blue lines, tees and corners are active from battle 1; red/blue plus and `joker_line_v` unlock from battle 2; stronger joker corner/tee and double line/curve candidates stay staged until their placement/scoring UX is implemented. All bought card families remain `balanceStatus: "unverified"` until the separate balance pass records keep, tuning or disable decisions.

@@ -100,17 +100,14 @@ The existing MVP art contract already supports this direction:
 - Do not make the universal starter look red-only or blue-only.
 - Avoid heavy decorative constellations inside tile cells unless they follow the existing matrix.
 
-## First Art Pass
+## Current Art Pass Status
 
-The first practical pass should not redraw everything at once. It should prove the direction with a small, high-signal slice:
+The first practical Astral Archive pass is already in the build. The runtime now uses generated MVP art for menu, intro, battle, result and shop surfaces where practical; `assets/tiles_v2` was repainted as brass-framed stone plates with luminous red/blue ward channels; monster icons/portraits have distinct placeholder silhouettes; closure fill now reads as a seal-completion field instead of a debug rectangle; and board-cell states now have a coherent brass/stone + red invalid hint language with portrait/desktop proof screenshots in `assets/art_review/`.
 
-1. One battle background using the observatory floor.
-2. One battle intro background.
-3. `monster_portrait_battle_01` and `monster_icon_battle_01`.
-4. Red and blue capture overlays as solar and lunar seals.
-5. Heart, gold, submit and strike icons in the new language.
-6. A restrained tile palette update if it improves readability without changing topology.
+The next art work should focus on production replacement and extraction polish:
 
-Success criterion: a player should describe the battle as "I am sealing a monster breach" before reading any external explanation.
+1. Finish final monster portraits for battles 2-5 and optional level backdrops.
+2. Finish card/shop frame and special-card presentation for the implemented shop.
+3. Move remaining low-level procedural borders/effects into manifest-backed assets with validation.
 
-Use `assets/art_refs/astral_archive_style_portrait.png` as the default visual comparison for this pass.
+Success criterion remains: a player should describe the battle as "I am sealing a monster breach" before reading any external explanation. Use `assets/art_refs/astral_archive_style_portrait.png` as the default visual comparison for the next pass.

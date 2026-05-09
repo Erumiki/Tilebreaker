@@ -101,7 +101,7 @@ The monster icon inventory lives in `design/monster-roster.md` under `UIX Monste
 - future Art Track 2 battle HUD: compact icon inside `monsterBanner`;
 - future Art Track 2 desktop battle side panel: compact icon before the monster/battle name.
 
-Result and shop monster icons are optional polish until the economy/shop route exists.
+Result and shop monster icons are optional polish now that the economy/shop route exists; prioritize them only after the battle intro and in-battle identity reads cleanly.
 
 ## UIX Review Notes
 

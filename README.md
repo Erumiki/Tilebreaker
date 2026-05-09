@@ -2,7 +2,7 @@
 
 Tilebreaker is a fast roguelite tile-placement battler about a defender of a star archive. The player places boundary tiles as magical red and blue wards, closes contours to seal invading monsters, stabilizes space inside those seals and survives by spending hearts only when a new hand is worth the cost.
 
-The current MVP after the manual playtest and fake-shot art pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, one universal red-blue center starter, one hold slot, Astral Archive presentation and a checked-in card catalog for future shop cards.
+The current MVP after the manual playtest and fake-shot art pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, one universal red-blue center starter, one hold slot, Astral Archive presentation and a gold card shop between battles.
 
 - active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + universal starter + two-color capture-fill + hearts + hand-submit + field-resource economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
 - active art direction: Astral Archive defense; closed contours are completed seals/wards, monsters lose hearts when their intrusion is cut off, `Сдать руку` is an archive overload paid with living light, detailed guidance lives in `design/art-direction.md`, and accepted style references live in `assets/art_refs/`;
@@ -17,10 +17,11 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - legality: if a cell has direct neighbors, adjacent edges must match by 3-cell edge signature; an empty cell with no direct neighbors is valid as a new island;
 - gray blank tiles remain in the manifest as technical/future material, but are removed from the active starting deck and opening tests;
 - scoring: a closed colored boundary captures the empty or filled interior;
-- legacy damage is shown as hearts: the first monster has 3 hearts, a minimal 2x2 capture deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`;
+- legacy damage is shown as hearts: early monsters have 3 hearts, the tuned final battle has `enemyHp: 4`, a minimal 2x2 capture deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`;
 - active `legacy` scores closures immediately after placement: monster hearts, gold and strike feedback update before the next placement or hand submit;
 - field resources are board underlays in active `legacy`: gold can be picked up by placing on it or sealed inside a closure, hearts heal only when sealed, and healing is capped by `hearts.maxPlayerHp`;
 - monster kill bounty pays the configured `configs/levels.json` `reward` once on victory;
+- after non-final victories, the run enters a card shop with 5 offers from `configs/cards.json`; the player may buy any number they can afford or skip, and bought cards go to discard while also increasing the persistent deck and staying marked `balanceStatus: "unverified"`;
 - `Сдать руку` in `legacy` has an explicit cost: `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, paid immediately before the hand is redealt;
 - an unaffordable dealt hand is a last-chance hand: if the monster survives and the player cannot pay for another hand, the battle ends instead of redealing for free;
 - active hand mode has one hold slot: the selected card can be set aside, swapped with another card later and carried across a hand submit; it returns to discard when the battle ends;
@@ -32,8 +33,8 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - in Variant B, all combat tiles count as one land color for placement/capture rules, attacks are merged into one land lane, and continuing the same connected region increases `Chain xN`; chain is spent as bonus damage on the next capture;
 - in Variant C, all combat tiles also count as one land color, but the board has A/B targets instead of Chain: if connected land links both cells, the round gains one-time `connectTargets.bonusDamage`, and a new pair appears next round;
 - in Variant D, all combat tiles count as one land color, the board has S/E gates, area-capture payoff is disabled, a short bridge gives a weak finish bonus, and a completed road deals its main damage from extra route length: `roadMode.completeBonus + min(extraLength, roadMode.maxScoredExtraLength) * roadMode.damagePerTile`;
-- the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile, persistent gold, field resources and rewards between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank;
-- buyable card catalog data exists but the shop is not implemented yet: `configs/cards.json` defines common red/blue line/tee/corner buys, plus/cross as a controlled uncommon buy, one `joker_line_v` special-card definition, price bands, offer rules and staged double/joker candidates.
+- the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile, persistent gold, field resources and card purchases between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank;
+- buyable card data lives in `configs/cards.json`: common red/blue line/tee/corner buys, plus/cross as a controlled uncommon buy, one `joker_line_v` special-card definition, price bands, offer rules and staged double/joker candidates.
 
 ## Where Things Live
 
@@ -43,14 +44,16 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
 - `assets/art_mvp/art_manifest.json` - stable presentation asset ids, states, filenames and Astral Archive PNG contract for the beautiful MVP track.
 - `assets/art_refs/` - accepted Astral Archive fake-screenshot references for future monster, UI, backdrop and effect work.
+- `assets/art_review/` - visual proof screenshots and contact-sheet checks for art passes, including board-cell valid/invalid hover examples.
 - `design/core.md` - current Core 1 Rescue gameplay summary and boundaries.
 - `design/art-direction.md` - accepted Astral Archive defense setting, visual language, monster escalation and asset mapping.
 - `design/art-mvp-brief.md` - technical artist brief: safe replacement rules, topology locks, required asset categories and future art-loading plan.
 - `design/monster-roster.md` - art-facing list of the five MVP monsters with portrait/icon/backdrop ids and silhouette notes.
 - `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.
 - `design/ui-mockup.md` - named battle layout slots, portrait viewport contract and debug UI states.
-- `src/entities/cards.js` - card catalog validation, enabled-offer filtering and special tile extraction for the future shop.
-- `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.
+- `src/entities/cards.js` - card catalog validation, enabled-offer filtering and special tile extraction for the shop.
+- `src/entities/run.js` - run state: deck, draw pile, discard pile, gold, shop offers, card purchases and old debug reward helpers.
+- `src/scenes/upgrades.js` - current between-battle card shop scene; the filename is legacy, but the scene name/debug state is `shop`.
 - `src/scenes/battleIntro.js` - pre-battle monster presentation scene and responsive intro layout.
 - `src/scenes/battleLayout.js` - pure battle layout calculation for desktop and portrait mode.
 - `todo/tasks.md` - the only backlog, work order, next-step, acceptance and status list.

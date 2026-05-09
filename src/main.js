@@ -7,10 +7,11 @@ import {
     normalizeGameplayVariantId,
 } from './entities/gameplayVariants.js';
 import {
-    applyUpgrade,
     BattleOutcome,
+    buyShopOffer,
+    createShopState,
     createRunState,
-    getRewardChoices,
+    finishShop,
     getCurrentBattle,
     resolveBattle,
 } from './entities/run.js';
@@ -23,7 +24,7 @@ import { createBattleIntroScene } from './scenes/battleIntro.js';
 import { createBattleScene } from './scenes/battle.js';
 import { createMainMenuScene } from './scenes/mainmenu.js';
 import { createBattleResultScene } from './scenes/result.js';
-import { createUpgradeScene } from './scenes/upgrades.js';
+import { createShopScene } from './scenes/upgrades.js';
 
 const canvas = document.getElementById('game');
 const config = await loadConfig();
@@ -230,20 +231,26 @@ function showResult(outcome) {
                 return;
             }
 
-            showUpgrades();
+            showShop();
         },
     });
 }
 
-function showUpgrades() {
-    scene = createUpgradeScene({
+function showShop() {
+    const shopState = createShopState(run, config.cards);
+
+    scene = createShopScene({
         input,
         ui,
         artTextures,
+        tileTextures,
         run,
-        upgrades: getRewardChoices(run, tiles, config.game.tileBattle),
-        onChoose(upgrade) {
-            applyUpgrade(run, upgrade);
+        shopState,
+        onBuy(offer) {
+            return buyShopOffer(run, shopState, offer.offerId);
+        },
+        onContinue() {
+            finishShop(run, shopState);
             showBattleIntro();
         },
     });
@@ -294,6 +301,9 @@ window.__tilebreakerDebug = {
         return scene?.name === 'battleIntro' ? scene.getDebugState?.() ?? null : null;
     },
     getUpgradeDebug() {
-        return scene?.name === 'upgrades' ? scene.getDebugState?.() ?? null : null;
+        return ['upgrades', 'shop'].includes(scene?.name) ? scene.getDebugState?.() ?? null : null;
+    },
+    getShopDebug() {
+        return scene?.name === 'shop' ? scene.getDebugState?.() ?? null : null;
     },
 };

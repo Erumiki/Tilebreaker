@@ -146,7 +146,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ### ~~[2026-05-09] Day 4: Core 1 Rescue - hearts and new-pick cost~~ DONE
 
-**Status:** active `legacy` stays on `drawMode: "hand"` and rescue deck without gray blank; visible combat UI shows only red/blue, HP/damage were converted to hearts, first monster has 3 hearts, minimal 2x2 capture deals 1 heart, and a new pick shows and applies previewed damage `1 + floor(unplayed / 4)` hearts. Pick-pressure scoped to `legacy`, road-mode smoke reduced to URL-playable/gates/first-placement because the mode is postponed. Unit/check/smoke pass.
+**Status:** active `legacy` stays on `drawMode: "hand"` and rescue deck without gray blank; visible combat UI shows only red/blue, HP/damage were converted to hearts, early monsters have 3 hearts, minimal 2x2 capture deals 1 heart, and a new pick shows and applies previewed damage `1 + floor(unplayed / 4)` hearts. Pick-pressure scoped to `legacy`, road-mode smoke reduced to URL-playable/gates/first-placement because the mode is postponed. Unit/check/smoke pass.
 
 ---
 
@@ -324,7 +324,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ### ~~[2026-05-09] MVP UIX Track 2: monster intro before each battle~~ DONE
 
-**Status:** added a standalone `battleIntro` scene between menu/upgrades and battle. It shows the current monster name, portrait/icon, hearts, danger/ante, player hearts/gold and honest pending reward preview from `configs/levels.json`, uses `assets/art_mvp` intro/backdrop/monster ids with fallbacks, exposes `getBattleIntroDebug()`, and routes through one `Битва` button before battle state is created. Smoke covers desktop, portrait viewports and non-final victory routes through intro. Artist/UIX handoff now lives in `design/art-mvp-brief.md`, `design/ui-mockup.md` and `design/monster-roster.md`.
+**Status:** added a standalone `battleIntro` scene between progression screens and battle. It shows the current monster name, portrait/icon, hearts, danger/ante, player hearts/gold and honest pending reward preview from `configs/levels.json`, uses `assets/art_mvp` intro/backdrop/monster ids with fallbacks, exposes `getBattleIntroDebug()`, and routes through one `Битва` button before battle state is created. Smoke covers desktop, portrait viewports and non-final victory routes through intro. Artist/UIX handoff now lives in `design/art-mvp-brief.md`, `design/ui-mockup.md` and `design/monster-roster.md`.
 
 **Priority:** must
 
@@ -387,7 +387,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Art Director Task: hand-painted tile atlas pass against the fake shot
+### ~~[2026-05-09] Art Director Task: hand-painted tile atlas pass against the fake shot~~ DONE
 
 **Idea:** replace the remaining procedural-looking `assets/tiles_v2` atlas with a deliberate fake-shot-quality tile paintover while preserving all gameplay topology.
 
@@ -406,13 +406,15 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Acceptance:** at board scale and hand scale, red/blue paths read as strong magical ward channels close to the accepted fake shot, all tile topology remains unchanged, and the live portrait screenshot no longer looks like thin procedural line art on empty slabs.
 
+**Status:** completed a deterministic paintover pass through `scripts/generate-tile-art-v2.js`: all `assets/tiles_v2` PNGs and `starter_universal_line_v.png` were regenerated as darker brass/stone plates with thicker luminous ward channels, hot cores, softer glow, richer bevels and cleaner gray blanks. Filenames, PNG size, manifest ids, matrices, edge signatures, colors, patterns and special starter semantics were preserved; `assets/tiles_v2/tile_manifest.json` has no diff. Before/after records were saved in `assets/art_review/`: `tile_contact_sheet_before_art_director_pass.png`, `tile_contact_sheet_after_art_director_pass.png`, `portrait_battle_before_tile_atlas_pass.png`, `portrait_battle_after_tile_atlas_pass.png` and `desktop_battle_after_tile_atlas_pass.png`. Follow-up fixes: corner tiles now use a rounded elbow through the center micro-cell instead of a rigid L, T tiles now use rounded branch junctions instead of a hard perpendicular join, and `starter_universal_line_v` now uses one balanced red-to-blue gradient column with a violet/gold transition instead of a blue-dominant double stripe. Proof files include `tile_contact_sheet_after_rounded_corner_restore.png`, `portrait_battle_after_rounded_corner_restore.png`, `tile_contact_sheet_after_rounded_tee_restore.png`, `portrait_battle_after_rounded_tee_restore.png`, `starter_universal_line_v_after_gradient_balance.png` and `portrait_battle_after_universal_gradient_balance.png`. `./scripts/npm.sh run check` passes. Playwright smoke rerun is 8/9 with the remaining 5-battle loop failing after battle completion on `Expected "mainmenu", Received undefined`, not on tile art/topology assertions.
+
 **Priority:** must
 
 **Layer:** MVP
 
 ---
 
-### [2026-05-09] Art Director Task: board-cell states and placement-hint readability pass
+### ~~[2026-05-09] Art Director Task: board-cell states and placement-hint readability pass~~ DONE
 
 **Idea:** design the board cell states, valid/invalid placement hints and closure overlays as one visual system instead of relying on procedural corner markers.
 
@@ -430,6 +432,8 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Acceptance:** valid hints are visible enough to play but visually quieter than placed ward paths, invalid/hover/scored states are distinct, and board-cell chrome no longer fights the tile art in the live battle screen.
 
+**Status:** completed the board-cell readability pass. `scripts/generate-art-mvp-placeholders.js` now emits a coherent brass/stone board-cell family for `board_cell_empty`, `board_cell_hover`, `board_cell_valid`, `board_cell_invalid` and `board_cell_scored`; unhovered valid cells use a subtle brass glint; invalid cells use an urgent red state; and `overlay_valid_cell` / `overlay_invalid_cell` carry the main placement-hint artwork. `src/scenes/battle.js` now chooses `board_cell_valid` for unhovered valid targets, keeps the selected-tile preview above valid hover, uses manifest-backed valid/invalid overlays before procedural fallback markers, and exposes board-cell/hint ids in battle debug for tests and art review. Field resource icons still render above cell art, and closure/fill visuals remain on the existing seal-overlay path. Proof screenshots were saved to `assets/art_review/board_cells_portrait_valid_hover_after.png`, `assets/art_review/board_cells_portrait_invalid_hover_after.png`, `assets/art_review/board_cells_desktop_valid_hover_after.png` and `assets/art_review/board_cells_desktop_invalid_hover_after.png`. `./scripts/npm.sh run check` passes; Playwright smoke coverage includes the new art ids.
+
 **Priority:** must
 
 **Layer:** MVP
@@ -438,9 +442,9 @@ The single list of planned features, improvements, work order and statuses for T
 
 ### [2026-05-09] Art Director Task: buyable card and special-tile art pack
 
-**Idea:** give the artist a focused asset task for the new shop/card catalog tiles before the shop is implemented.
+**Idea:** give the artist a focused asset task for the implemented shop/card catalog tiles.
 
-**Why:** `configs/cards.json` now defines ordinary buys, plus/cross, `joker_line_v` and staged joker/double candidates, but the live assets still mostly reuse the base atlas or generator output. The shop will need readable card previews and distinct special tiles that feel worth buying without changing gameplay topology.
+**Why:** `configs/cards.json` now defines ordinary buys, plus/cross, `joker_line_v` and staged joker/double candidates, but the live assets still mostly reuse the base atlas or generator output. The implemented shop needs readable card previews and distinct special tiles that feel worth buying without changing gameplay topology.
 
 **MVP:**
 
@@ -451,7 +455,7 @@ The single list of planned features, improvements, work order and statuses for T
 - prepare visual concepts for `double_line` and `double_curve`/`double_corner` cards as clearly special two-cell tools, without implying free rotation, extra score or unimplemented placement behavior;
 - if new filenames or manifest ids are needed, propose them in the task/status before code consumes them; do not silently rename existing tile ids or PNG files;
 - keep all topology locked: art may change pixels, but not `matrix`, edge signatures, card rules, costs, rarity, offer weights or enabled status;
-- provide a small contact sheet or screenshot set showing ordinary card, plus/cross, joker line and double-card concepts together in the future shop frame scale.
+- provide a small contact sheet or screenshot set showing ordinary card, plus/cross, joker line and double-card concepts together in the current shop frame scale.
 
 **Acceptance:** the artist can hand back a tile/card art pack where every active catalog card has a readable preview path, `joker_line_v` has a distinct special-tile visual, staged joker/double concepts are clearly marked as not-yet-enabled, and no gameplay semantics are changed by the art.
 
@@ -484,7 +488,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Acceptance:** the project has a checked-in card catalog with prices for ordinary cards, cross/plus, jokers and double straight/curve candidates; disabled/staged cards are explicit; code/tests can load and validate the catalog before any shop scene uses it.
 
-**Status:** added `configs/cards.json` as the future shop catalog: offer count, active red/blue shop colors, rarity weights, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special definition and staged joker/double candidates with explicit semantics. Added `src/entities/cards.js` for catalog validation, enabled-offer filtering and special tile extraction; `loadConfig()` now validates the catalog against tile/special references. Unit/check/e2e pass.
+**Status:** added `configs/cards.json` as the shop catalog: offer count, active red/blue shop colors, rarity weights, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special definition and staged joker/double candidates with explicit semantics. Added `src/entities/cards.js` for catalog validation, enabled-offer filtering and special tile extraction; `loadConfig()` now validates the catalog against tile/special references. Unit/check/e2e pass.
 
 **Priority:** must
 
@@ -492,7 +496,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Shop: replace 1-of-3 upgrades with card sales
+### ~~[2026-05-09] MVP Shop: replace 1-of-3 upgrades with card sales~~ DONE
 
 **Idea:** after a won battle, show a shop of random card offers and let the player buy any number they can afford.
 
@@ -512,6 +516,8 @@ The single list of planned features, improvements, work order and statuses for T
 - expose shop debug state: offers, prices, bought cards, gold before/after, deck/draw/discard counts and next-battle route.
 
 **Acceptance:** a full smoke run can win a battle, enter the shop, buy multiple affordable cards or skip, see gold/deck counts update correctly, then continue to the next monster intro and battle. The old `1 of 3` upgrade screen is no longer the normal between-battle progression.
+
+**Status:** implemented the normal post-victory `shop` flow. `src/entities/run.js` now generates deterministic 5-offer shops from `configs/cards.json`, respecting rarity weights, offer weights, active colors, unlock battle and `maxPerShop`; purchases spend gold immediately, add the bought tile/special tile to deck and discard, record `purchasedCards`/`shopHistory`, and keep `balanceStatus: "unverified"`. Config load exposes enabled catalog special tiles such as `joker_line_v`, and `src/scenes/upgrades.js` now renders the `shop` scene with card art previews, affordability, bought states, skip/continue and debug. Result copy routes to the shop, README/core/current/decisions are synced, and unit/check/e2e pass.
 
 **Priority:** must
 
@@ -575,13 +581,13 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Idea:** finish the remaining art extraction after the fake-shot pass and verify that the game can be fully reskinned by files/manifests.
 
-**Why:** the fake-shot pass replaced the largest visible prototype look, but some low-level borders, text treatments, debug/variant surfaces and future shop elements still use procedural drawing. A beautiful MVP needs the project to select asset ids and states consistently, not hide late prototype visuals in scene code.
+**Why:** the fake-shot pass replaced the largest visible prototype look, but some low-level borders, text treatments, debug/variant surfaces and shop elements still use procedural drawing. A beautiful MVP needs the project to select asset ids and states consistently, not hide late prototype visuals in scene code.
 
 **MVP:**
 
 - formalize the ad hoc asset helpers added during the fake-shot pass into shared renderer helpers such as `drawSprite`, `drawNineSlice`, `drawIcon` and `drawStatefulButton`;
 - keep `drawText` as a system text layer, but move any remaining panels, buttons, board cells, slots, frames, icons, backgrounds, overlays and resource visuals to files from the art manifest;
-- complete future shop/resource routes once those mechanics exist;
+- finish manifest-backed presentation extraction for the now-implemented shop and field-resource routes;
 - finish battle extraction: capture/closure overlays, resource underlays, richer HUD rails, pressed states and any remaining hardcoded borders;
 - remove the procedural tile fallback from active presentation: missing tile art should show an explicit missing asset state or fail validation instead of silently drawing a colored 3x3 fallback;
 - add static checks with a small allowlist for remaining hardcoded drawing/color usage in `src/scenes` and `src/render`;
@@ -684,7 +690,7 @@ The single list of planned features, improvements, work order and statuses for T
 - smoke test for launch and main loop completion;
 - update README with the current description.
 
-**Acceptance:** the player opens the build, goes through menu -> battle -> result -> upgrade -> next battle and understands the main mechanic without external explanation.
+**Acceptance:** the player opens the build, goes through menu -> battleIntro -> battle -> result -> shop -> battleIntro -> next battle and understands the main mechanic without external explanation.
 
 **Priority:** must
 

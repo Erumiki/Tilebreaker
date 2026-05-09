@@ -1,4 +1,7 @@
-import { validateCardCatalog } from '../entities/cards.js';
+import {
+    getCatalogSpecialTiles,
+    validateCardCatalog,
+} from '../entities/cards.js';
 
 const CONFIG_FILES = {
     game: 'configs/game.json',
@@ -38,6 +41,15 @@ export async function loadConfig() {
             ],
             settings: configs.game.tileBattle,
         });
+        const existingSpecialTiles = configs.game.tileBattle?.specialTiles ?? [];
+        const existingIds = new Set(existingSpecialTiles.map((tile) => tile.id));
+        const catalogSpecialTiles = getCatalogSpecialTiles(configs.cards)
+            .filter((tile) => !existingIds.has(tile.id));
+
+        configs.game.tileBattle.specialTiles = [
+            ...existingSpecialTiles,
+            ...catalogSpecialTiles,
+        ];
     }
 
     return configs;

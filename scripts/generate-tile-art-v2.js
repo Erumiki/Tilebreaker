@@ -255,157 +255,6 @@ function withAlpha(color, alpha) {
     return [color[0], color[1], color[2], alpha];
 }
 
-function drawPattern(bitmap, rect, colorKey, seed) {
-    const colors = palette[colorKey];
-    const { x, y, width, height } = rect;
-
-    if (colors.pattern === 'slash') {
-        for (let offset = -height; offset < width + height; offset += 20) {
-            const shade = (offset / 20 + seed) % 2 === 0 ? colors.light : colors.dark;
-            for (let localY = 0; localY < height; localY += 1) {
-                const localX = offset + localY;
-                if (localX >= 0 && localX < width - 2) {
-                    bitmap.fillRect(x + localX, y + localY, 2, 2, withAlpha(shade, 54));
-                }
-            }
-        }
-        return;
-    }
-
-    if (colors.pattern === 'bars') {
-        for (let py = y + 13 + (seed % 5); py < y + height - 8; py += 20) {
-            bitmap.fillRect(x + 9, py, width - 18, 3, withAlpha(colors.light, 68));
-            bitmap.fillRect(x + 13, py + 7, width - 26, 2, withAlpha(colors.dark, 44));
-        }
-        return;
-    }
-
-    if (colors.pattern === 'dots') {
-        for (let py = y + 13; py < y + height - 8; py += 18) {
-            for (let px = x + 11 + ((py + seed * 7) % 12); px < x + width - 8; px += 24) {
-                bitmap.fillRect(px, py, 4, 4, withAlpha(colors.light, 72));
-                bitmap.fillRect(px + 2, py + 2, 3, 3, withAlpha(colors.dark, 38));
-            }
-        }
-        return;
-    }
-
-    for (let py = y + 9; py < y + height - 6; py += 17) {
-        for (let px = x + 8 + ((py + seed) % 9); px < x + width - 6; px += 23) {
-            bitmap.fillRect(px, py, 3, 3, withAlpha(colors.light, 40));
-            bitmap.fillRect(px + 7, py + 7, 2, 2, withAlpha(colors.dark, 42));
-        }
-    }
-}
-
-function cellColor(matrix, colorKey, row, col) {
-    if (matrix[row][col] === '*') {
-        return 'universal';
-    }
-
-    return matrix[row][col] === 'X' ? colorKey : 'gray';
-}
-
-function drawCell(bitmap, col, row, colorKey, seed) {
-    const bounds = [0, 85, 171, 256];
-    const x = bounds[col];
-    const y = bounds[row];
-    const width = bounds[col + 1] - bounds[col];
-    const height = bounds[row + 1] - bounds[row];
-    const colors = palette[colorKey];
-    const lightBias = ((col * 2 + row + seed) % 3 - 1) * 0.045;
-    const base = lightBias >= 0
-        ? mix(colors.base, colors.light, lightBias)
-        : mix(colors.base, colors.dark, -lightBias);
-
-    bitmap.fillRect(x, y, width, height, base);
-    bitmap.fillRect(x, y, width, 2, withAlpha(colors.light, 26));
-    bitmap.fillRect(x, y + height - 2, width, 2, withAlpha(colors.dark, 24));
-    drawPattern(bitmap, { x, y, width, height }, colorKey, seed + col * 7 + row * 13);
-}
-
-function drawUniversalCell(bitmap, col, row, seed) {
-    const bounds = [0, 85, 171, 256];
-    const x = bounds[col];
-    const y = bounds[row];
-    const width = bounds[col + 1] - bounds[col];
-    const height = bounds[row + 1] - bounds[row];
-    const split = Math.floor(width / 2);
-    const rightWidth = width - split;
-    const redBase = mix(palette.red.base, palette.red.light, 0.04);
-    const blueBase = mix(palette.blue.base, palette.blue.light, 0.04);
-
-    bitmap.fillRect(x, y, split, height, redBase);
-    bitmap.fillRect(x + split, y, rightWidth, height, blueBase);
-    bitmap.fillRect(x, y, width, 2, [255, 255, 255, 30]);
-    bitmap.fillRect(x, y + height - 2, width, 2, [0, 0, 0, 30]);
-    drawPattern(bitmap, { x, y, width: split, height }, 'red', seed + col * 7 + row * 13);
-    drawPattern(bitmap, { x: x + split, y, width: rightWidth, height }, 'blue', seed + col * 11 + row * 17);
-    bitmap.fillRect(x + split - 1, y + 7, 2, height - 14, [245, 222, 145, 164]);
-}
-
-function drawCellBoundaries(bitmap, matrix, colorKey) {
-    const bounds = [0, 85, 171, 256];
-
-    for (let col = 1; col < 3; col += 1) {
-        const x = bounds[col];
-        for (let row = 0; row < 3; row += 1) {
-            const left = cellColor(matrix, colorKey, row, col - 1);
-            const right = cellColor(matrix, colorKey, row, col);
-            const y = bounds[row];
-            const height = bounds[row + 1] - bounds[row];
-            const same = left === right;
-            bitmap.fillRect(x - (same ? 1 : 2), y, same ? 2 : 4, height, [24, 32, 42, same ? 42 : 104]);
-        }
-    }
-
-    for (let row = 1; row < 3; row += 1) {
-        const y = bounds[row];
-        for (let col = 0; col < 3; col += 1) {
-            const top = cellColor(matrix, colorKey, row - 1, col);
-            const bottom = cellColor(matrix, colorKey, row, col);
-            const x = bounds[col];
-            const width = bounds[col + 1] - bounds[col];
-            const same = top === bottom;
-            bitmap.fillRect(x, y - (same ? 1 : 2), width, same ? 2 : 4, [24, 32, 42, same ? 42 : 104]);
-        }
-    }
-}
-
-function drawActiveRidge(bitmap, matrix, colorKey) {
-    const bounds = [0, 85, 171, 256];
-    const colors = palette[colorKey];
-
-    for (let row = 0; row < 3; row += 1) {
-        for (let col = 0; col < 3; col += 1) {
-            if (matrix[row][col] !== 'X' && matrix[row][col] !== '*') {
-                continue;
-            }
-
-            const x = bounds[col];
-            const y = bounds[row];
-            const width = bounds[col + 1] - bounds[col];
-            const height = bounds[row + 1] - bounds[row];
-
-            if (matrix[row][col] === '*') {
-                const split = Math.floor(width / 2);
-                bitmap.fillRect(x + 8, y + 8, split - 10, 3, withAlpha(palette.red.light, 58));
-                bitmap.fillRect(x + split + 2, y + 8, width - split - 10, 3, withAlpha(palette.blue.light, 58));
-                bitmap.fillRect(x + 8, y + height - 11, split - 10, 3, withAlpha(palette.red.dark, 46));
-                bitmap.fillRect(x + split + 2, y + height - 11, width - split - 10, 3, withAlpha(palette.blue.dark, 46));
-                bitmap.fillRect(x + 8, y + 8, 3, height - 16, withAlpha(palette.red.light, 34));
-                bitmap.fillRect(x + width - 11, y + 8, 3, height - 16, withAlpha(palette.blue.dark, 38));
-                continue;
-            }
-
-            bitmap.fillRect(x + 8, y + 8, width - 16, 3, withAlpha(colors.light, 50));
-            bitmap.fillRect(x + 8, y + height - 11, width - 16, 3, withAlpha(colors.dark, 46));
-            bitmap.fillRect(x + 8, y + 8, 3, height - 16, withAlpha(colors.light, 30));
-            bitmap.fillRect(x + width - 11, y + 8, 3, height - 16, withAlpha(colors.dark, 34));
-        }
-    }
-}
-
 function drawThinLine(bitmap, x1, y1, x2, y2, thickness, color) {
     if (Math.abs(x1 - x2) < 0.001) {
         const y = Math.min(y1, y2);
@@ -423,62 +272,148 @@ function drawThinLine(bitmap, x1, y1, x2, y2, thickness, color) {
     }
 }
 
-function drawNeonLine(bitmap, x1, y1, x2, y2, colorKey) {
-    const colors = palette[colorKey] ?? palette.universal;
-    drawThinLine(bitmap, x1, y1, x2, y2, 42, withAlpha(colors.ink, 118));
-    drawThinLine(bitmap, x1, y1, x2, y2, 62, withAlpha(colors.neon, 28));
-    drawThinLine(bitmap, x1, y1, x2, y2, 46, withAlpha(colors.neon, 48));
-    drawThinLine(bitmap, x1, y1, x2, y2, 32, withAlpha(colors.neon, 92));
-    drawThinLine(bitmap, x1, y1, x2, y2, 22, withAlpha(colors.neon, 165));
-    drawThinLine(bitmap, x1, y1, x2, y2, 15, withAlpha(colors.neon, 255));
-    drawThinLine(bitmap, x1, y1, x2, y2, 8, withAlpha(colors.core, 245));
-    drawThinLine(bitmap, x1, y1, x2, y2, 3, withAlpha(colors.core, 255));
+function drawSoftCircle(bitmap, cx, cy, radius, color, falloff = 1.65) {
+    const x0 = Math.floor(cx - radius);
+    const y0 = Math.floor(cy - radius);
+    const x1 = Math.ceil(cx + radius);
+    const y1 = Math.ceil(cy + radius);
+
+    for (let y = y0; y <= y1; y += 1) {
+        for (let x = x0; x <= x1; x += 1) {
+            const dx = x - cx;
+            const dy = y - cy;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance > radius) {
+                continue;
+            }
+
+            const alpha = Math.round(color[3] * Math.pow(1 - distance / radius, falloff));
+            if (alpha > 0) {
+                bitmap.setPixel(x, y, [color[0], color[1], color[2], alpha]);
+            }
+        }
+    }
 }
 
-function drawWardNode(bitmap, cx, cy, colorKey) {
+function drawDiamond(bitmap, cx, cy, radius, color) {
+    for (let y = -radius; y <= radius; y += 1) {
+        const halfWidth = radius - Math.abs(y);
+        bitmap.fillRect(cx - halfWidth, cy + y, halfWidth * 2 + 1, 1, color);
+    }
+}
+
+function drawSampledLine(bitmap, x1, y1, x2, y2, radius, color, soft = true) {
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    const steps = Math.max(1, Math.ceil(length / Math.max(1.6, radius * 0.36)));
+
+    for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps;
+        const x = x1 * (1 - t) + x2 * t;
+        const y = y1 * (1 - t) + y2 * t;
+        if (soft) {
+            drawSoftCircle(bitmap, x, y, radius, color);
+        } else {
+            bitmap.fillCircle(x, y, radius, color);
+        }
+    }
+}
+
+function drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, radius, color, soft = true) {
+    const length = Math.hypot(cx - x1, cy - y1) + Math.hypot(x2 - cx, y2 - cy);
+    const steps = Math.max(12, Math.ceil(length / Math.max(1.6, radius * 0.34)));
+
+    for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps;
+        const a = (1 - t) * (1 - t);
+        const b = 2 * (1 - t) * t;
+        const c = t * t;
+        const x = a * x1 + b * cx + c * x2;
+        const y = a * y1 + b * cy + c * y2;
+        if (soft) {
+            drawSoftCircle(bitmap, x, y, radius, color);
+        } else {
+            bitmap.fillCircle(x, y, radius, color);
+        }
+    }
+}
+
+function drawNeonLine(bitmap, x1, y1, x2, y2, colorKey) {
     const colors = palette[colorKey] ?? palette.universal;
-    bitmap.fillCircle(cx, cy, 25, withAlpha(colors.neon, 36));
-    bitmap.fillCircle(cx, cy, 17, withAlpha(colors.neon, 92));
-    bitmap.fillCircle(cx, cy, 10, withAlpha(colors.neon, 210));
-    bitmap.fillCircle(cx, cy, 4, withAlpha(colors.core, 250));
-    drawThinLine(bitmap, cx - 13, cy, cx + 13, cy, 2, withAlpha(colors.core, 150));
-    drawThinLine(bitmap, cx, cy - 13, cx, cy + 13, 2, withAlpha(colors.core, 150));
+    drawSampledLine(bitmap, x1, y1, x2, y2, 28, withAlpha(colors.ink, 132), false);
+    drawSampledLine(bitmap, x1, y1, x2, y2, 42, withAlpha(colors.neon, 38));
+    drawSampledLine(bitmap, x1, y1, x2, y2, 30, withAlpha(colors.neon, 64));
+    drawSampledLine(bitmap, x1, y1, x2, y2, 20, withAlpha(colors.neon, 118));
+    drawSampledLine(bitmap, x1, y1, x2, y2, 13, withAlpha(colors.neon, 236), false);
+    drawSampledLine(bitmap, x1, y1, x2, y2, 7, withAlpha(colors.core, 255), false);
+    drawSampledLine(bitmap, x1, y1, x2, y2, 3, withAlpha(colors.core, 255), false);
+}
+
+function drawNeonCurve(bitmap, x1, y1, cx, cy, x2, y2, colorKey) {
+    const colors = palette[colorKey] ?? palette.universal;
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 28, withAlpha(colors.ink, 132), false);
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 42, withAlpha(colors.neon, 38));
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 30, withAlpha(colors.neon, 64));
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 20, withAlpha(colors.neon, 118));
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 13, withAlpha(colors.neon, 236), false);
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 7, withAlpha(colors.core, 255), false);
+    drawSampledQuadratic(bitmap, x1, y1, cx, cy, x2, y2, 3, withAlpha(colors.core, 255), false);
+}
+
+function drawWardSpark(bitmap, cx, cy, colorKey, scale = 1) {
+    const colors = palette[colorKey] ?? palette.universal;
+    drawSoftCircle(bitmap, cx, cy, 23 * scale, withAlpha(colors.neon, 78));
+    drawDiamond(bitmap, Math.round(cx), Math.round(cy), Math.round(7 * scale), withAlpha(colors.core, 224));
+    drawDiamond(bitmap, Math.round(cx), Math.round(cy), Math.round(4 * scale), withAlpha(colors.core, 255));
+    drawThinLine(bitmap, cx - 17 * scale, cy, cx + 17 * scale, cy, Math.max(1, 2 * scale), withAlpha(colors.core, 160));
+    drawThinLine(bitmap, cx, cy - 17 * scale, cx, cy + 17 * scale, Math.max(1, 2 * scale), withAlpha(colors.core, 160));
 }
 
 function drawStoneGrid(bitmap, seed) {
-    const base = [84, 73, 64, 255];
-    const warm = [112, 94, 74, 255];
-    const cool = [48, 48, 52, 255];
+    const base = [76, 66, 57, 255];
+    const warm = [126, 101, 72, 255];
+    const cool = [39, 40, 45, 255];
+    const panelWarm = [96, 80, 64, 255];
 
     for (let y = 0; y < TILE_SIZE; y += 1) {
         const t = y / (TILE_SIZE - 1);
-        bitmap.fillRect(0, y, TILE_SIZE, 1, mix(base, cool, t * 0.4));
+        bitmap.fillRect(0, y, TILE_SIZE, 1, mix(mix(base, panelWarm, 0.18), cool, t * 0.46));
     }
 
-    for (let i = 0; i < 42; i += 1) {
+    for (let i = 0; i < 62; i += 1) {
         const x = (seed * 31 + i * 47) % (TILE_SIZE - 28);
         const y = (seed * 19 + i * 29) % (TILE_SIZE - 28);
-        const size = 3 + ((seed + i * 7) % 8);
-        bitmap.fillRect(x + 14, y + 14, size, size, withAlpha(i % 3 === 0 ? warm : cool, 25 + (i % 4) * 8));
+        const size = 2 + ((seed + i * 7) % 7);
+        bitmap.fillRect(x + 14, y + 14, size, size, withAlpha(i % 3 === 0 ? warm : cool, 18 + (i % 5) * 7));
     }
 
-    for (let line = 28; line < TILE_SIZE - 20; line += 28) {
-        bitmap.fillRect(18, line, TILE_SIZE - 36, 1, [33, 31, 31, 92]);
-        bitmap.fillRect(line, 18, 1, TILE_SIZE - 36, [33, 31, 31, 88]);
+    for (let line = 30; line < TILE_SIZE - 22; line += 28) {
+        bitmap.fillRect(20, line, TILE_SIZE - 40, 1, [26, 25, 25, 84]);
+        bitmap.fillRect(line, 20, 1, TILE_SIZE - 40, [26, 25, 25, 80]);
+        bitmap.fillRect(20, line + 1, TILE_SIZE - 40, 1, [137, 113, 82, 22]);
+        bitmap.fillRect(line + 1, 20, 1, TILE_SIZE - 40, [137, 113, 82, 20]);
     }
 
     const bounds = [0, 85, 171, 256];
     for (let index = 1; index < 3; index += 1) {
         const point = bounds[index];
-        bitmap.fillRect(18, point - 1, TILE_SIZE - 36, 2, [31, 26, 24, 124]);
-        bitmap.fillRect(point - 1, 18, 2, TILE_SIZE - 36, [31, 26, 24, 124]);
-        bitmap.fillRect(18, point + 1, TILE_SIZE - 36, 1, [148, 125, 92, 54]);
-        bitmap.fillRect(point + 1, 18, 1, TILE_SIZE - 36, [148, 125, 92, 48]);
+        bitmap.fillRect(18, point - 2, TILE_SIZE - 36, 3, [25, 21, 20, 132]);
+        bitmap.fillRect(point - 2, 18, 3, TILE_SIZE - 36, [25, 21, 20, 132]);
+        bitmap.fillRect(18, point + 1, TILE_SIZE - 36, 1, [165, 132, 87, 62]);
+        bitmap.fillRect(point + 1, 18, 1, TILE_SIZE - 36, [165, 132, 87, 58]);
+    }
+
+    for (let inset = 18; inset < 34; inset += 3) {
+        const alpha = 34 - inset;
+        bitmap.fillRect(inset, inset, TILE_SIZE - inset * 2, 1, [196, 155, 94, alpha]);
+        bitmap.fillRect(inset, TILE_SIZE - inset - 1, TILE_SIZE - inset * 2, 1, [12, 11, 12, alpha + 16]);
+        bitmap.fillRect(inset, inset, 1, TILE_SIZE - inset * 2, [196, 155, 94, Math.round(alpha * 0.7)]);
+        bitmap.fillRect(TILE_SIZE - inset - 1, inset, 1, TILE_SIZE - inset * 2, [12, 11, 12, alpha + 12]);
     }
 }
 
 function drawBrassFrame(bitmap, colorKey) {
     const brass = [212, 160, 87, 255];
+    const brassLight = [255, 210, 128, 255];
     const brassDark = [79, 51, 32, 255];
     const shadow = [12, 13, 16, 255];
     const accent = palette[colorKey]?.neon ?? brass;
@@ -491,92 +426,215 @@ function drawBrassFrame(bitmap, colorKey) {
     bitmap.fillRect(8, TILE_SIZE - 12, TILE_SIZE - 16, 4, brassDark);
     bitmap.fillRect(8, 8, 4, TILE_SIZE - 16, brassDark);
     bitmap.fillRect(TILE_SIZE - 12, 8, 4, TILE_SIZE - 16, brassDark);
-    bitmap.fillRect(13, 13, TILE_SIZE - 26, 2, withAlpha(brass, 190));
+    bitmap.fillRect(13, 13, TILE_SIZE - 26, 2, withAlpha(brassLight, 178));
     bitmap.fillRect(13, TILE_SIZE - 15, TILE_SIZE - 26, 2, withAlpha(brass, 116));
-    bitmap.fillRect(13, 13, 2, TILE_SIZE - 26, withAlpha(brass, 116));
-    bitmap.fillRect(TILE_SIZE - 15, 13, 2, TILE_SIZE - 26, withAlpha(brass, 116));
-    bitmap.fillRect(TILE_SIZE / 2 - 5, TILE_SIZE - 12, 10, 10, withAlpha(accent, 180));
-}
+    bitmap.fillRect(13, 13, 2, TILE_SIZE - 26, withAlpha(brass, 124));
+    bitmap.fillRect(TILE_SIZE - 15, 13, 2, TILE_SIZE - 26, withAlpha(brass, 108));
+    bitmap.fillRect(22, 22, TILE_SIZE - 44, 2, withAlpha(brassDark, 130));
+    bitmap.fillRect(22, TILE_SIZE - 24, TILE_SIZE - 44, 2, withAlpha(brassDark, 130));
+    bitmap.fillRect(22, 22, 2, TILE_SIZE - 44, withAlpha(brassDark, 130));
+    bitmap.fillRect(TILE_SIZE - 24, 22, 2, TILE_SIZE - 44, withAlpha(brassDark, 130));
 
-function isActiveSymbol(symbol) {
-    return symbol === 'X' || symbol === '*';
-}
-
-function getCellCenter(col, row) {
-    const bounds = [0, 85, 171, 256];
-
-    return {
-        x: (bounds[col] + bounds[col + 1]) / 2,
-        y: (bounds[row] + bounds[row + 1]) / 2,
-    };
-}
-
-function drawPathForMatrix(bitmap, matrix, colorKey, offsetX = 0) {
-    for (let row = 0; row < 3; row += 1) {
-        for (let col = 0; col < 3; col += 1) {
-            if (!isActiveSymbol(matrix[row][col])) {
-                continue;
-            }
-
-            const center = getCellCenter(col, row);
-            const cx = center.x + offsetX;
-            const cy = center.y;
-
-            if (col < 2 && isActiveSymbol(matrix[row][col + 1])) {
-                const right = getCellCenter(col + 1, row);
-                drawNeonLine(bitmap, cx, cy, right.x + offsetX, right.y, colorKey);
-            }
-
-            if (row < 2 && isActiveSymbol(matrix[row + 1][col])) {
-                const down = getCellCenter(col, row + 1);
-                drawNeonLine(bitmap, cx, cy, down.x + offsetX, down.y, colorKey);
-            }
-
-            if (col === 0) {
-                drawNeonLine(bitmap, 8 + offsetX, cy, cx, cy, colorKey);
-            }
-            if (col === 2) {
-                drawNeonLine(bitmap, cx, cy, TILE_SIZE - 8 + offsetX, cy, colorKey);
-            }
-            if (row === 0) {
-                drawNeonLine(bitmap, cx, 8, cx, cy, colorKey);
-            }
-            if (row === 2) {
-                drawNeonLine(bitmap, cx, cy, cx, TILE_SIZE - 8, colorKey);
-            }
-
-            drawWardNode(bitmap, cx, cy, colorKey);
-        }
+    for (const corner of [[19, 19], [TILE_SIZE - 20, 19], [19, TILE_SIZE - 20], [TILE_SIZE - 20, TILE_SIZE - 20]]) {
+        drawDiamond(bitmap, corner[0], corner[1], 6, withAlpha(brassLight, 135));
+        drawDiamond(bitmap, corner[0], corner[1], 3, withAlpha(brassDark, 160));
     }
+
+    drawDiamond(bitmap, TILE_SIZE / 2, TILE_SIZE - 11, 7, withAlpha(accent, 174));
+    drawDiamond(bitmap, TILE_SIZE / 2, TILE_SIZE - 11, 3, withAlpha(palette[colorKey]?.core ?? brassLight, 210));
+}
+
+const pathPoints = {
+    center: { x: TILE_SIZE / 2, y: TILE_SIZE / 2 },
+    top: { x: TILE_SIZE / 2, y: 9 },
+    right: { x: TILE_SIZE - 9, y: TILE_SIZE / 2 },
+    bottom: { x: TILE_SIZE / 2, y: TILE_SIZE - 9 },
+    left: { x: 9, y: TILE_SIZE / 2 },
+};
+
+function drawWardEndpoints(bitmap, colorKey, exits) {
+    for (const exit of exits) {
+        const point = pathPoints[exit];
+        drawWardSpark(bitmap, point.x, point.y, colorKey, 0.55);
+    }
+}
+
+function drawPathMotifs(bitmap, colorKey, seed) {
+    const colors = palette[colorKey] ?? palette.universal;
+    for (let i = 0; i < 5; i += 1) {
+        const x = 40 + ((seed * 41 + i * 53) % 176);
+        const y = 40 + ((seed * 29 + i * 61) % 176);
+        const alpha = 34 + (i % 2) * 26;
+        drawDiamond(bitmap, x, y, 2 + (i % 2), withAlpha(colors.core, alpha));
+    }
+}
+
+function drawRoundedElbow(bitmap, colorKey, from, to) {
+    const p = pathPoints;
+    const radius = TILE_SIZE * 0.18;
+    const cx = p.center.x;
+    const cy = p.center.y;
+
+    const bend = {
+        top: { x: cx, y: cy - radius },
+        right: { x: cx + radius, y: cy },
+        bottom: { x: cx, y: cy + radius },
+        left: { x: cx - radius, y: cy },
+    };
+
+    drawNeonLine(bitmap, p[from].x, p[from].y, bend[from].x, bend[from].y, colorKey);
+    drawNeonCurve(bitmap, bend[from].x, bend[from].y, cx, cy, bend[to].x, bend[to].y, colorKey);
+    drawNeonLine(bitmap, bend[to].x, bend[to].y, p[to].x, p[to].y, colorKey);
+}
+
+function drawRoundedTee(bitmap, colorKey, trunk, armA, armB) {
+    const p = pathPoints;
+
+    if ((armA === 'left' && armB === 'right') || (armA === 'right' && armB === 'left')) {
+        drawNeonLine(bitmap, p.left.x, p.left.y, p.right.x, p.right.y, colorKey);
+    } else {
+        drawNeonLine(bitmap, p.top.x, p.top.y, p.bottom.x, p.bottom.y, colorKey);
+    }
+
+    drawRoundedElbow(bitmap, colorKey, trunk, armA);
+    drawRoundedElbow(bitmap, colorKey, trunk, armB);
+}
+
+function drawUniversalGradientColumn(bitmap) {
+    const p = pathPoints;
+    const red = palette.red;
+    const blue = palette.blue;
+    const violet = [190, 83, 255, 255];
+    const gold = [245, 198, 116, 255];
+    const white = [255, 244, 220, 255];
+    const cx = p.center.x;
+    const y1 = p.top.y;
+    const y2 = p.bottom.y;
+
+    const drawBand = (radius, alpha, brighten = 0) => {
+        const x0 = Math.floor(cx - radius);
+        const x1 = Math.ceil(cx + radius);
+        for (let y = Math.floor(y1); y <= Math.ceil(y2); y += 1) {
+            for (let x = x0; x <= x1; x += 1) {
+                const dx = Math.abs(x - cx) / radius;
+                if (dx > 1) {
+                    continue;
+                }
+
+                const side = (x - (cx - radius)) / (radius * 2);
+                const sideColor = side < 0.5
+                    ? mix(red.neon, violet, side * 2)
+                    : mix(violet, blue.neon, (side - 0.5) * 2);
+                const centerGlow = Math.max(0, 1 - Math.abs(side - 0.5) * 4);
+                const color = mix(sideColor, brighten > 0.5 ? white : gold, centerGlow * brighten);
+                const falloff = Math.pow(1 - dx, 1.35);
+                bitmap.setPixel(x, y, withAlpha(color, Math.round(alpha * falloff)));
+            }
+        }
+    };
+
+    drawBand(50, 34, 0.08);
+    drawBand(36, 72, 0.1);
+    drawBand(25, 136, 0.14);
+    drawBand(18, 220, 0.2);
+    drawBand(9, 225, 0.42);
+
+    drawThinLine(bitmap, cx, y1 + 14, cx, y2 - 14, 2, withAlpha(gold, 132));
+    drawThinLine(bitmap, cx - 15, y1, cx - 15, y2, 5, withAlpha(red.core, 206));
+    drawThinLine(bitmap, cx + 15, y1, cx + 15, y2, 5, withAlpha(blue.core, 226));
+    drawThinLine(bitmap, cx - 19, y1 + 4, cx - 19, y2 - 4, 2, withAlpha(red.neon, 160));
+    drawThinLine(bitmap, cx + 19, y1 + 4, cx + 19, y2 - 4, 2, withAlpha(blue.neon, 180));
+    drawWardSpark(bitmap, cx - 14, y1, 'red', 0.5);
+    drawWardSpark(bitmap, cx + 14, y1, 'blue', 0.5);
+    drawWardSpark(bitmap, cx - 14, y2, 'red', 0.5);
+    drawWardSpark(bitmap, cx + 14, y2, 'blue', 0.5);
+}
+
+function drawWardPath(bitmap, colorKey, pattern, seed) {
+    const p = pathPoints;
+
+    if (pattern === 'line_h') {
+        drawNeonLine(bitmap, p.left.x, p.left.y, p.right.x, p.right.y, colorKey);
+        drawWardEndpoints(bitmap, colorKey, ['left', 'right']);
+    } else if (pattern === 'line_v') {
+        drawNeonLine(bitmap, p.top.x, p.top.y, p.bottom.x, p.bottom.y, colorKey);
+        drawWardEndpoints(bitmap, colorKey, ['top', 'bottom']);
+    } else if (pattern === 'corner_ur') {
+        drawRoundedElbow(bitmap, colorKey, 'top', 'right');
+        drawWardEndpoints(bitmap, colorKey, ['top', 'right']);
+    } else if (pattern === 'corner_rd') {
+        drawRoundedElbow(bitmap, colorKey, 'right', 'bottom');
+        drawWardEndpoints(bitmap, colorKey, ['right', 'bottom']);
+    } else if (pattern === 'corner_dl') {
+        drawRoundedElbow(bitmap, colorKey, 'bottom', 'left');
+        drawWardEndpoints(bitmap, colorKey, ['bottom', 'left']);
+    } else if (pattern === 'corner_lu') {
+        drawRoundedElbow(bitmap, colorKey, 'left', 'top');
+        drawWardEndpoints(bitmap, colorKey, ['left', 'top']);
+    } else if (pattern === 'tee_u') {
+        drawRoundedTee(bitmap, colorKey, 'top', 'left', 'right');
+        drawWardEndpoints(bitmap, colorKey, ['left', 'right', 'top']);
+    } else if (pattern === 'tee_r') {
+        drawRoundedTee(bitmap, colorKey, 'right', 'top', 'bottom');
+        drawWardEndpoints(bitmap, colorKey, ['top', 'bottom', 'right']);
+    } else if (pattern === 'tee_d') {
+        drawRoundedTee(bitmap, colorKey, 'bottom', 'left', 'right');
+        drawWardEndpoints(bitmap, colorKey, ['left', 'right', 'bottom']);
+    } else if (pattern === 'tee_l') {
+        drawRoundedTee(bitmap, colorKey, 'left', 'top', 'bottom');
+        drawWardEndpoints(bitmap, colorKey, ['top', 'bottom', 'left']);
+    } else if (pattern === 'plus') {
+        drawNeonLine(bitmap, p.left.x, p.left.y, p.right.x, p.right.y, colorKey);
+        drawNeonLine(bitmap, p.top.x, p.top.y, p.bottom.x, p.bottom.y, colorKey);
+        drawWardEndpoints(bitmap, colorKey, ['left', 'right', 'top', 'bottom']);
+    } else if (pattern === 'universal_line_v') {
+        drawUniversalGradientColumn(bitmap);
+    }
+
+    drawWardSpark(bitmap, p.center.x, p.center.y, pattern === 'universal_line_v' ? 'universal' : colorKey, pattern === 'line_h' || pattern === 'line_v' ? 0.72 : 0.9);
+    drawPathMotifs(bitmap, pattern === 'universal_line_v' ? 'universal' : colorKey, seed);
 }
 
 function drawCompassRune(bitmap, colorKey) {
     const colors = palette[colorKey] ?? palette.universal;
     const cx = TILE_SIZE / 2;
     const cy = TILE_SIZE / 2;
-    bitmap.fillCircle(cx, cy, 15, withAlpha(colors.neon, 30));
-    drawThinLine(bitmap, cx - 18, cy, cx + 18, cy, 2, withAlpha(colors.core, 118));
-    drawThinLine(bitmap, cx, cy - 18, cx, cy + 18, 2, withAlpha(colors.core, 118));
-    bitmap.fillRect(cx - 4, cy - 4, 8, 8, withAlpha(colors.core, 170));
+    bitmap.fillCircle(cx, cy, 19, withAlpha(colors.neon, 24));
+    drawThinLine(bitmap, cx - 22, cy, cx + 22, cy, 2, withAlpha(colors.core, 92));
+    drawThinLine(bitmap, cx, cy - 22, cx, cy + 22, 2, withAlpha(colors.core, 92));
+    drawDiamond(bitmap, cx, cy, 5, withAlpha(colors.core, 145));
 }
 
-function drawTile(matrix, colorKey, seed = 0) {
+function drawGraySeal(bitmap, seed) {
+    const cx = TILE_SIZE / 2;
+    const cy = TILE_SIZE / 2;
+    bitmap.fillCircle(cx, cy, 27, [196, 166, 116, 20]);
+    bitmap.fillCircle(cx, cy, 16, [221, 190, 135, 26]);
+    drawThinLine(bitmap, cx - 24, cy, cx + 24, cy, 2, [186, 152, 102, 54]);
+    drawThinLine(bitmap, cx, cy - 24, cx, cy + 24, 2, [186, 152, 102, 54]);
+    for (let i = 0; i < 6; i += 1) {
+        const x = 42 + ((seed * 37 + i * 31) % 172);
+        const y = 38 + ((seed * 17 + i * 47) % 180);
+        bitmap.fillRect(x, y, 3, 3, [170, 139, 92, 34]);
+    }
+}
+
+function drawTile(matrix, colorKey, seed = 0, pattern = '') {
     const bitmap = new Bitmap(TILE_SIZE, TILE_SIZE);
 
     drawStoneGrid(bitmap, seed);
 
     if (colorKey === 'universal') {
-        drawPathForMatrix(bitmap, matrix, 'red', -5);
-        drawPathForMatrix(bitmap, matrix, 'blue', 5);
-        drawThinLine(bitmap, TILE_SIZE / 2, 20, TILE_SIZE / 2, TILE_SIZE - 20, 2, [235, 195, 116, 168]);
-        drawCompassRune(bitmap, 'universal');
+        drawWardPath(bitmap, colorKey, pattern, seed);
     } else if (colorKey !== 'gray') {
-        drawPathForMatrix(bitmap, matrix, colorKey);
-        drawCompassRune(bitmap, colorKey);
+        drawWardPath(bitmap, colorKey, pattern, seed);
     } else {
-        bitmap.fillCircle(TILE_SIZE / 2, TILE_SIZE / 2, 19, [190, 168, 126, 28]);
+        drawGraySeal(bitmap, seed);
     }
 
+    if (colorKey !== 'gray') {
+        drawCompassRune(bitmap, colorKey);
+    }
     drawBrassFrame(bitmap, colorKey);
 
     return bitmap;
@@ -779,11 +837,11 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const entries = buildEntries().map((entry, index) => ({
     ...entry,
-    bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? index + 1),
+    bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? index + 1, entry.pattern),
 }));
 const specialEntries = buildSpecialEntries().map((entry, index) => ({
     ...entry,
-    bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? entries.length + index + 1),
+    bitmap: drawTile(entry.matrix, entry.color, entry.variantSeed ?? entries.length + index + 1, entry.pattern),
 }));
 
 for (const entry of entries) {

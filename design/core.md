@@ -27,10 +27,10 @@ The player should feel:
 Current implemented loop:
 
 ```text
-menu -> battle -> result -> upgrades -> next battle -> final
+menu -> battle intro -> battle -> result -> shop -> next battle intro -> final
 ```
 
-The `upgrades` scene is still the old simple reward choice. The planned MVP path will replace it with monster intro and card shop tasks from `todo/tasks.md`.
+After a non-final victory, the old simple reward choice is replaced by the card shop. The player can buy zero or more cards before continuing to the next monster intro.
 
 After 5 victories, the player receives the final run victory. On defeat, the run ends.
 
@@ -125,7 +125,7 @@ Clarification rules:
 - placed cells inside a closed boundary count as interior for the evaluated color;
 - visual captured fill does not change tile topology.
 
-Active `legacy` converts closure damage to hearts. The first monster has 3 hearts, a minimal 2x2 closure deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`.
+Active `legacy` converts closure damage to hearts. Early monsters have 3 hearts, the tuned final battle has `enemyHp: 4`, a minimal 2x2 closure deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`.
 
 The underlying configured formula remains:
 
@@ -137,7 +137,7 @@ grayInteriorBonus = gray interior cells * grayInteriorBonus.bonusPerCell
 
 ## Resources
 
-Gold is currently battle income and future shop currency:
+Gold is battle income and shop currency:
 
 - a run starts at 0 gold;
 - each closed zone gives `+1 gold`;
@@ -146,7 +146,7 @@ Gold is currently battle income and future shop currency:
 - field hearts heal only through closure and are capped by `hearts.maxPlayerHp`;
 - monster victory pays `battle.reward` from `configs/levels.json` once as kill bounty.
 
-Gold spending is not implemented yet. Buyable card design lives in `design/card-pool.md`; the shop implementation lives later in `todo/tasks.md`.
+The shop generates 5 offers from `configs/cards.json`, respecting card rarity, offer weight, active colors, unlock battle and max-per-shop caps. Bought cards spend gold immediately and go to discard while also increasing the persistent deck.
 
 ## Variants
 
@@ -162,13 +162,13 @@ The code keeps archived/test variants behind one switch:
 
 ## Between Battles
 
-Current implemented rewards are still simple:
+Current implemented progression is the card shop:
 
-- add a tile;
-- remove a tile;
-- increase a combat color multiplier.
-
-Add/boost rewards respect active combat colors, so early active rewards do not reintroduce green. The planned shop will replace this normal path after the card catalog and shop tasks are implemented.
+- card offers are generated from the validated catalog;
+- the player may buy any number they can afford, or skip;
+- ordinary cards add their tile id to the deck and discard pile;
+- enabled special cards, currently `joker_line_v`, add their special tile id to the deck and discard pile;
+- bought cards are marked `balanceStatus: "unverified"` until a separate balance pass keeps, nerfs or disables the family.
 
 ## Art Fantasy
 
@@ -185,8 +185,8 @@ Detailed art direction lives in `design/art-direction.md`. Accepted style refere
 ## Not Doing Yet
 
 - Deep permanent meta-progression.
-- Full card shop and buyable special cards.
-- Final monster intro presentation.
+- Shop reroll, removal service and other shop services.
+- Balanced/approved final card pool.
 - Full art replacement through the MVP art manifest.
 - Manual rotation as a default rule.
 - Reintroducing green, gray blank or plus into the active starting deck without a separate decision.

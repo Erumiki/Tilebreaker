@@ -14,13 +14,21 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Between-battle progression becomes a gold card shop
+
+**Context:** Battles now pay closure gold, field resources and monster bounties, and the card catalog is validated data. The old `1 of 3` free upgrade screen no longer fits the deck-building loop.
+
+**Decision:** Replace the normal post-victory upgrade route with a `shop` scene. Each non-final victory generates 5 offers from `configs/cards.json` for the next battle, using rarity weights, card offer weights, active colors, unlock battle and `maxPerShop`. The player can buy zero or more affordable cards, and each purchase spends gold immediately and adds the bought tile or special tile to the persistent deck and discard pile.
+
+**Rationale:** Gold now has a clear between-battle sink without hardcoding reward families in scene code. Sending buys to discard preserves the existing deck accounting tempo, while `balanceStatus: "unverified"` keeps bought cards visibly provisional until the separate card-balance pass approves each family.
+
 ### 2026-05-09 - Card catalog becomes validated data before shop UI
 
 **Context:** Gold and monster bounty now exist, but between-battle spending still needs a stable data source before replacing the old upgrade screen.
 
-**Decision:** Add `configs/cards.json` as the source of truth for future shop offers. The catalog defines offer count, rarity weights, active red/blue shop colors, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special-card definition and explicitly staged joker/double candidates. `src/entities/cards.js` validates the catalog during config load, checks enabled tile/special/asset references and exposes enabled-offer filtering plus special tile extraction for later shop work.
+**Decision:** Add `configs/cards.json` as the source of truth for shop offers. The catalog defines offer count, rarity weights, active red/blue shop colors, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special-card definition and explicitly staged joker/double candidates. `src/entities/cards.js` validates the catalog during config load, checks enabled tile/special/asset references and exposes enabled-offer filtering plus special tile extraction for the shop.
 
-**Rationale:** This lets the next shop task consume data instead of hardcoding prices or offer families in a scene. Keeping stronger joker/double cards staged protects the closure puzzle while making the planned control-card direction concrete and testable.
+**Rationale:** This lets the shop consume data instead of hardcoding prices or offer families in a scene. Keeping stronger joker/double cards staged protects the closure puzzle while making the planned control-card direction concrete and testable.
 
 ### 2026-05-09 - Field resources and kill bounty extend battle economy
 
@@ -34,7 +42,7 @@ Important decisions are recorded with date and rationale so any team member or C
 
 **Context:** The active Core 1 loop needs a readable beat before each battle so the player sees the incoming monster, hearts, danger and pending reward before the board appears.
 
-**Decision:** Add a standalone `battleIntro` scene between menu/upgrades and battle. It reads the current `configs/levels.json` battle data, uses `assets/art_mvp` intro/backdrop/monster placeholder ids with drawn fallbacks and exposes `getBattleIntroDebug()`. The intro has one action, `Битва`, and does not create tile-battle state.
+**Decision:** Add a standalone `battleIntro` scene between menu/shop progression and battle. It reads the current `configs/levels.json` battle data, uses `assets/art_mvp` intro/backdrop/monster placeholder ids with drawn fallbacks and exposes `getBattleIntroDebug()`. The intro has one action, `Битва`, and does not create tile-battle state.
 
 **Rationale:** A separate scene strengthens the first-minute fantasy without touching combat rules or deck accounting. The later battle-economy task now pays the previewed bounty on victory.
 

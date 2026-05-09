@@ -18,7 +18,7 @@ Bugs in game code that need to be fixed. Configs and documentation may already b
 
 ### ~~[2026-05-09] Art-backed board cells made valid placement hints unreadable~~ FIXED
 
-**Status:** fixed in `src/scenes/battle.js`: valid/invalid placement hints now render as a separate overlay with corner markers and hover border above the board-cell art, so the stone underlay can stay quiet without hiding clickable cells.
+**Status:** fixed in `src/scenes/battle.js`: valid placement hover now renders a transparent preview of the selected card above the board-cell art, while invalid hover renders the attempted card footprint with a red X overlay. The stone underlay can stay quiet without making legal and illegal cells look the same.
 
 ---
 

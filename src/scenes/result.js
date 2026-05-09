@@ -79,8 +79,8 @@ export function createBattleResultScene({
                 ? `Все ${result.totalBattles} битв пройдены`
                 : isDefeat
                     ? `Забег закончился на битве ${result.battleNumber}`
-                    : 'Открылся этап улучшений';
-            const label = isRunVictory || isDefeat ? 'В меню' : 'К улучшениям';
+                    : 'Открылся магазин карт';
+            const label = isRunVictory || isDefeat ? 'В меню' : 'В магазин';
             const screenRect = {
                 x: 0,
                 y: 0,

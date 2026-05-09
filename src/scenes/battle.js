@@ -213,31 +213,60 @@ function drawCornerMarkers(ui, rect, color, options = {}) {
     ui.drawRect({ x: right - thickness, y: bottom - length, width: thickness, height: length }, color, alpha);
 }
 
-function drawPlacementHint(ui, rect, { valid, hovered }) {
+function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
     const color = valid ? '#d6a05c' : '#ff7b83';
     const fill = valid ? '#d6a05c' : '#ff4f5f';
-    const alpha = valid
-        ? hovered ? 0.72 : 0.24
-        : hovered ? 0.95 : 0.58;
     const inset = Math.max(3, Math.floor(rect.width * 0.065));
+    const overlayId = valid ? 'overlay_valid_cell' : 'overlay_invalid_cell';
 
     ui.drawRect(insetRect(rect, inset), fill, valid
-        ? hovered ? 0.1 : 0.025
-        : hovered ? 0.14 : 0.07);
-    drawCornerMarkers(ui, rect, color, {
-        alpha,
-        thickness: valid
-            ? hovered ? Math.max(2, Math.floor(rect.width * 0.04)) : Math.max(1, Math.floor(rect.width * 0.025))
-            : hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
-        length: valid
-            ? hovered ? Math.max(10, Math.floor(rect.width * 0.24)) : Math.max(7, Math.floor(rect.width * 0.16))
-            : hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
-        inset,
+        ? hovered ? 0.08 : 0.025
+        : hovered ? 0.18 : 0.08);
+    const drewOverlay = drawArtImage(ui, artTextures, overlayId, insetRect(rect, Math.max(2, inset * 0.5)), {
+        alpha: valid
+            ? hovered ? 0.38 : 0.22
+            : hovered ? 0.94 : 0.55,
+        fit: 'stretch',
     });
 
-    if (hovered) {
-        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.035))), color, 2, valid ? 0.45 : 0.72);
+    if (!drewOverlay) {
+        drawCornerMarkers(ui, rect, color, {
+            alpha: valid ? hovered ? 0.78 : 0.28 : hovered ? 1 : 0.72,
+            thickness: valid
+                ? hovered ? Math.max(2, Math.floor(rect.width * 0.04)) : Math.max(1, Math.floor(rect.width * 0.025))
+                : hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
+            length: valid
+                ? hovered ? Math.max(10, Math.floor(rect.width * 0.24)) : Math.max(7, Math.floor(rect.width * 0.16))
+                : hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
+            inset,
+        });
     }
+
+    if (hovered && !drewOverlay) {
+        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.035))), color, 2, valid ? 0.45 : 0.72);
+
+        if (!valid) {
+            ui.drawText('X', rect.x + rect.width / 2, rect.y + rect.height * 0.08, {
+                align: 'center',
+                size: Math.max(32, rect.width * 0.72),
+                color: '#ff9aa0',
+                weight: 700,
+            });
+        }
+    }
+}
+
+function drawPlacementPreview(ui, rect, tileDef, settings, tileTextures) {
+    const previewRect = insetRect(rect, Math.max(5, Math.floor(rect.width * 0.075)));
+
+    ui.drawRect(insetRect(rect, Math.max(3, Math.floor(rect.width * 0.055))), '#f5d58a', 0.08);
+    drawTile(ui, tileDef, previewRect, {
+        oneColorLand: isOneColorLandVariant(settings),
+        tileTextures,
+        alpha: 0.54,
+        background: '#2b251f',
+    });
+    drawBorder(ui, previewRect, '#f6d88a', Math.max(1, Math.floor(rect.width * 0.025)), 0.48);
 }
 
 function getBattleAssetId(prefix, battle) {
@@ -277,8 +306,24 @@ function getZoneFilledOverlayAssetId(color, settings) {
 
 function drawZoneFilledCell(ui, rect, color, settings) {
     const inset = Math.max(1, rect.width * 0.08);
+    const fill = getColorHex(color, settings);
+    const inner = insetRect(rect, inset);
+    const gleamThickness = Math.max(1, rect.width * 0.035);
 
-    ui.drawRect(insetRect(rect, inset), getColorHex(color, settings), 0.08);
+    ui.drawRect(inner, fill, 0.14);
+    drawBorder(ui, inner, fill, gleamThickness, 0.18);
+    ui.drawRect({
+        x: inner.x + inner.width * 0.18,
+        y: inner.y + inner.height * 0.48,
+        width: inner.width * 0.64,
+        height: gleamThickness,
+    }, '#fff0c2', 0.08);
+    ui.drawRect({
+        x: inner.x + inner.width * 0.48,
+        y: inner.y + inner.height * 0.18,
+        width: gleamThickness,
+        height: inner.height * 0.64,
+    }, '#fff0c2', 0.065);
 }
 
 function getZoneTileBounds(layout, cells) {
@@ -314,7 +359,7 @@ function drawZoneFilledSeal(ui, artTextures, layout, microSize, zone, settings) 
         height: bounds.height - layout.cellSize * 0.1,
     };
 
-    drawArtImage(ui, artTextures, assetId, sealRect, { alpha: 0.3, fit: 'stretch' });
+    drawArtImage(ui, artTextures, assetId, sealRect, { alpha: 0.42, fit: 'stretch' });
     drawArtImage(ui, artTextures, 'effect_capture_flash', sealRect, {
         alpha: 0.82,
         fit: 'stretch',
@@ -554,7 +599,6 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                 && canPlaceTile(state.board, selectedTile, x, y, settings);
             const isInvalidHovered = canShowPlacementHints
                 && isHovered
-                && isEmpty
                 && !isValid;
             const fill = isValid
                 ? isHovered ? '#31566b' : '#203748'
@@ -565,6 +609,7 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
 
             const cellAssetId = isHovered
                 ? isInvalidHovered ? 'board_cell_invalid' : 'board_cell_hover'
+                : isValid ? 'board_cell_valid'
                 : 'board_cell_empty';
             if (!drawArtImage(ui, artTextures, cellAssetId, rect, { alpha: 1 })) {
                 ui.drawRect(rect, fill, 1);
@@ -621,12 +666,18 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                 drawPlacementHint(ui, rect, {
                     valid: true,
                     hovered: isHovered,
+                    artTextures,
                 });
             } else if (isInvalidHovered) {
                 drawPlacementHint(ui, rect, {
                     valid: false,
                     hovered: true,
+                    artTextures,
                 });
+            }
+
+            if (isEmpty && isValid && isHovered) {
+                drawPlacementPreview(ui, rect, selectedTile, settings, tileTextures);
             }
 
             const targets = state.connectTargets;
@@ -1667,6 +1718,18 @@ export function createBattleScene({
                     strike: 'icon_strike',
                     fieldGold: 'icon_gold',
                     fieldHeart: 'icon_heart_full',
+                    boardCells: {
+                        empty: 'board_cell_empty',
+                        hover: 'board_cell_hover',
+                        valid: 'board_cell_valid',
+                        invalid: 'board_cell_invalid',
+                        scored: 'board_cell_scored',
+                    },
+                    placementHints: {
+                        valid: 'overlay_valid_cell',
+                        invalid: 'overlay_invalid_cell',
+                        hoverTile: 'overlay_hover_tile',
+                    },
                 },
                 gold: run.gold ?? 0,
                 maxPlayerHp: run.maxPlayerHp ?? settings.hearts?.maxPlayerHp ?? settings.startingPlayerHp ?? null,

@@ -100,7 +100,7 @@ During the game jam, every new idea and decision passes through three roles:
 When starting any new feature, balance iteration, major UI change or any task from `todo/tasks.md` that affects gameplay, the core loop, UX, economy, draw rules, scoring or the playable build, Codex acts as **lead** and starts at least two background agents:
 
 - **Game Design Agent** - checks whether the solution actually plays: clear turn fantasy, risk/reward, readable action result, connection to the core loop, and whether the first 3-minute experience avoids becoming a dry rules check.
-- **Developer Simplifier** - keeps implementation from becoming too complex: cuts extra systems, catches premature abstractions, proposes the shortest path to acceptance, and protects the loop `menu -> intro -> battle -> result -> upgrade -> intro -> next battle -> final`.
+- **Developer Simplifier** - keeps implementation from becoming too complex: cuts extra systems, catches premature abstractions, proposes the shortest path to acceptance, and protects the loop `menu -> battleIntro -> battle -> result -> shop -> battleIntro -> next battle -> final`.
 - **Lead Codex** - owns the task, accepts or rejects agent advice, integrates the final decision, verifies the build and is accountable to the user for the outcome.
 
 Optional focused agents for tasks that need them:
@@ -162,7 +162,7 @@ If background agents participated in the work, before the final answer gather th
 - If a task does not improve the first 3-minute player experience, it must prove its value separately.
 - Every workday should end with a clickable build.
 - Do not leave the main loop in a broken state.
-- Until the loop `menu -> intro -> battle -> result -> upgrade -> intro -> next battle -> final` works, do not add new modes, deep meta or large parallel systems.
+- Until the loop `menu -> battleIntro -> battle -> result -> shop -> battleIntro -> next battle -> final` works, do not add new modes, deep meta or large parallel systems.
 - The only task list, work order, next work item and completion status live in `todo/tasks.md`.
 - Choose the next task only from `todo/tasks.md`: the first non-struck heading from top to bottom.
 - `todo/current.md` is only a snapshot of the current version and design context. Do not store the task list, build order, next task, acceptance or task statuses in it.

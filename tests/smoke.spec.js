@@ -28,31 +28,64 @@ async function expectScene(page, name) {
 }
 
 async function getBattleDebug(page) {
-  await expect.poll(() => page.evaluate(() => {
-    const debug = window.__tilebreakerDebug?.getBattleDebug?.();
-    return Boolean(debug?.layout);
-  })).toBe(true);
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(() => {
+        const debug = window.__tilebreakerDebug?.getBattleDebug?.();
+        return Boolean(debug?.layout);
+      });
+    } catch {
+      return false;
+    }
+  }).toBe(true);
 
   return page.evaluate(() => window.__tilebreakerDebug.getBattleDebug());
 }
 
 async function getBattleIntroDebug(page) {
-  await expect.poll(() => page.evaluate(() => {
-    const debug = window.__tilebreakerDebug?.getBattleIntroDebug?.();
-    return Boolean(debug?.layout?.primaryButton?.width);
-  })).toBe(true);
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(() => {
+        const debug = window.__tilebreakerDebug?.getBattleIntroDebug?.();
+        return Boolean(debug?.layout?.primaryButton?.width);
+      });
+    } catch {
+      return false;
+    }
+  }).toBe(true);
 
   return page.evaluate(() => window.__tilebreakerDebug.getBattleIntroDebug());
 }
 
+async function getShopDebug(page) {
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(() => {
+        const debug = window.__tilebreakerDebug?.getShopDebug?.();
+        return Boolean(debug?.layout?.continueButton?.width && debug?.offers?.length);
+      });
+    } catch {
+      return false;
+    }
+  }).toBe(true);
+
+  return page.evaluate(() => window.__tilebreakerDebug.getShopDebug());
+}
+
 async function getMainMenuDebug(page) {
-  await expect.poll(() => page.evaluate(() => {
-    const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
-    return Boolean(
-      debug?.layout?.startButton?.width
-      && debug?.layout?.variants?.length,
-    );
-  })).toBe(true);
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate(() => {
+        const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
+        return Boolean(
+          debug?.layout?.startButton?.width
+          && debug?.layout?.variants?.length,
+        );
+      });
+    } catch {
+      return false;
+    }
+  }).toBe(true);
 
   return page.evaluate(() => window.__tilebreakerDebug.getMainMenuDebug());
 }
@@ -113,7 +146,64 @@ async function enterBattleFromIntro(page) {
   return introDebug;
 }
 
+async function buyAffordableShopOffers(page, maxBuys) {
+  let bought = 0;
+
+  for (let attempt = 0; attempt < maxBuys; attempt += 1) {
+    let debug = await getShopDebug(page);
+    const index = debug.offers.findIndex((offer) => offer.affordable && !offer.bought);
+
+    if (index < 0) {
+      break;
+    }
+
+    const offer = debug.offers[index];
+    const goldBefore = debug.shop.goldAfter;
+    const deckBefore = debug.deck.deck;
+    await clickRect(page, debug.layout.offers[index]);
+    await expect.poll(() => page.evaluate((offerId) => {
+      const shop = window.__tilebreakerDebug.getShopDebug();
+      return shop.offers.find((candidate) => candidate.offerId === offerId)?.bought;
+    }, offer.offerId)).toBe(true);
+
+    debug = await getShopDebug(page);
+    expect(debug.shop.goldAfter).toBe(goldBefore - offer.cost);
+    expect(debug.deck.deck).toBe(deckBefore + 1);
+    expect(debug.boughtCards.at(-1)).toEqual(expect.objectContaining({
+      cardId: offer.cardId,
+      cost: offer.cost,
+      balanceStatus: 'unverified',
+    }));
+    bought += 1;
+  }
+
+  return bought;
+}
+
+async function continueFromShop(page, { maxBuys = 0 } = {}) {
+  await expectScene(page, 'shop');
+  let shopDebug = await getShopDebug(page);
+
+  expect(shopDebug.offers).toHaveLength(5);
+  expect(shopDebug.offers.every((offer) => offer.balanceStatus === 'unverified')).toBe(true);
+  expect(shopDebug.offers.every((offer) => offer.cardId.startsWith('card_'))).toBe(true);
+
+  if (maxBuys > 0) {
+    await buyAffordableShopOffers(page, maxBuys);
+    shopDebug = await getShopDebug(page);
+  }
+
+  await clickRect(page, shopDebug.layout.continueButton);
+  await expectScene(page, 'battleIntro');
+  return getBattleIntroDebug(page);
+}
+
 async function placeHandIndex(page, handIndex, cellX, cellY) {
+  const sceneBefore = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+  if (sceneBefore !== 'battle') {
+    return false;
+  }
+
   let debug = await getBattleDebug(page);
   const placedBefore = debug.placedCount;
   await clickRect(page, debug.layout.hand[handIndex]);
@@ -127,12 +217,19 @@ async function placeHandIndex(page, handIndex, cellX, cellY) {
   );
   await page.waitForTimeout(50);
 
+  const sceneAfter = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+  if (sceneAfter !== 'battle') {
+    return true;
+  }
+
   debug = await getBattleDebug(page);
   if (debug.lastResult?.lastClosureImmediate) {
     expect(debug.lastResult.closedZones).toBeGreaterThan(0);
   } else {
     expect(debug.placedCount).toBe(placedBefore + 1);
   }
+
+  return true;
 }
 
 async function placeCurrentQueueTile(page) {
@@ -220,10 +317,24 @@ async function playClosureIfAvailable(page) {
     return false;
   }
 
-  await placeHandIndex(page, indices.corner_rd, origin.x, origin.y);
-  await placeHandIndex(page, indices.corner_dl, origin.x + 1, origin.y);
-  await placeHandIndex(page, indices.corner_ur, origin.x, origin.y + 1);
-  await placeHandIndex(page, indices.corner_lu, origin.x + 1, origin.y + 1);
+  for (const placement of [
+    [indices.corner_rd, origin.x, origin.y],
+    [indices.corner_dl, origin.x + 1, origin.y],
+    [indices.corner_ur, origin.x, origin.y + 1],
+    [indices.corner_lu, origin.x + 1, origin.y + 1],
+  ]) {
+    const placed = await placeHandIndex(page, ...placement);
+
+    if (!placed) {
+      break;
+    }
+
+    const scene = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+    if (scene !== 'battle') {
+      break;
+    }
+  }
+
   return true;
 }
 
@@ -348,6 +459,12 @@ async function playLegacyUntilBattleResult(page) {
   let sawSubmit = false;
 
   for (let turn = 0; turn < 48; turn += 1) {
+    const sceneBeforeTurn = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+    if (sceneBeforeTurn === 'result') {
+      expect(sawDamage).toBe(true);
+      return { sawDamage, sawSubmit };
+    }
+
     let debug = await getBattleDebug(page);
 
     if (debug.outcome) {
@@ -380,11 +497,31 @@ async function playLegacyUntilBattleResult(page) {
       }
     } else {
       await placeFirstValidHandTile(page);
+      const sceneAfterPlacement = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+      if (sceneAfterPlacement === 'result') {
+        expect(sawDamage).toBe(true);
+        return { sawDamage, sawSubmit };
+      }
       debug = await getBattleDebug(page);
 
       if (debug.outcome) {
         continue;
       }
+    }
+
+    const sceneBeforeSubmit = await page.evaluate(() => window.__tilebreakerDebug.getSceneName());
+    if (sceneBeforeSubmit === 'result') {
+      expect(sawDamage).toBe(true);
+      return { sawDamage, sawSubmit };
+    }
+
+    debug = await getBattleDebug(page);
+    if (debug.submitCost?.canPay === false) {
+      const placed = await placeFirstValidHandTile(page);
+      if (!placed) {
+        throw new Error('Last-chance hand had no payable submit and no valid placement');
+      }
+      continue;
     }
 
     await submitLegacyHand(page);
@@ -432,7 +569,7 @@ async function playUntilBattleResult(page) {
 }
 
 test('player can complete the 5-battle prototype loop', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
 
   await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
 
@@ -490,7 +627,26 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     hold: 'icon_hold',
     submit: 'icon_submit',
   }));
+  expect(battleDebug.battleArtIds.boardCells).toEqual({
+    empty: 'board_cell_empty',
+    hover: 'board_cell_hover',
+    valid: 'board_cell_valid',
+    invalid: 'board_cell_invalid',
+    scored: 'board_cell_scored',
+  });
+  expect(battleDebug.battleArtIds.placementHints).toEqual({
+    valid: 'overlay_valid_cell',
+    invalid: 'overlay_invalid_cell',
+    hoverTile: 'overlay_hover_tile',
+  });
   expect(battleDebug.artImageIds).toEqual(expect.arrayContaining([
+    'board_cell_empty',
+    'board_cell_hover',
+    'board_cell_valid',
+    'board_cell_invalid',
+    'board_cell_scored',
+    'overlay_valid_cell',
+    'overlay_invalid_cell',
     'monster_icon_battle_01',
     'monster_icon_battle_02',
     'monster_icon_battle_03',
@@ -524,23 +680,49 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     await clickCanvas(page, 0.5, 0.73);
 
     if (battle < 5) {
-      await expectScene(page, 'upgrades');
-      const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
-      expect(upgradeDebug.upgrades.map((upgrade) => upgrade.type)).toEqual([
-        'add_tile',
-        'remove_tile',
-        'boost_color',
-      ]);
-      await clickRect(page, upgradeDebug.layout.choices[2]);
+      const maxBuys = 0;
+      const boughtBefore = run.purchasedCards?.length ?? 0;
+      const shopIntroDebug = await continueFromShop(page, { maxBuys });
+      expect(shopIntroDebug.battleNumber).toBe(battle + 1);
+      if (maxBuys > 0) {
+        const shoppedRun = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+        expect((shoppedRun.purchasedCards?.length ?? 0) - boughtBefore).toBeGreaterThanOrEqual(1);
+        expect(shoppedRun.shopHistory).toHaveLength(battle);
+      }
       introDebug = await enterBattleFromIntro(page);
       expect(introDebug.battleNumber).toBe(battle + 1);
       const upgradedRun = await page.evaluate(() => window.__tilebreakerDebug.getRun());
-      expect(upgradedRun.upgrades).toHaveLength(battle);
-      expect(Object.values(upgradedRun.colorMultipliers).some((value) => value > 1)).toBe(true);
+      expect(upgradedRun.shopHistory).toHaveLength(battle);
     } else {
       await expectScene(page, 'mainmenu');
     }
   }
+});
+
+test('shop sells an affordable card and continues to the next monster intro', async ({ page }) => {
+  test.setTimeout(60_000);
+
+  await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  await clickRect(page, menuDebug.layout.startButton);
+  await enterBattleFromIntro(page);
+  await playUntilBattleResult(page);
+  await expectScene(page, 'result');
+  await clickCanvas(page, 0.5, 0.73);
+
+  const introDebug = await continueFromShop(page, { maxBuys: 1 });
+  expect(introDebug.battleNumber).toBe(2);
+
+  const run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+  expect(run.purchasedCards).toHaveLength(1);
+  expect(run.shopHistory).toHaveLength(1);
+  expect(run.shopHistory[0].boughtCards).toHaveLength(1);
+  expect(run.deck).toContain(run.purchasedCards[0].tileId);
+  expect(run.discardPile).toContain(run.purchasedCards[0].tileId);
 });
 
 test('player can hold and swap one hand card', async ({ page }) => {
@@ -711,9 +893,7 @@ test('one-color chain variant is playable through the first two battles', async 
     await clickCanvas(page, 0.5, 0.73);
 
     if (battle < 2) {
-      await expectScene(page, 'upgrades');
-      const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
-      await clickRect(page, upgradeDebug.layout.choices[2]);
+      await continueFromShop(page);
       await enterBattleFromIntro(page);
 
       battleDebug = await getBattleDebug(page);
@@ -756,9 +936,7 @@ test('connect-targets variant is playable through the first two battles', async 
     await clickCanvas(page, 0.5, 0.73);
 
     if (battle < 2) {
-      await expectScene(page, 'upgrades');
-      const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
-      await clickRect(page, upgradeDebug.layout.choices[2]);
+      await continueFromShop(page);
       await enterBattleFromIntro(page);
 
       battleDebug = await getBattleDebug(page);

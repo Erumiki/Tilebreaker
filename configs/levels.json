@@ -58,7 +58,7 @@
             "monsterName": "Монарх черного солнца",
             "ante": 3,
             "reward": 8,
-            "enemyHp": 5,
+            "enemyHp": 4,
             "attacks": [
                 { "red": 1, "blue": 1 },
                 { "red": 1, "blue": 1 },

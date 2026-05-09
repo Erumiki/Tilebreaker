@@ -2,9 +2,9 @@
 
 Date: 2026-05-08.
 
-Goal: produce a v2 tile asset pack for the Tilebreaker MVP. Tiles must match the simulation results from `design/tile-feasibility.md`: 3x3 micro-land matrix, strict edge compatibility, large captured areas as the main risk and reward.
+Goal: maintain the active v2 tile asset pack for the Tilebreaker MVP. Tiles must match the current Core 1 Rescue rules from `design/core.md` and the simulation history in `design/tile-feasibility.md`: 3x3 micro-land matrix, strict edge compatibility, boundary contours, immediate closure scoring and readable captured areas.
 
-Current active gameplay uses the v2 pack as a source library, not as a full starting deck. Core 1 Rescue uses a 7x7 board, red/blue active colors, no gray blank in the starting deck, no plus in the starting deck and one board-only universal starter from `configs/game.json`. Green, gray and plus remain in the manifest for tooling, archived variants, future rewards and shop work.
+Current active gameplay uses the v2 pack as a source library, not as a full starting deck. Core 1 Rescue uses a 7x7 board, red/blue active colors, no gray blank in the starting deck, no plus in the starting deck and one board-only universal starter from `configs/game.json`. Green, gray and plus remain in the manifest for tooling, archived variants and buyable shop cards where enabled by `configs/cards.json`.
 
 ## Short Brief For AI Artist
 
@@ -56,7 +56,7 @@ Adjacent tiles are compatible only if their touching edges match across all 3 mi
 - Red, blue, green and gray must not be confused when scaled down.
 - Textures are allowed only if subtle: they should help distinguish lands, not fight the shape.
 - Shadows should be short and UI-like. No long cast shadows.
-- No tiny objects, highlights, heavy gradients, noisy hand-painted lines or decorative frames that make the 3x3 structure harder to read.
+- No tiny objects, harsh highlights, heavy gradients, noisy hand-painted lines or decorative frames that make the 3x3 structure harder to read.
 
 ## Important Concern: Land Or Roads
 
@@ -102,11 +102,11 @@ When a colored boundary fully closes an area, the whole interior is temporarily 
 
 Art consequences:
 
-- current thin `line`, `corner`, `tee` and `plus` shapes are acceptable because they mark the boundary of a future capture;
-- after closure, a separate visual state is needed: captured fill over inner micro-cells;
+- current thin `line`, `corner`, `tee` and `plus` shapes are acceptable because they mark the boundary of a possible capture;
+- after closure, the runtime uses a separate visual state: captured fill over inner micro-cells plus a seal-completion flash;
 - interior fill should be softer/smoother than the original colored boundary so the player can see both contour and captured area;
 - do not manually repaint "orphan" gray corners inside the PNGs until a separate `land mass` decision is made;
-- a future battle-scene preview should show not only tiles in hand, but also the post-capture state, otherwise the land fantasy will be lost.
+- valid placement hover should show a transparent preview of the selected tile, while invalid hover should show the attempted footprint with a red X overlay; neither state should create fake red/blue exits.
 
 ## v2 Decision: Only Connectable Boundaries
 

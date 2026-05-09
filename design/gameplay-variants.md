@@ -40,7 +40,7 @@ Lead position: do not fix all variants at once. The next work slice should be sm
 
 New playtest signal: with a full hand, `legacy` immediately became more playable. This confirms that the problem was not only scoring, but agency: the player needs to see options and plan instead of waiting for the next tile.
 
-Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`; the later hand-submit/immediate-closure/gold loop is implemented; field gold/hearts and monster kill bounty are now implemented for active `legacy`.
+Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`; the later hand-submit/immediate-closure/gold loop is implemented; field gold/hearts, monster kill bounty and the between-battle gold card shop are now implemented for active `legacy`.
 
 ### Next Loop Decision: Сдать Руку, Immediate Closure, Gold
 
@@ -53,7 +53,7 @@ Implemented decisions:
 - pay the cost immediately when the button is pressed, then redeal the hand;
 - remove separate monster attack damage from active Core 1;
 - score closed zones immediately after the placement that closes them;
-- add gold as visible battle income, but only as saved future shop currency;
+- add gold as visible battle income and spend it in the between-battle card shop;
 - add strike as a reward for two or more closures on consecutive valid placements;
 - fill the battle log and debug state from the concrete UIX checklist in `design/signs-and-feedback.md`.
 
@@ -93,13 +93,14 @@ Gold rules for the first implementation pass:
 - field gold can be picked up by placing on it or by sealing it in a closed zone, and is consumed once;
 - field hearts heal only when sealed in a closed zone and respect `hearts.maxPlayerHp`;
 - battle win rewards now pay the configured `battle.reward` once as monster kill bounty;
-- card buying is not implemented yet.
+- between-battle shop offers 5 catalog-driven card buys; bought cards spend gold immediately and go to both deck and discard;
+- bought cards remain marked `balanceStatus: "unverified"` until a separate card-balance pass keeps, nerfs or disables that family.
 
-Later card/shop pass:
+Later shop/card services:
 
-- spend gold between battles on card buys;
-- define shop prices, reroll/remove costs and reward pacing after gold income is visible;
-- revisit card pool, universal red/blue card, rotate tools or double-color cards only after the new closure/submit loop is tested.
+- reroll/remove costs and reward pacing after shop playtest;
+- card-family balance validation for common buys, plus/cross and `joker_line_v`;
+- rotate tools or double-color cards only after the current shop pool is tested.
 
 Card GD / universal starter status 2026-05-09: accepted design lives in `design/card-pool.md`, and the board-only starter is now implemented in active `legacy`.
 
@@ -116,6 +117,7 @@ Implementation status:
 - closed zones score immediately after placement and use the existing scored-tile cleanup;
 - active `legacy` no longer applies separate monster attack damage;
 - run gold starts at 0, closure/strike/field/bounty gold is visible in UI/debug, and field heart healing is logged/debugged;
+- the normal post-victory route is now `result -> shop -> battleIntro`, not the old free upgrade choice;
 - archived variants remain URL-playable on the old `resolveTileRound` path.
 
 Previous implemented hearts slice, now superseded by the `Сдать руку` wording for the next implementation pass:
@@ -137,7 +139,7 @@ Accepted hearts MVP slice before the hand-submit implementation:
 2. A new pick used to cost `1 + floor(unplayed / 4)` hearts, with preview shown before confirmation. The full `Сдать руку` formula above replaces it in active `legacy`.
 3. Minimal matching capture now really hits the monster for 1 heart: equal defense by color counts as enough, instead of requiring strictly beating the threat.
 4. Road-mode remains URL-playable, but its smoke is reduced to launch/gates/first placement because the mode was removed from active rescue comparison.
-5. The next manual playtest should judge the implemented hand-submit/immediate-closure loop before adding shop cards, universal center, rotate or double-color tools.
+5. The next manual playtest should judge the implemented hand-submit/immediate-closure/shop loop before adding rotate or double-color tools.
 
 Risks:
 
@@ -145,7 +147,7 @@ Risks:
 - if hearts are too discrete, large zones may stop feeling richer than a small square;
 - if the unplayed-tile penalty is not visible before the action, it will feel like a hidden trap.
 
-Next playtest criterion: the player understands how many hearts the monster has left, how many hearts they will lose on `Сдать руку`, how much gold closures/strikes earned and can explain victory/defeat by the number of hand submits.
+Next playtest criterion: the player understands how many hearts the monster has left, how many hearts they will lose on `Сдать руку`, how much gold closures/strikes earned, why a shop card is affordable or not, and can explain victory/defeat by the number of hand submits.
 
 ## Launch
 
@@ -273,4 +275,4 @@ For each variant, record next to manual observations:
 
 ## Current Status
 
-The switching scaffold and comparison protocol are ready, but after the manual playtest pass the active choice is narrower. `legacy` as full-hand already feels better, and the hand-submit/immediate-closure/gold loop is implemented to check battle tempo. The card GD pass has chosen the first universal starter semantics and a later shop candidate pool. Core 1 should verify the starter before adding the shop/control-card pool; if the rescue loop still does not come alive, move to the Kingdomino-like spike.
+The switching scaffold and comparison protocol are ready, but after the manual playtest pass the active choice is narrower. `legacy` as full-hand already feels better, and the hand-submit/immediate-closure/gold/shop loop is implemented to check battle tempo. The card GD pass has chosen the universal starter semantics and the current catalog-backed shop pool; the next Core 1 check should validate whether those buys add planning without making closures automatic. If the rescue loop still does not come alive, move to the Kingdomino-like spike.

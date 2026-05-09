@@ -1,4 +1,5 @@
 import { getGameplayVariant } from './gameplayVariants.js';
+import { getEnabledShopCards } from './cards.js';
 
 export const BattleOutcome = {
     Victory: 'victory',
@@ -116,6 +117,61 @@ function pickBoostColor(run, activeColors) {
     return activeColors[(run.completedBattles - 1 + activeColors.length) % activeColors.length];
 }
 
+function getShopBattleNumber(run) {
+    return Math.max(1, (run.completedBattles ?? 0) + 1);
+}
+
+function getCardOfferWeight(card, catalog) {
+    const rarityWeight = catalog.shop?.rarityWeights?.[card.rarity] ?? 1;
+    return Math.max(0, (card.offerWeight ?? 0) * rarityWeight);
+}
+
+function pickWeightedCard(run, candidates, catalog) {
+    const totalWeight = candidates.reduce((sum, card) => (
+        sum + getCardOfferWeight(card, catalog)
+    ), 0);
+
+    if (totalWeight <= 0) {
+        return null;
+    }
+
+    let roll = nextRandom(run) * totalWeight;
+
+    for (const card of candidates) {
+        roll -= getCardOfferWeight(card, catalog);
+
+        if (roll <= 0) {
+            return card;
+        }
+    }
+
+    return candidates.at(-1) ?? null;
+}
+
+function getOfferTileId(offer) {
+    return offer.tileId ?? offer.specialTile?.id ?? null;
+}
+
+function snapshotDeckStats(run) {
+    return {
+        deck: run.deck.length,
+        drawPile: run.drawPile.length,
+        discardPile: run.discardPile.length,
+    };
+}
+
+function createOfferFromCard(card, index) {
+    return {
+        ...card,
+        offerId: `${card.id}_${index + 1}`,
+        cardId: card.id,
+        type: 'shop_card',
+        tileId: card.tileId ?? card.specialTile?.id ?? null,
+        bought: false,
+        balanceStatus: 'unverified',
+    };
+}
+
 export function createRunState({
     totalBattles,
     playerHp,
@@ -133,6 +189,8 @@ export function createRunState({
         maxPlayerHp: settings.hearts?.maxPlayerHp ?? settings.maxPlayerHp ?? playerHp,
         gold: 0,
         bountiesClaimed: [],
+        purchasedCards: [],
+        shopHistory: [],
         gameplayVariant: gameplayVariant.id,
         upgrades: [],
         deck: [...startingDeck],
@@ -274,4 +332,148 @@ export function applyUpgrade(run, upgrade) {
 
     run.upgrades.push(upgrade);
     run.currentBattle = run.completedBattles + 1;
+}
+
+export function createShopState(run, catalog, options = {}) {
+    const battleNumber = Math.max(1, Math.floor(options.battleNumber ?? getShopBattleNumber(run)));
+    const offerCount = Math.max(1, Math.floor(catalog.shop?.offerCount ?? 5));
+    const activeColors = run.activeCombatColors ?? catalog.shop?.activeColors ?? [];
+    const allCandidates = getEnabledShopCards(catalog, {
+        battleNumber,
+        activeColors,
+    }).filter((card) => getCardOfferWeight(card, catalog) > 0 && (card.maxPerShop ?? 0) > 0);
+    const offerCounts = new Map();
+    const offers = [];
+
+    while (offers.length < offerCount) {
+        const candidates = allCandidates.filter((card) => (
+            (offerCounts.get(card.id) ?? 0) < (card.maxPerShop ?? 1)
+        ));
+        const card = pickWeightedCard(run, candidates, catalog);
+
+        if (!card) {
+            break;
+        }
+
+        offerCounts.set(card.id, (offerCounts.get(card.id) ?? 0) + 1);
+        offers.push(createOfferFromCard(card, offers.length));
+    }
+
+    return {
+        id: `shop_after_battle_${run.completedBattles}`,
+        battleNumber,
+        nextBattle: battleNumber,
+        offerCount,
+        offers,
+        boughtCards: [],
+        goldBefore: run.gold ?? 0,
+        goldAfter: run.gold ?? 0,
+        continued: false,
+        balanceStatus: 'unverified',
+    };
+}
+
+export function buyShopOffer(run, shopState, offerId) {
+    const offer = shopState.offers.find((candidate) => candidate.offerId === offerId);
+
+    if (!offer) {
+        return {
+            bought: false,
+            reason: 'unknown_offer',
+        };
+    }
+
+    if (offer.bought) {
+        return {
+            bought: false,
+            reason: 'already_bought',
+            offer,
+        };
+    }
+
+    if ((run.gold ?? 0) < offer.cost) {
+        return {
+            bought: false,
+            reason: 'not_enough_gold',
+            offer,
+            goldBefore: run.gold ?? 0,
+            goldAfter: run.gold ?? 0,
+        };
+    }
+
+    const tileId = getOfferTileId(offer);
+
+    if (!tileId) {
+        return {
+            bought: false,
+            reason: 'unsupported_card',
+            offer,
+        };
+    }
+
+    const goldBefore = run.gold ?? 0;
+    const deckBefore = snapshotDeckStats(run);
+
+    run.gold = goldBefore - offer.cost;
+    run.deck.push(tileId);
+    run.discardPile.push(tileId);
+    run.purchasedCards ??= [];
+
+    const purchase = {
+        offerId: offer.offerId,
+        cardId: offer.cardId,
+        tileId,
+        name: offer.name,
+        cost: offer.cost,
+        rarity: offer.rarity,
+        family: offer.family,
+        battleNumber: shopState.battleNumber,
+        balanceStatus: 'unverified',
+        goldBefore,
+        goldAfter: run.gold,
+        deckBefore,
+        deckAfter: snapshotDeckStats(run),
+    };
+
+    offer.bought = true;
+    shopState.boughtCards.push(purchase);
+    shopState.goldAfter = run.gold;
+    run.purchasedCards.push(purchase);
+
+    return {
+        bought: true,
+        offer,
+        purchase,
+        goldBefore,
+        goldAfter: run.gold,
+    };
+}
+
+export function finishShop(run, shopState) {
+    run.currentBattle = run.completedBattles + 1;
+    shopState.continued = true;
+    shopState.goldAfter = run.gold ?? 0;
+    run.shopHistory ??= [];
+    run.shopHistory.push({
+        id: shopState.id,
+        battleNumber: shopState.battleNumber,
+        nextBattle: shopState.nextBattle,
+        goldBefore: shopState.goldBefore,
+        goldAfter: shopState.goldAfter,
+        skipped: shopState.boughtCards.length === 0,
+        offers: shopState.offers.map((offer) => ({
+            offerId: offer.offerId,
+            cardId: offer.cardId,
+            cost: offer.cost,
+            bought: offer.bought,
+            balanceStatus: offer.balanceStatus,
+        })),
+        boughtCards: [...shopState.boughtCards],
+    });
+
+    return {
+        nextBattle: run.currentBattle,
+        boughtCards: shopState.boughtCards.length,
+        gold: run.gold ?? 0,
+    };
 }

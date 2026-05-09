@@ -23,8 +23,10 @@ Each scene owns its screen structure and must not create DOM directly.
 Current minimum loop:
 
 ```text
-menu -> battle -> result -> upgrades -> next battle -> final
+menu -> battleIntro -> battle -> result -> shop -> next battleIntro -> final
 ```
+
+The between-battle scene is implemented in the legacy file `src/scenes/upgrades.js`, but its runtime scene name and debug surface are `shop`.
 
 ## UI
 
@@ -37,7 +39,7 @@ menu -> battle -> result -> upgrades -> next battle -> final
 
 ## Assets
 
-Future sprites, tiles, particles and effects should be added through Pixi assets/sprites. Do not return to manual WebGL for game visuals without a separate architectural decision.
+Sprites, tiles, UI chrome, monsters, overlays and effects are loaded through Pixi assets/sprites. Do not return to manual WebGL for game visuals without a separate architectural decision.
 
 The current tile set for the battle MVP lives in:
 
@@ -47,6 +49,14 @@ assets/tiles_v2/tile_manifest.json
 ```
 
 Battle code must read matrices and edge signatures from the manifest instead of duplicating the tile list in JS. `assets/tiles/` is the first art pack archive.
+
+The general MVP presentation art manifest lives in:
+
+```text
+assets/art_mvp/art_manifest.json
+```
+
+Runtime scenes use these manifest-backed assets for menu, battle intro, battle HUD/chrome, result and shop presentation, with drawn fallbacks where needed.
 
 ## Asset Naming Convention
 

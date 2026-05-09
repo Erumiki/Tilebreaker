@@ -12,8 +12,8 @@ This brief covers presentation assets for the active Core 1 MVP:
 - 7x7 board;
 - red and blue active combat colors;
 - one board-only universal red-blue starter at the center;
-- full-hand draw, one hold slot, `Сдать руку`, hearts, gold and strikes;
-- implemented static monster intro, plus later shop and field resource tasks.
+- full-hand draw, one hold slot, `Сдать руку`, hearts, gold, strikes, field resources and monster bounty;
+- implemented static monster intro and the current between-battle gold card shop.
 
 ## Accepted Art Direction
 
@@ -39,6 +39,8 @@ Accepted style references live in `assets/art_refs/`:
 - `astral_archive_style_landscape.png` is the secondary reference for desktop composition and broader backdrop atmosphere.
 
 Future art prompts and replacement passes should cite these references unless a later art-direction decision supersedes them.
+
+Current runtime status: menu, battle intro, battle HUD/chrome, result and shop all load the MVP art manifest where practical; tile textures still come from `assets/tiles_v2/tile_manifest.json`; board-cell states and placement hint overlays use manifest-backed PNGs; valid placement hover shows a transparent selected-card preview; invalid hover shows the attempted cell with a red X overlay. Closure seal overlays are partially extracted through manifest assets, with some low-level battle drawing still tracked by Art Track 3.
 
 The tile topology itself remains owned by gameplay data. Tile `matrix`, `edges`, `color`, `pattern`, `special` rules and scoring semantics live in `assets/tiles_v2/tile_manifest.json` and `configs/game.json`. Repainting a PNG must not change any of those values.
 
@@ -81,8 +83,37 @@ The manifest already reserves ids and files for these MVP categories:
 - Buttons: primary and secondary, with default/hover/pressed/disabled states.
 - Monster portraits and compact monster icons: one per configured battle id.
 - Icons: hearts, gold, strike, deck, discard, hold, multiplier, submit and lock.
-- Capture overlays: red/blue capture, valid/invalid placement, selected/hover tile, target/gate markers.
+- Capture overlays: red/blue capture, valid hover transparent tile preview, invalid hover red X overlay, selected/hover tile, target/gate markers.
 - Basic effects: capture flash, gold pickup, heart heal, strike burst and submit damage.
+
+## Artist Screen: Board Cells And Placement Hints
+
+Runtime source: `src/scenes/battle.js`.
+
+Purpose: the board should read as an archive seal grid underneath the topology-bearing tile PNGs. Board-cell art and hint overlays may guide the player, but must stay quieter than red/blue ward paths on placed tiles.
+
+| State | Asset id | File | Notes |
+| --- | --- | --- | --- |
+| Empty cell | `board_cell_empty` | `board_cell_empty.png` | Default brass/stone cell. Keep it dark enough for gold/heart resources and tile art. |
+| Unhovered valid placement | `board_cell_valid` + `overlay_valid_cell` | `board_cell_valid.png`, `overlay_valid_cell.png` | Accepted language: subtle brass glint. It should say "you may place here" without becoming louder than tile ward paths. |
+| Hovered valid placement | `board_cell_hover` + `overlay_valid_cell` + selected tile preview | `board_cell_hover.png`, `overlay_valid_cell.png` | Runtime draws a translucent selected-card preview above the cell. Do not add fake red/blue exits to the cell art. |
+| Hovered invalid placement | `board_cell_invalid` + `overlay_invalid_cell` | `board_cell_invalid.png`, `overlay_invalid_cell.png` | Must be urgent and clearly red, with the red X doing the main work. It may be louder than valid hints. |
+| Scored/fading cell | `board_cell_scored` | `board_cell_scored.png` | Gold seal residue under scored/closing feedback. It should support closure overlays, not replace them. |
+
+Proof screenshots live in `assets/art_review/`:
+
+- `board_cells_portrait_valid_hover_after.png`
+- `board_cells_portrait_invalid_hover_after.png`
+- `board_cells_desktop_valid_hover_after.png`
+- `board_cells_desktop_invalid_hover_after.png`
+
+Artist guardrails:
+
+- Do not paint red/blue playable contours, exits or micro-cell topology into board cells or placement overlays.
+- Valid hints should remain mostly brass/gold, not cyan or combat-color-coded.
+- Invalid hints may be red, but should not resemble a red combat ward path.
+- Field gold/heart icons must remain readable on both empty cells and cells covered by placed tiles.
+- If a new board-cell or hint filename is needed, propose it in the task/status first; do not silently rename existing ids.
 
 ## Artist Screen: Battle Intro
 
@@ -130,14 +161,14 @@ Gameplay-breaking changes:
 - adding visuals that imply gray blank tiles are active in the starting deck;
 - changing dimensions for assets that code expects to stretch as frames or icons without updating the manifest.
 
-## Loading Plan
+## Loading Status And Remaining Plan
 
-The current runtime loads tile textures directly from `tile_manifest.json`. The MVP art path should become:
+The current runtime loads tile textures directly from `tile_manifest.json` and routes presentation art through `assets/art_mvp/art_manifest.json` for menu, intro, battle, result and shop surfaces where practical. Remaining extraction work should keep that split explicit: topology-bearing tile art stays in the tile manifest, while UI chrome, backgrounds, monsters, frames, overlays and effects stay in the MVP art manifest.
 
 1. Load `assets/art_mvp/art_manifest.json`.
 2. Validate unique ids/files, lowercase names, declared states and existing PNGs.
 3. Load all referenced PNGs into a `Map<assetId, texture>`.
-4. Route low-risk screens first through manifest ids: menu, result, battle intro and shop. The current runtime already loads the manifest for `battleIntro` and uses the reserved intro/backdrop/monster ids with drawn fallbacks.
+4. Continue extracting remaining low-level battle borders, pressed states, capture/closure effects, resource underlays and debug/variant surfaces into manifest ids. Intro, result and shop already consume manifest-backed art, though `src/scenes/upgrades.js` keeps its legacy filename while rendering the current `shop` scene.
 5. After the UI layout contract exists, route battle board cells, slots, buttons, monster portraits, resource icons and overlays through the same asset map.
 6. Keep tile topology and tile PNG loading separate, but allow card/shop frames to compose with tile textures.
 

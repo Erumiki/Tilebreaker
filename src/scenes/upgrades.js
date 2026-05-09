@@ -1,20 +1,52 @@
-function getChoiceRects(screen, choiceCount) {
-    const gap = 18;
-    const isStacked = screen.width < 720;
-    const columns = isStacked ? 1 : choiceCount;
-    const totalGap = gap * (columns - 1);
-    const availableWidth = screen.width - 48 - totalGap;
-    const width = Math.min(230, availableWidth / columns);
-    const totalWidth = width * columns + totalGap;
-    const startX = screen.width / 2 - totalWidth / 2;
-    const startY = screen.height * 0.48;
+function getShopLayout(screen, offerCount) {
+    const isPortrait = screen.width < 620;
+    const gap = isPortrait ? 10 : 16;
+    const columns = Math.max(1, Math.min(
+        offerCount,
+        isPortrait ? 2 : screen.width < 960 ? 3 : offerCount,
+    ));
+    const rows = Math.ceil(offerCount / columns);
+    const maxGridWidth = isPortrait ? screen.width - 32 : Math.min(screen.width - 56, columns * 190 + gap * (columns - 1));
+    const cardWidth = (maxGridWidth - gap * (columns - 1)) / columns;
+    const cardHeight = isPortrait
+        ? Math.max(124, Math.min(146, (screen.height - 312) / Math.max(1, rows)))
+        : screen.height < 720 ? 166 : 210;
+    const gridWidth = cardWidth * columns + gap * (columns - 1);
+    const startX = screen.width / 2 - gridWidth / 2;
+    const startY = isPortrait ? Math.max(140, screen.height * 0.2) : screen.height * 0.34;
+    const offerRects = Array.from({ length: offerCount }, (_, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
 
-    return Array.from({ length: choiceCount }, (_, index) => ({
-        x: startX + (isStacked ? 0 : index * (width + gap)),
-        y: startY + (isStacked ? index * 154 : 0),
-        width,
-        height: isStacked ? 136 : 142,
-    }));
+        return {
+            x: startX + column * (cardWidth + gap),
+            y: startY + row * (cardHeight + gap),
+            width: cardWidth,
+            height: cardHeight,
+        };
+    });
+    const continueWidth = Math.min(isPortrait ? screen.width - 48 : 340, 380);
+    const gridBottom = startY + rows * cardHeight + (rows - 1) * gap;
+    const continueButton = {
+        x: screen.width / 2 - continueWidth / 2,
+        y: Math.min(screen.height - 78, gridBottom + (isPortrait ? 14 : 26)),
+        width: continueWidth,
+        height: isPortrait ? 56 : 62,
+    };
+
+    return {
+        mode: isPortrait ? 'portrait' : 'desktop',
+        offers: offerRects,
+        continueButton,
+        viewport: {
+            screen: {
+                width: screen.width,
+                height: screen.height,
+            },
+            overflows: offerRects.some((rect) => rect.y + rect.height > screen.height)
+                || continueButton.y + continueButton.height > screen.height,
+        },
+    };
 }
 
 function getArtTexture(artTextures, assetId) {
@@ -35,33 +67,186 @@ function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
     return true;
 }
 
-export function createUpgradeScene({
+function drawArtButton(ui, artTextures, rect, label, options = {}) {
+    const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
+    const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
+    const drawn = drawArtImage(ui, artTextures, `button_primary_${state}`, rect);
+
+    if (!drawn) {
+        ui.drawButton(rect, label, options);
+        return;
+    }
+
+    ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - 12, {
+        align: 'center',
+        size: options.textSize ?? 22,
+        color: options.textColor ?? '#f7e7bd',
+        weight: 700,
+    });
+}
+
+function wrapText(text, maxChars, maxLines = 2) {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+
+    for (const word of words) {
+        const next = line ? `${line} ${word}` : word;
+
+        if (next.length > maxChars && line) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = next;
+        }
+
+        if (lines.length === maxLines) {
+            break;
+        }
+    }
+
+    if (line && lines.length < maxLines) {
+        lines.push(line);
+    }
+
+    if (words.join(' ').length > lines.join(' ').length && lines.length > 0) {
+        lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[.,;:!?]+$/, '')}...`;
+    }
+
+    return lines.join('\n');
+}
+
+function getTileTexture(tileTextures, offer) {
+    return tileTextures?.get(offer.assetId)
+        ?? tileTextures?.get(offer.tileId)
+        ?? tileTextures?.get(offer.specialTile?.id)
+        ?? null;
+}
+
+function drawOfferCard(ui, {
+    artTextures,
+    tileTextures,
+    offer,
+    rect,
+    mouse,
+    gold,
+}) {
+    const hovered = ui.contains(rect, mouse);
+    const affordable = !offer.bought && gold >= offer.cost;
+    const assetId = offer.bought
+        ? 'shop_card_bought'
+        : affordable ? 'shop_card_affordable' : 'shop_card_unaffordable';
+
+    if (!drawArtImage(ui, artTextures, assetId, rect)) {
+        ui.drawRect(rect, offer.bought ? '#263421' : affordable ? '#173747' : '#201d25', 0.96);
+        ui.drawRect({
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: 3,
+        }, affordable ? '#f4d36f' : '#6f6370', hovered ? 1 : 0.65);
+    }
+
+    const compact = rect.height < 160;
+    const textColor = offer.bought ? '#cbf0b8' : affordable ? '#fff2ca' : '#9f97a0';
+    const previewSize = compact ? 40 : 58;
+    const previewRect = {
+        x: rect.x + rect.width / 2 - previewSize / 2,
+        y: rect.y + (compact ? 34 : 50),
+        width: previewSize,
+        height: previewSize,
+    };
+    const tileTexture = getTileTexture(tileTextures, offer);
+
+    ui.drawText(offer.name, rect.x + rect.width / 2, rect.y + 12, {
+        align: 'center',
+        size: compact ? 13 : 17,
+        color: textColor,
+        weight: 700,
+    });
+
+    if (tileTexture) {
+        ui.drawImage(tileTexture, previewRect, { fit: 'contain', alpha: offer.bought ? 0.78 : 1 });
+    } else {
+        ui.drawRect(previewRect, '#3b2d31', 0.88);
+        ui.drawText('?', previewRect.x + previewRect.width / 2, previewRect.y + 7, {
+            align: 'center',
+            size: 28,
+            color: '#f4d36f',
+        });
+    }
+
+    if (!compact) {
+        ui.drawText(wrapText(offer.description, 28, 2), rect.x + rect.width / 2, rect.y + 120, {
+            align: 'center',
+            size: 13,
+            color: offer.bought ? '#b7c9aa' : '#d7c59e',
+            lineHeight: 17,
+        });
+    }
+
+    const priceLabel = offer.bought ? 'Куплено' : `${offer.cost} золота`;
+    ui.drawText(priceLabel, rect.x + rect.width / 2, rect.y + rect.height - (compact ? 31 : 43), {
+        align: 'center',
+        size: compact ? 13 : 16,
+        color: affordable || offer.bought ? '#f3d991' : '#8f7780',
+        weight: 700,
+    });
+    ui.drawText('баланс: не проверена', rect.x + rect.width / 2, rect.y + rect.height - (compact ? 15 : 22), {
+        align: 'center',
+        size: compact ? 10 : 11,
+        color: '#9e8d71',
+    });
+
+    if (hovered && affordable) {
+        ui.drawRect(rect, '#f4d36f', 0.08);
+    }
+}
+
+function getDeckDebug(run) {
+    return {
+        deck: run.deck.length,
+        drawPile: run.drawPile.length,
+        discardPile: run.discardPile.length,
+    };
+}
+
+export function createShopScene({
     input,
     ui,
     artTextures = null,
+    tileTextures = null,
     run,
-    upgrades,
-    onChoose,
+    shopState,
+    onBuy,
+    onContinue,
 }) {
     return {
-        name: 'upgrades',
-        choiceRects: [],
+        name: 'shop',
+        layout: null,
+        lastPurchaseResult: null,
         update() {
             const click = input.consumeClick();
 
-            if (!click) {
+            if (!click || !this.layout) {
                 return;
             }
 
-            const index = this.choiceRects.findIndex((rect) => ui.contains(rect, click));
+            if (ui.contains(this.layout.continueButton, click)) {
+                onContinue();
+                return;
+            }
+
+            const index = this.layout.offers.findIndex((rect) => ui.contains(rect, click));
+
             if (index >= 0) {
-                onChoose(upgrades[index]);
+                this.lastPurchaseResult = onBuy(shopState.offers[index]);
             }
         },
         render(app) {
             ui.begin();
             const screen = app.screen;
-            this.choiceRects = getChoiceRects(screen, upgrades.length);
+            this.layout = getShopLayout(screen, shopState.offers.length);
             const mouse = input.getMouse();
             const screenRect = {
                 x: 0,
@@ -73,57 +258,72 @@ export function createUpgradeScene({
             if (!drawArtImage(ui, artTextures, 'screen_background_shop', screenRect, { fit: 'cover' })) {
                 ui.drawRect(screenRect, '#07111d', 1);
             }
-            ui.drawRect(screenRect, '#03070c', 0.22);
+            ui.drawRect(screenRect, '#03070c', 0.26);
 
-            ui.drawText('Улучшения', screen.width / 2, screen.height * 0.18, {
+            ui.drawText('Магазин карт', screen.width / 2, screen.width < 620 ? 24 : screen.height * 0.12, {
                 align: 'center',
-                size: 46,
+                size: screen.width < 620 ? 32 : 46,
                 color: '#ffe7ad',
             });
-            ui.drawText(`Перед битвой ${run.completedBattles + 1} выбери одно мета-усиление`, screen.width / 2, screen.height * 0.32, {
+            ui.drawText(`Перед битвой ${shopState.nextBattle}: покупай сколько хватает золота`, screen.width / 2, screen.width < 620 ? 68 : screen.height * 0.23, {
                 align: 'center',
-                size: 22,
+                size: screen.width < 620 ? 15 : 21,
                 color: '#d7c59e',
             });
-            ui.drawText(`Колода ${run.deck.length}  |  Добор ${run.drawPile.length}  |  Сброс ${run.discardPile.length}`, screen.width / 2, screen.height * 0.38, {
+            ui.drawText(`Золото ${run.gold ?? 0}  |  Колода ${run.deck.length}  |  Добор ${run.drawPile.length}  |  Сброс ${run.discardPile.length}`, screen.width / 2, screen.width < 620 ? 96 : screen.height * 0.29, {
                 align: 'center',
-                size: 17,
-                color: '#bca77e',
+                size: screen.width < 620 ? 13 : 17,
+                color: '#f3d991',
             });
 
-            upgrades.forEach((upgrade, index) => {
-                const rect = this.choiceRects[index];
-                const hovered = ui.contains(rect, mouse);
-                const assetId = hovered ? 'shop_card_affordable' : 'shop_card_offer';
-                if (!drawArtImage(ui, artTextures, assetId, rect)) {
-                    ui.drawRect(rect, hovered ? '#355e78' : '#17293b', 0.96);
-                    ui.drawRect({
-                        x: rect.x,
-                        y: rect.y,
-                        width: rect.width,
-                        height: 3,
-                    }, '#8bd7ff', hovered ? 1 : 0.65);
-                }
-                ui.drawText(upgrade.name, rect.x + rect.width / 2, rect.y + 22, {
-                    align: 'center',
-                    size: 21,
-                    color: '#fff2ca',
+            shopState.offers.forEach((offer, index) => {
+                drawOfferCard(ui, {
+                    artTextures,
+                    tileTextures,
+                    offer,
+                    rect: this.layout.offers[index],
+                    mouse,
+                    gold: run.gold ?? 0,
                 });
-                ui.drawText(upgrade.description, rect.x + rect.width / 2, rect.y + 72, {
-                    align: 'center',
-                    size: 16,
-                    color: '#d7c59e',
-                    lineHeight: 22,
-                });
+            });
+
+            drawArtButton(ui, artTextures, this.layout.continueButton, 'К следующему монстру', {
+                mouse,
+                color: '#1c3346',
+                hoverColor: '#66c7f4',
+                textSize: screen.width < 620 ? 18 : 22,
             });
         },
         getDebugState() {
             return {
-                upgrades,
-                layout: {
-                    choices: this.choiceRects,
+                shop: {
+                    id: shopState.id,
+                    battleNumber: shopState.battleNumber,
+                    nextBattle: shopState.nextBattle,
+                    offerCount: shopState.offerCount,
+                    goldBefore: shopState.goldBefore,
+                    goldAfter: run.gold ?? 0,
+                    balanceStatus: shopState.balanceStatus,
                 },
+                offers: shopState.offers.map((offer) => ({
+                    offerId: offer.offerId,
+                    cardId: offer.cardId,
+                    tileId: offer.tileId,
+                    name: offer.name,
+                    cost: offer.cost,
+                    rarity: offer.rarity,
+                    family: offer.family,
+                    bought: offer.bought,
+                    affordable: !offer.bought && (run.gold ?? 0) >= offer.cost,
+                    balanceStatus: offer.balanceStatus,
+                })),
+                boughtCards: [...shopState.boughtCards],
+                lastPurchaseResult: this.lastPurchaseResult,
+                deck: getDeckDebug(run),
+                layout: this.layout,
             };
         },
     };
 }
+
+export const createUpgradeScene = createShopScene;

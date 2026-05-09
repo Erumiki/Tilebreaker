@@ -6,9 +6,9 @@ Goal: before implementing and tuning the battle scene, check whether the tile-pl
 
 ## Current Status Note
 
-This file is a chronological feasibility log. The current active truth is the Core 1 Rescue snapshot in `todo/current.md` and the core summary in `design/core.md`: `legacy`, `drawMode: "hand"`, 7x7 board, red/blue active colors, 24-card rescue deck, one universal center starter, hold, hearts, hand submit, immediate closure scoring and gold.
+This file is a chronological feasibility log. The current active truth is the Core 1 Rescue snapshot in `todo/current.md` and the core summary in `design/core.md`: `legacy`, `drawMode: "hand"`, 7x7 board, red/blue active colors, 24-card rescue deck, one universal center starter, hold, hearts, hand submit, immediate closure scoring, field resources, monster bounty and the implemented gold card shop.
 
-Older sections below intentionally preserve the experiments that led here. When they mention 6x6, queue as active mode, three active colors, gray in the starting deck or round-end attack damage, read those details as historical context unless the current status note or config says otherwise.
+Older sections below intentionally preserve the experiments that led here. When they mention 6x6, queue as active mode, three active colors, gray in the starting deck, round-end attack damage or the pre-shop upgrade flow, read those details as historical context unless the current status note or config says otherwise.
 
 ## Test Model
 
@@ -62,11 +62,11 @@ Accepted changes for the next tests:
 
 Core 1 follow-up status:
 
-- hearts/pick-pressure became the current `Сдать руку` hand-submit economy: first monster has 3 hearts, minimal 2x2 capture = 1 heart, and submit cost is `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`;
+- hearts/pick-pressure became the current `Сдать руку` hand-submit economy: early monsters have 3 hearts, the tuned final battle has `enemyHp: 4`, minimal 2x2 capture = 1 heart, and submit cost is `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`;
 - green is removed from visible legacy combat rows and active attack tables;
 - the starting universal red-blue center tile is implemented, so the first move is not "find where to start" but "where to develop";
 - one hold slot is implemented in hand mode;
-- limited rotate and red/blue double-color cards remain later levers after checking the universal starter, shop and card pool.
+- limited rotate and red/blue double-color cards remain later levers after checking the universal starter and the implemented shop/card-pool economy.
 
 Sanity run after config change:
 
