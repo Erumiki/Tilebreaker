@@ -1,8 +1,8 @@
 # Current Version
 
-## v0.21 Core 1 Rescue + Universal Starter
+## v0.22 Core 1 Rescue + Monster Intro
 
-**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, a larger board, one universal red-blue center starter, one hold slot, the implemented hand-submit/immediate-closure/gold loop, and staged design for later buyable control cards.
+**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, a larger board, one universal red-blue center starter, one hold slot, the implemented hand-submit/immediate-closure/gold loop, a pre-battle monster intro beat, and staged design for later buyable control cards.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
@@ -10,6 +10,8 @@
 
 - Tile-battle tuning lives in JSON configs, not in code.
 - Active art direction is Astral Archive defense: Tilebreaker is about a defender of a star archive who builds magical contours on a battle grid to seal invading monsters while their heart holds out. A closed contour is a completed seal/ward, not a weapon swing; the monster loses hearts because part of its intrusion is cut off by the barrier. `Сдать руку` is an archive overload paid with living light. Details live in `design/art-direction.md`.
+- Accepted style references live in `assets/art_refs/`: `astral_archive_style_portrait.png` is the primary reference for future portrait UI, monster, backdrop and effect work; `astral_archive_style_landscape.png` is secondary for desktop/backdrop mood. These guide mood/composition, not gameplay topology.
+- The artist-facing MVP monster roster lives in `design/monster-roster.md`: five battle monsters, portrait/icon/backdrop filenames, silhouette notes and UIX readability notes.
 - `configs/game.json` stores board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, `roadMode`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
 - Active default `gameplayVariant` is `legacy`. It is the preserved two-color capture-fill ruleset and the main rescue candidate.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
@@ -17,6 +19,10 @@
 - The main menu temporarily shows only the still-useful variant picker options. Modes removed from active playtest stay URL/debug-addressable but are hidden from the menu.
 - The combat UI and debug state show the short variant id (`LEG`, `A`, `B`, `C`, `D`) so manual playtests do not get mixed.
 - Battle layout now lives in pure `src/scenes/battleLayout.js` and returns named rects for `hud`, `monsterBanner`, `board`, `feedback`, `log`, `hold`, `hand[]`, `primaryButton`/`endRoundButton` and `sidePanel`. The coordinate contract and UI state inventory live in `design/ui-mockup.md`.
+- Battle intro now lives in `src/scenes/battleIntro.js`: every new battle enters through a static monster presentation scene with one `Битва` button before tile-battle state is created.
+- Battle intro reads `configs/levels.json` for `monsterName`, battle name, `enemyHp`, `ante` and pending `reward` preview; reward text is honest and does not pay kill bounty until the battle-economy task implements it.
+- Battle intro uses `assets/art_mvp/art_manifest.json` placeholder ids for `screen_background_battle_intro`, `level_backdrop_battle_0N`, `monster_portrait_battle_0N` and `monster_icon_battle_0N`, with drawn fallbacks if art is missing.
+- Debug exposes `getBattleIntroDebug()` with layout mode, rects, viewport overflow, minimum touch target, button rect, monster preview, danger/ante, reward preview and player hearts/gold.
 - `scripts/simulate-tiles.js` reads `GAMEPLAY_VARIANT` or config default and prints the active variant plus comparison order before the usual metrics.
 - Manual comparison protocol and scorecard live in `design/gameplay-variants.md`.
 - Variant A (`placement_payoff`) adds Focus: a useful direct-neighbor placement that extends existing land without closing a zone gives `Focus +1`, up to `placementPayoff.maxFocus`.
@@ -35,7 +41,7 @@
 - Variant D attacks are combined into one land threat like B/C, and a new run uses one active combat lane (`red`) for rewards/multipliers.
 - Variant D UI highlights S/E gates, shows gate distance or road bonus in the side panel, gives immediate connected-road feedback, includes road length/extra/damage in result/debug, clears scored road-path tiles, and respawns a new pair on the next round after scoring. Smoke covers the first two battles through `?variant=d`.
 - Scoring uses configured `damageFormula.type = areaMultiplier`: base area damage is `area * areaMultiplier`, zones larger than `largeZoneBonus.minArea` gain `largeZoneBonus.bonusPerArea` per extra micro-cell, and gray tile micro-cells inside a closed zone add `grayInteriorBonus.bonusPerCell`.
-- `configs/levels.json` stores only the battle list, enemy HP and enemy color attacks.
+- `configs/levels.json` stores the battle list, player-facing `monsterName`, intro ante/reward preview, enemy HP and enemy color attacks.
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The active tile catalog still has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blank ids in the manifest.
 - Active MVP `activeCombatColors` are `red` and `blue`. Green remains in the manifest and UI model, but is not in the starting deck, early reward color cycle or the first two battle attack tables.
@@ -63,8 +69,8 @@
 - Gold is accepted as future between-round card-buying currency. A run starts at 0 gold; each closed zone gives `+1 gold`; strike bonus adds `+strikeCount gold`.
 - Buyable card design is accepted but not implemented: common red/blue line, tee and corner cards are rough 2-4 gold buys; `joker_line` is the first uncommon wildcard at 5 gold; red-blue split corner, joker corner, joker tee and gold-seal cards are staged later so wildcard power is added one family at a time.
 - MVP art now has a stable replacement contract in `assets/art_mvp/art_manifest.json`: 78 placeholder PNGs for screen backgrounds, level backdrops, board cells, hand/hold slots, card/shop frames, buttons, monster portraits/icons, hearts, gold, strike, deck/discard/hold icons, capture overlays and basic effects.
-- Artist-facing instructions live in `design/art-mvp-brief.md` and now point at the Astral Archive defense setting. Art can replace PNGs in place, but must not change tile topology data (`matrix`, `edges`, `color`, `pattern`, `special` rules or scoring semantics) in manifests/configs.
-- Placeholder art can be regenerated and validated with `./scripts/node.sh scripts/generate-art-mvp-placeholders.js`. The current runtime still loads tile textures directly; the brief records the later general `loadArtAssets` path for Art Track 2.
+- Artist-facing instructions live in `design/art-mvp-brief.md` and now point at the Astral Archive defense setting, `assets/art_refs/` and `design/monster-roster.md`. Art can replace PNGs in place, but must not change tile topology data (`matrix`, `edges`, `color`, `pattern`, `special` rules or scoring semantics) in manifests/configs.
+- Placeholder art can be regenerated and validated with `./scripts/node.sh scripts/generate-art-mvp-placeholders.js`. The current runtime loads the MVP art manifest for battle intro and battle HUD/icon presentation with cache-busted PNG URLs, so artist file replacements show after a browser reload. Broader replacement of hardcoded prototype visuals remains in Art Track 2.
 - A strike happens when the next valid placement after a closure also closes a zone. Valid non-closing placement or `Сдать руку` resets it; selection, hold/swap and invalid clicks do not.
 - Starting player hearts are 18 in the active rescue build.
 - After each won battle, the player chooses one of three rewards: add a tile to discard/deck, remove a tile from deck, or increase a combat color multiplier. Add/boost rewards respect `activeCombatColors`, so the v3 start does not offer green before the game reintroduces it deliberately.
@@ -84,4 +90,4 @@
 - Interpret `zero damage` over a multi-round window, not as an isolated first-round failure. Watch zero-damage streaks, captures within the next 2-3 rounds, dead-end/freshStart rate, win rate and player damage.
 - Manual playtest result on 2026-05-09: `legacy` is the most playable variant, but still collapses into waiting for the right card. Two colors helped but did not fully fix it. Variant A did not feel meaningfully different and is not a standalone direction; Variant B lacks a strong one-color idea; Variant D/road-style scoring needs rethinking/rotation before more tests; the fifth tested direction is cut. Current favorites are Core 1 rescue and a separate Kingdomino-like combat spike.
 - Updated legacy target after universal starter + hold: judge whether the first 3-5 turns feel less like waiting for one card before adding rotate or double-color control tools.
-- Latest implementation pass added the battle UI layout contract and portrait mobile battle layout. Actual monster intro, field resources and card shop buying remain unimplemented.
+- Latest implementation pass added the pre-battle monster intro scene and routed menu/upgrades through it before every battle. Field resources, kill bounty payout and card shop buying remain unimplemented.

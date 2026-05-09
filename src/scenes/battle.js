@@ -193,6 +193,63 @@ function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
     ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
 }
 
+function getBattleAssetId(prefix, battle) {
+    return `${prefix}_${battle.id}`;
+}
+
+function getMonsterName(battle) {
+    return battle.monsterName ?? battle.name;
+}
+
+function getArtTexture(artTextures, assetId) {
+    return artTextures?.textures?.get(assetId) ?? null;
+}
+
+function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
+    const texture = getArtTexture(artTextures, assetId);
+
+    if (!texture) {
+        return false;
+    }
+
+    ui.drawImage(texture, rect, {
+        alpha: options.alpha ?? 1,
+        tint: options.tint,
+    });
+    return true;
+}
+
+function drawIconText(ui, artTextures, assetId, x, y, iconSize, text, options = {}) {
+    const iconRect = {
+        x,
+        y,
+        width: iconSize,
+        height: iconSize,
+    };
+    const drawn = drawArtImage(ui, artTextures, assetId, iconRect, {
+        alpha: options.iconAlpha ?? 1,
+        tint: options.tint,
+    });
+
+    if (!drawn && options.fallback) {
+        ui.drawText(options.fallback, x + iconSize / 2, y + Math.max(0, (iconSize - 18) / 2), {
+            align: 'center',
+            size: options.fallbackSize ?? Math.max(14, iconSize - 6),
+            color: options.fallbackColor ?? options.color ?? '#ffffff',
+        });
+    }
+
+    if (text === null || text === undefined || text === '') {
+        return;
+    }
+
+    ui.drawText(String(text), x + iconSize + (options.gap ?? 5), y + (options.textOffsetY ?? 0), {
+        size: options.textSize ?? 15,
+        color: options.color ?? '#ffffff',
+        weight: options.weight ?? 600,
+    });
+}
+
 function getBoardCell(layout, settings, point) {
     if (point.x < layout.board.x
         || point.y < layout.board.y
@@ -369,7 +426,7 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
     }
 }
 
-function drawHand(ui, layout, settings, state, mouse, tileTextures) {
+function drawHand(ui, layout, settings, state, mouse, tileTextures, artTextures) {
     const isQueue = isQueueDrawMode(settings);
 
     layout.hand.forEach((rect, index) => {
@@ -381,6 +438,13 @@ function drawHand(ui, layout, settings, state, mouse, tileTextures) {
             : null;
 
         ui.drawRect(rect, hovered && (!isQueue || index === 0) ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
+        drawArtImage(
+            ui,
+            artTextures,
+            selected ? 'slot_hand_selected' : hovered ? 'slot_hand_hover' : 'slot_hand_empty',
+            rect,
+            { alpha: tileDef ? 1 : 0.78 },
+        );
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
         drawTile(ui, tileDef, insetRect(rect, 8), {
             oneColorLand: isOneColorLandVariant(settings),
@@ -400,7 +464,7 @@ function drawHand(ui, layout, settings, state, mouse, tileTextures) {
     });
 }
 
-function drawHold(ui, layout, settings, state, mouse, tileTextures) {
+function drawHold(ui, layout, settings, state, mouse, tileTextures, artTextures) {
     if (!layout.hold) {
         return;
     }
@@ -410,11 +474,35 @@ function drawHold(ui, layout, settings, state, mouse, tileTextures) {
     const tileDef = state.heldTile;
 
     ui.drawRect(rect, hovered ? '#263d4f' : '#182838', tileDef ? 1 : 0.5);
+    drawArtImage(
+        ui,
+        artTextures,
+        tileDef ? 'slot_hold_filled' : 'slot_hold_empty',
+        rect,
+        { alpha: hovered ? 1 : 0.82 },
+    );
     drawBorder(ui, rect, tileDef ? '#f3d991' : '#38536a', tileDef ? 3 : 2, tileDef ? 1 : 0.8);
     drawTile(ui, tileDef, insetRect(rect, 8), {
         oneColorLand: isOneColorLandVariant(settings),
         tileTextures,
     });
+    if (!tileDef) {
+        const iconSize = Math.max(20, Math.min(30, rect.width * 0.34));
+        drawIconText(
+            ui,
+            artTextures,
+            'icon_hold',
+            rect.x + rect.width / 2 - iconSize / 2,
+            rect.y + rect.height / 2 - iconSize / 2,
+            iconSize,
+            '',
+            {
+                fallback: 'H',
+                fallbackColor: '#8fb1cb',
+                iconAlpha: 0.9,
+            },
+        );
+    }
     if (layout.mode === 'portrait') {
         ui.drawText('Запас', rect.x + rect.width / 2, rect.y + rect.height - 18, {
             align: 'center',
@@ -429,7 +517,7 @@ function drawHold(ui, layout, settings, state, mouse, tileTextures) {
     }
 }
 
-function drawSidePanel(ui, layout, battle, run, settings, state) {
+function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
     if (!layout.sidePanel) {
         return;
     }
@@ -446,30 +534,68 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
 
     ui.drawRect(panel, '#0f1d2b', 0.94);
     drawBorder(ui, panel, '#28445c', 2, 0.9);
-    ui.drawText(battle.name, panel.x + 18, panel.y + 18, {
+    const monsterIconSize = 54;
+    const monsterIconId = getBattleAssetId('monster_icon', battle);
+    const headerTextX = panel.x + 18 + monsterIconSize + 12;
+
+    ui.drawRect({
+        x: panel.x + 18,
+        y: panel.y + 16,
+        width: monsterIconSize,
+        height: monsterIconSize,
+    }, '#132334', 0.72);
+    drawArtImage(ui, artTextures, monsterIconId, {
+        x: panel.x + 18,
+        y: panel.y + 16,
+        width: monsterIconSize,
+        height: monsterIconSize,
+    });
+    drawBorder(ui, {
+        x: panel.x + 18,
+        y: panel.y + 16,
+        width: monsterIconSize,
+        height: monsterIconSize,
+    }, '#f3d991', 1, 0.8);
+    ui.drawText(getMonsterName(battle), headerTextX, panel.y + 18, {
         size: 24,
         color: '#ffffff',
     });
-    ui.drawText(`Раунд ${state.round} · ${variant.shortLabel}`, panel.x + 18, panel.y + 52, {
+    ui.drawText(`Раунд ${state.round} · ${variant.shortLabel}`, headerTextX, panel.y + 52, {
         size: 17,
         color: '#9fb8ca',
     });
-    ui.drawText(`Игрок ${formatHearts(state.playerHp)}`, panel.x + 18, panel.y + 86, {
-        size: 20,
+    drawIconText(ui, artTextures, 'icon_heart_full', panel.x + 18, panel.y + 88, 21, `Игрок ${state.playerHp}`, {
+        fallback: '♥',
+        textSize: 18,
         color: '#c8f7dd',
     });
-    ui.drawText(`Монстр ${formatHearts(state.enemyHp)}`, panel.x + 18, panel.y + 116, {
-        size: 20,
+    drawIconText(ui, artTextures, 'icon_heart_lost', panel.x + 18, panel.y + 118, 21, `Монстр ${state.enemyHp}`, {
+        fallback: '♥',
+        textSize: 18,
         color: '#ffd4d8',
     });
-    ui.drawText(`Золото ${run.gold ?? 0}`, panel.x + 18, panel.y + 144, {
-        size: 16,
+    drawIconText(ui, artTextures, 'icon_gold', panel.x + 18, panel.y + 146, 17, String(run.gold ?? 0), {
+        fallback: 'G',
+        textSize: 16,
         color: '#f3d991',
     });
-    ui.drawText(`Колода ${deck.drawPile}  |  Сброс ${deck.discardPile}`, panel.x + 18, panel.y + 166, {
-        size: 15,
+    drawIconText(ui, artTextures, 'icon_deck', panel.x + 88, panel.y + 146, 17, String(deck.drawPile), {
+        fallback: 'D',
+        textSize: 15,
         color: '#8fb1cb',
     });
+    drawIconText(ui, artTextures, 'icon_discard', panel.x + 150, panel.y + 146, 17, String(deck.discardPile), {
+        fallback: 'X',
+        textSize: 15,
+        color: '#8fb1cb',
+    });
+    if ((state.strikeCount ?? 0) > 0) {
+        drawIconText(ui, artTextures, 'icon_strike', panel.x + panel.width - 70, panel.y + 146, 17, state.strikeCount, {
+            fallback: '*',
+            textSize: 15,
+            color: '#f3d991',
+        });
+    }
     if (isQueueDrawMode(settings)) {
         ui.drawText(`Queue ${state.queuePlayedThisRound} / ${settings.handSize}`, panel.x + panel.width - 112, panel.y + 52, {
             size: 15,
@@ -574,10 +700,10 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
 function getCompactBattleLine(battle, state, settings) {
     const variant = getGameplayVariant(settings);
 
-    return `${battle.name} · Раунд ${state.round} · ${variant.shortLabel}`;
+    return `${getMonsterName(battle)} · Раунд ${state.round} · ${variant.shortLabel}`;
 }
 
-function drawBattleHeader(ui, layout, run, battle, settings, state) {
+function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures) {
     if (layout.mode === 'portrait') {
         const hud = layout.hud;
         const banner = layout.monsterBanner;
@@ -588,22 +714,47 @@ function drawBattleHeader(ui, layout, run, battle, settings, state) {
             size: 13,
             color: '#eef8ff',
         });
-        ui.drawText(`Игрок ${formatHearts(state.playerHp)}`, hud.x + hud.width * 0.24, hud.y + 8, {
-            size: 14,
+        drawIconText(ui, artTextures, 'icon_heart_full', hud.x + hud.width * 0.24, hud.y + 8, 18, state.playerHp, {
+            fallback: '♥',
+            textSize: 14,
             color: '#c8f7dd',
         });
-        ui.drawText(`Монстр ${formatHearts(state.enemyHp)}`, hud.x + hud.width * 0.53, hud.y + 8, {
-            size: 14,
-            color: '#ffd4d8',
-        });
-        ui.drawText(`${run.gold ?? 0} зол`, hud.x + hud.width - 58, hud.y + 8, {
-            size: 14,
+        drawIconText(
+            ui,
+            artTextures,
+            getBattleAssetId('monster_icon', battle),
+            hud.x + hud.width * 0.52,
+            hud.y + 7,
+            20,
+            state.enemyHp,
+            {
+                fallback: 'M',
+                textSize: 14,
+                color: '#ffd4d8',
+            },
+        );
+        drawIconText(ui, artTextures, 'icon_gold', hud.x + hud.width - 62, hud.y + 8, 18, run.gold ?? 0, {
+            fallback: 'G',
+            textSize: 14,
             color: '#f3d991',
         });
 
         ui.drawRect(banner, '#132334', 0.94);
         drawBorder(ui, banner, '#31566b', 1, 0.85);
-        ui.drawText(getCompactBattleLine(battle, state, settings), banner.x + 10, banner.y + 9, {
+        drawIconText(
+            ui,
+            artTextures,
+            getBattleAssetId('monster_icon', battle),
+            banner.x + 8,
+            banner.y + 7,
+            24,
+            '',
+            {
+                fallback: 'M',
+                fallbackColor: '#f3d991',
+            },
+        );
+        ui.drawText(getCompactBattleLine(battle, state, settings), banner.x + 40, banner.y + 9, {
             size: 15,
             color: '#d8e7f2',
         });
@@ -1025,6 +1176,7 @@ export function createBattleScene({
     run,
     battle,
     tileTextures = new Map(),
+    artTextures = null,
     onFinish,
 }) {
     const settings = config.game.tileBattle;
@@ -1170,11 +1322,23 @@ export function createBattleScene({
             this.lastRenderKey = renderKey;
             ui.begin();
 
-            drawBattleHeader(ui, this.layout, run, battle, settings, state);
+            drawArtImage(ui, artTextures, 'screen_background_battle', {
+                x: 0,
+                y: 0,
+                width: screen.width,
+                height: screen.height,
+            }, { alpha: 0.92 });
+            ui.drawRect({
+                x: 0,
+                y: 0,
+                width: screen.width,
+                height: screen.height,
+            }, '#06101a', 0.22);
+            drawBattleHeader(ui, this.layout, run, battle, settings, state, artTextures);
             drawBoard(ui, this.layout, settings, state, mouse, tileTextures);
-            drawSidePanel(ui, this.layout, battle, run, settings, state);
-            drawHold(ui, this.layout, settings, state, mouse, tileTextures);
-            drawHand(ui, this.layout, settings, state, mouse, tileTextures);
+            drawSidePanel(ui, this.layout, battle, run, settings, state, artTextures);
+            drawHold(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
+            drawHand(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawPortraitFeedback(ui, this.layout, settings, state);
             const submitBlocked = usesHandSubmitEconomy(settings)
                 && state.phase === 'placing'
@@ -1191,6 +1355,20 @@ export function createBattleScene({
                 edgeColor: submitBlocked ? '#5b6872' : '#9fdfff',
                 textSize: this.layout.mode === 'portrait' ? 18 : 20,
             });
+            const iconSize = this.layout.mode === 'portrait' ? 24 : 26;
+            drawIconText(
+                ui,
+                artTextures,
+                submitBlocked ? 'icon_lock' : 'icon_submit',
+                this.layout.endRoundButton.x + 14,
+                this.layout.endRoundButton.y + this.layout.endRoundButton.height / 2 - iconSize / 2,
+                iconSize,
+                '',
+                {
+                    fallback: submitBlocked ? '!' : '>',
+                    fallbackColor: submitBlocked ? '#ff8b9c' : '#d8e7f2',
+                },
+            );
         },
         getDebugState() {
             return {
@@ -1224,6 +1402,19 @@ export function createBattleScene({
                 gameplayVariantLabel: getGameplayVariant(settings).shortLabel,
                 drawMode: settings.drawMode ?? 'hand',
                 tileImageIds: [...tileTextures.keys()],
+                artImageIds: artTextures?.textures ? [...artTextures.textures.keys()] : [],
+                battleArtIds: {
+                    background: 'screen_background_battle',
+                    monsterIcon: getBattleAssetId('monster_icon', battle),
+                    heart: 'icon_heart_full',
+                    gold: 'icon_gold',
+                    deck: 'icon_deck',
+                    discard: 'icon_discard',
+                    hold: 'icon_hold',
+                    submit: 'icon_submit',
+                    lock: 'icon_lock',
+                    strike: 'icon_strike',
+                },
                 gold: run.gold ?? 0,
                 submitCost: getHandSubmitCostPreview(state, settings),
                 handSubmitLocked: state.handSubmitLocked ?? false,

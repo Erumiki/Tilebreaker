@@ -2,25 +2,30 @@
 
 Date: 2026-05-08.
 
-Goal: before implementing the battle scene, check whether the tile-placement battle idea works at all: can we define a starting deck, deal random hands, close colored boundaries, capture land, deal damage and theoretically clear levels.
+Goal: before implementing and tuning the battle scene, check whether the tile-placement battle idea works at all: can we define a starting deck, deal random hands, close colored boundaries, capture land, deal damage and theoretically clear levels.
+
+## Current Status Note
+
+This file is a chronological feasibility log. The current active truth is the Core 1 Rescue snapshot in `todo/current.md` and the core summary in `design/core.md`: `legacy`, `drawMode: "hand"`, 7x7 board, red/blue active colors, 24-card rescue deck, one universal center starter, hold, hearts, hand submit, immediate closure scoring and gold.
+
+Older sections below intentionally preserve the experiments that led here. When they mention 6x6, queue as active mode, three active colors, gray in the starting deck or round-end attack damage, read those details as historical context unless the current status note or config says otherwise.
 
 ## Test Model
 
 Script: `scripts/simulate-tiles.js`.
 
-Parameters:
+Current parameters:
 
-- 6x6 board;
-- 7-tile hand;
-- active Core 1 Rescue starting deck: 24 tiles from `startingDeckRecipe`;
-- fair draw without hand smoothing; debug smoothing remains only for smoke/debug;
+- 7x7 board from `configs/game.json`;
+- 7-card hand;
+- active Core 1 Rescue starting deck: 24 red/blue tiles from `startingDeckRecipe`;
+- fair draw without loop autocompletion; debug smoothing remains only for smoke/debug overrides;
 - opening `drawBag` may reorder the first 12 future battle draws without adding tiles;
-- 100 simulations of each theoretical battle;
-- 250 random build attempts per candidate hand;
-- capture damage = area * 2;
-- in combat, unselected candidate hands go to discard and the selected hand is played normally;
-- if a color beats the attack, the full closed sum of that color hits the enemy;
-- if a color does not beat the attack, the player takes the shortage.
+- one board-only `starter_universal_line_v` at the center for active `legacy`;
+- active default `drawMode` is `hand`; `queue` remains available for comparison;
+- closure damage is still computed from area, then active `legacy` converts it to monster hearts;
+- active `legacy` scores closures immediately and removes separate player damage from color attack shortage;
+- archived variants and older log sections may still use the old round resolver for comparison.
 
 Temporary tile model for the test: each tile is a 3x3 micro-land grid. Tile edges match by a 3-character signature. The current simulation version counts area capture by colored boundary, not closed colored components.
 
@@ -55,13 +60,13 @@ Accepted changes for the next tests:
 - `drawBag.grayMax = 0` so opening tests do not return a blank tile into the early draw;
 - starting rescue deck became 24 tiles: red/blue `line_h x2`, `line_v x2`, each `tee` and `corner` x1, no `plus`, no gray blank.
 
-Next testable hypotheses for Core 1:
+Core 1 follow-up status:
 
-- hearts/pick-pressure MVP is enabled: first monster has 3 hearts, minimal 2x2 capture = 1 heart, a new pick costs `1 + floor(unplayed / 4)` hearts and preview is shown before confirmation;
-- green removed from visible legacy combat rows and active attack tables;
-- starting universal red/blue center tile, so the first move is not "find where to start" but "where to develop";
-- simple hold for one tile if full-hand still feels like waiting;
-- limited rotate or red/blue double-color tiles only after checking center and full-hand.
+- hearts/pick-pressure became the current `Сдать руку` hand-submit economy: first monster has 3 hearts, minimal 2x2 capture = 1 heart, and submit cost is `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`;
+- green is removed from visible legacy combat rows and active attack tables;
+- the starting universal red-blue center tile is implemented, so the first move is not "find where to start" but "where to develop";
+- one hold slot is implemented in hand mode;
+- limited rotate and red/blue double-color cards remain later levers after checking the universal starter, shop and card pool.
 
 Sanity run after config change:
 
@@ -127,7 +132,7 @@ colored boundary closes -> interior area fills with that color -> score is count
 
 Technically, the simulation counts capture through flood fill:
 
-1. Collect all placed tiles into one `18x18` micro-grid for the `6x6` board.
+1. Collect all placed tiles into one `boardSize * 3` micro-grid. The active board is currently 7x7, so active checks use a `21x21` micro-grid.
 2. For each combat color separately, treat micro-cells of that color as walls.
 3. Run flood fill over all cells that are not this color, starting from the outside frame.
 4. All non-color micro-cells that flood fill cannot reach count as captured interior. This includes placed cells and empty interior without tiles.

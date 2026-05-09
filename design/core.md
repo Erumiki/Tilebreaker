@@ -1,175 +1,193 @@
 # Core Gameplay
 
-Tilebreaker is a fast roguelite tile-placement battler: a mix of Balatro-style risky gambling and Carcassonne-style spatial building.
+Tilebreaker is a fast roguelite tile-placement battler about a defender of a star archive. The player places red and blue boundary tiles as magical wards, closes contours to seal invading monsters, and survives by deciding when a new hand is worth paying hearts.
 
-The main prototype goal: in the first 3 minutes, check whether placing tiles under enemy color pressure is fun and whether it is clear why a zone closed and dealt damage.
+This file describes the active Core 1 Rescue direction. Historical experiments and postponed variants live in `design/gameplay-variants.md`, `design/tile-feasibility.md` and `design/decisions.md`.
 
-## Design Pillar
+## Current Core
 
-Each round, the player receives a hand of tiles and builds a temporary map on a fixed board. The enemy declares attacks in three colors with numbers. The player tries to close colored zones so their strength beats the matching enemy color attacks.
+Active config:
 
-The main turn decision:
-
-```text
-Close a small safe zone now
-or risk growing a large zone for a huge multiplier.
-```
-
-## Main Fun
+- `gameplayVariant: "legacy"`;
+- `drawMode: "hand"`;
+- `holdEnabled: true`;
+- active combat colors: `red`, `blue`;
+- board: `7x7` macro tiles;
+- tile topology: each tile is a `3x3` micro-cell matrix.
 
 The player should feel:
 
-- the thrill of risking a large zone;
-- the pleasure of assembling a map;
-- a clear color problem from the enemy;
-- an explosive multiplier when a large zone closes;
-- the desire to play one more short battle.
+- a clear first move from the universal center starter;
+- the pleasure of growing a ward contour across the board;
+- tension between closing a small safe seal and investing in a larger one;
+- a readable tempo question: "Can I squeeze one more useful move out of this hand, or should I pay hearts to submit it?"
 
 ## Run Rhythm
 
-Main loop:
+Current implemented loop:
 
 ```text
-Menu -> Battle -> Result -> Upgrade -> Next battle -> Final
+menu -> battle -> result -> upgrades -> next battle -> final
 ```
+
+The `upgrades` scene is still the old simple reward choice. The planned MVP path will replace it with monster intro and card shop tasks from `todo/tasks.md`.
 
 After 5 victories, the player receives the final run victory. On defeat, the run ends.
 
-## Battle
+## Battle Loop
 
-In each battle round, the enemy declares attacks in three colors, for example:
+Each battle starts with:
 
-```text
-Red 5
-Blue 3
-Green 7
-```
+- player hearts from `configs/game.json`;
+- monster hearts from `configs/levels.json`;
+- persistent run deck, draw pile, discard pile and gold;
+- one board-only universal red-blue starter at the board center;
+- a full hand of 7 cards and one hold slot.
 
-The player receives a new tile hand, places tiles on the board, then closed colored boundaries capture the land inside them. Captured area counts as colored damage.
+The player places hand cards onto empty board cells. A valid placement either:
 
-For each color separately:
+- touches direct neighbors with matching 3-cell edge signatures; or
+- starts a new island in an empty cell with no direct neighbors.
 
-- if the closed sum of the color is greater than that enemy color attack, the full closed sum of that color hits the enemy;
-- if the closed sum of the color is lower than that enemy color attack, the player takes the missing damage;
-- excess in one color does not currently compensate for a shortage in another color.
+When a placement closes one or more zones, active `legacy` scores those closures immediately before the next player action. Monster hearts, gold, strike feedback and the battle log update in that same beat.
 
-Example:
+## Hand Submit
 
-```text
-Enemy: red 5, blue 3, green 7
-Player closed: red 8, blue 1, green 9
+The old round-end combat flow is replaced in active `legacy` by `Сдать руку`.
 
-To enemy: 8 red + 9 green
-To player: 2 damage for the blue shortage
-```
+Submitting the hand:
 
-Battle victory: kill the enemy with damage. Defeat: player HP runs out.
+1. previews the exact heart cost on the button;
+2. pays that cost immediately;
+3. increments the per-battle submit count;
+4. discards played and unplayed hand cards;
+5. preserves the held card;
+6. redeals the hand.
 
-## Board
-
-For the MVP, the board is fixed. Starting hypothesis: 6x6.
-
-The board refreshes automatically every battle round: on a new round, the player places a new temporary map from scratch. The map does not persist between rounds.
-
-## Tiles
-
-Land colors:
-
-- red;
-- blue;
-- green;
-- gray.
-
-Gray is the fourth neutral color. It participates in connections and balance, but does not deal damage by itself.
-
-MVP placement rule: adjacent edges must match by color.
-
-Active MVP tile set: `assets/tiles_v2/tile_manifest.json`.
-
-For each combat color in the starting v2 set:
-
-- `line_h`, `line_v`;
-- `corner_ur`, `corner_rd`, `corner_dl`, `corner_lu`;
-- `tee_u`, `tee_r`, `tee_d`, `tee_l`;
-- `plus`.
-
-`dot` and base `cap` tiles are not part of the MVP deck. They may return later only as a special/low-power layer with a separate rule.
-
-Rotation is an open hypothesis:
-
-- first try without manual rotation;
-- if it does not play well, add auto-rotation on placement;
-- if it still does not play well, allow manual rotation.
-
-## Land Capture
-
-For the MVP, colored micro-cells are read as land boundaries, not as the only scoring area themselves.
-
-Capture is counted like this:
-
-1. For each combat color separately, build the micro-grid for the full board.
-2. Micro-cells of that color count as walls/boundaries.
-3. If that boundary fully cuts an area off from outside air, the area inside is captured by that color.
-4. For visuals, the inner area is temporarily filled with the boundary color.
-5. Color score is counted by area: boundary cells + captured interior cells.
-
-Example: if a blue line fully closes around a gray or empty inner area, that entire area becomes blue for scoring this round.
-
-Unclosed boundaries at round end simply do not score in the MVP. The player is already punished by receiving no damage from that area.
-
-MVP clarification rules:
-
-- use 4-neighborhood; diagonal touching does not close a hole;
-- empty space connected to the outside area counts as outside air;
-- empty space inside a fully closed boundary counts as captured land and scores;
-- capture is counted separately for red, blue and green;
-- all placed micro-cells inside a closed boundary count as captured interior for that color, including gray and cells of other combat colors;
-- gray does not deal damage by itself, but can be captured by a colored boundary;
-- already captured areas are not repainted permanently between rounds because the board is temporary every round.
-
-## Damage And Multiplier
-
-The MVP should test the large multiplier: a large zone creates more risk and more reward.
-
-Starting prototype formula:
+Current formula:
 
 ```text
-Captured area = colored boundary cells + interior cells
-Final capture strength = captured area * 2
+submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)
 ```
 
-If the formula is too sharp, balance is adjusted in config.
+The held card is excluded from `unplayedHandCards`. If a new hand is needed, the player cannot pay, and the monster is still alive, the battle ends in defeat instead of giving a free redeal.
 
-## Deck
+## Board And Tiles
 
-The player has a deck, hand and discard.
+The active tile catalog is `assets/tiles_v2/tile_manifest.json`.
 
-Each round, the player receives a new hand. After play, tiles go to discard. When the deck is empty, discard is shuffled into a new deck.
+The full manifest contains:
 
-For the MVP, the player may play all tiles from the hand without energy or action limits.
+- red, blue and green combat boundary tiles;
+- gray blank technical/future tiles;
+- lines, corners, tees and plus patterns for combat colors.
 
-## Enemies
+The active Core 1 starting deck uses only red and blue:
 
-For the MVP, enemies differ by HP and color attack numbers. Special enemy rules are postponed to future versions.
+- `line_h x2`;
+- `line_v x2`;
+- each `tee` x1;
+- each `corner` x1;
+- no `plus`;
+- no gray blank.
 
-Each round, the enemy may provide a new color ratio.
+Green and gray remain in data for future work, archived variants and tooling, but they are not part of the active starting deck, early reward color cycle or visible legacy combat rows.
+
+## Universal Starter
+
+Legacy battles start with one board-only `starter_universal_line_v` at `(3,3)`.
+
+Rule matrix:
+
+```text
+.*.
+.*.
+.*.
+```
+
+The `*` boundary:
+
+- matches active combat colors for edge legality;
+- blocks flood-fill for the evaluated color;
+- does not count as red or blue scoring area;
+- does not let red and blue match directly;
+- returns when fresh-start recovery rebuilds the starter board.
+
+## Capture And Damage
+
+For each evaluated combat color, the game builds the board micro-grid and treats that color's boundary cells as walls. Empty or filled interior that cannot flood-fill to outside air becomes captured land for that color.
+
+Clarification rules:
+
+- 4-neighborhood only; diagonal touching does not close a hole;
+- empty area connected to outside air is not captured;
+- empty area inside a fully closed boundary is captured;
+- placed cells inside a closed boundary count as interior for the evaluated color;
+- visual captured fill does not change tile topology.
+
+Active `legacy` converts closure damage to hearts. The first monster has 3 hearts, a minimal 2x2 closure deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`.
+
+The underlying configured formula remains:
+
+```text
+baseDamage = area * damageFormula.areaMultiplier
+largeZoneBonus = max(0, area - largeZoneBonus.minArea) * largeZoneBonus.bonusPerArea
+grayInteriorBonus = gray interior cells * grayInteriorBonus.bonusPerCell
+```
+
+## Resources
+
+Gold is currently battle income and future shop currency:
+
+- a run starts at 0 gold;
+- each closed zone gives `+1 gold`;
+- consecutive closing placements award strike bonus gold equal to the current strike count.
+
+Gold spending is not implemented yet. Buyable card design lives in `design/card-pool.md`; the shop implementation lives later in `todo/tasks.md`.
+
+## Variants
+
+The code keeps archived/test variants behind one switch:
+
+- `legacy`;
+- `placement_payoff`;
+- `one_color_chain`;
+- `connect_targets`;
+- `road_mode`.
+
+`legacy` is the active rescue candidate. Variants A-D remain URL/debug-addressable for comparison, but they are not the current MVP direction. Details and manual scorecard live in `design/gameplay-variants.md`.
 
 ## Between Battles
 
-For a quick prototype, the meta layer is minimal:
+Current implemented rewards are still simple:
 
-- after a win, the player chooses one of three rewards;
-- rewards can initially be simple deck changes;
-- artifacts and rule breaking are a layer after the base battle is validated.
+- add a tile;
+- remove a tile;
+- increase a combat color multiplier.
+
+Add/boost rewards respect active combat colors, so early active rewards do not reintroduce green. The planned shop will replace this normal path after the card catalog and shop tasks are implemented.
+
+## Art Fantasy
+
+The active setting is Astral Archive defense:
+
+- red and blue boundaries are solar/lunar wards;
+- closed contours are completed seals;
+- monsters lose hearts because part of their intrusion is cut off;
+- `Сдать руку` is an archive overload paid with living light;
+- gold is star dust or archive tokens.
+
+Detailed art direction lives in `design/art-direction.md`. Accepted style references live in `assets/art_refs/`.
 
 ## Not Doing Yet
 
-- Complex story.
 - Deep permanent meta-progression.
-- Many special enemies.
-- Large artifact set.
-- Long tutorials.
-- Features that do not strengthen the first 3-minute experience.
+- Full card shop and buyable special cards.
+- Field resources and kill bounty.
+- Final monster intro presentation.
+- Full art replacement through the MVP art manifest.
+- Manual rotation as a default rule.
+- Reintroducing green, gray blank or plus into the active starting deck without a separate decision.
 
 ## Rule
 

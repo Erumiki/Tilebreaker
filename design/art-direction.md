@@ -8,6 +8,17 @@ Tilebreaker is a roguelite about a defender of a star archive who builds magical
 
 The player is not simply attacking a monster with tiles. The player is holding a defensive ritual. A closed contour is a completed seal or ward. The monster loses hearts because part of its intrusion has been cut off by the barrier.
 
+## Accepted Style References
+
+The accepted visual direction is captured in project-local reference images:
+
+- `assets/art_refs/astral_archive_style_portrait.png` - primary portrait mobile reference.
+- `assets/art_refs/astral_archive_style_landscape.png` - secondary desktop/wide reference.
+
+Future monster portraits, level backdrops, UI chrome, card/shop frames, buttons, slots, icons and effects should use these images as the default style target unless a later art-direction decision replaces them.
+
+The references are authoritative for mood and composition: observatory under siege, strict board-game UI, red/blue ward lines, monster breach pressure, living-light hearts and star-dust gold. They are not authoritative for gameplay geometry. If a reference detail conflicts with the 3x3 tile matrix, edge signatures, portrait layout contract or mobile readability, the implemented rules win.
+
 ## Why This Fits The Current Core
 
 - Boundary tiles become protective red and blue seal lines.
@@ -33,6 +44,8 @@ The player is not simply attacking a monster with tiles. The player is holding a
 ### Monsters
 
 Monsters should feel like intrusions from outside the map rather than ordinary enemies standing on the board.
+
+The production-facing roster lives in `design/monster-roster.md`. It defines each battle's monster name, portrait/icon filenames, level backdrop target, silhouette brief and UIX notes for readability.
 
 Suggested five-battle escalation:
 
@@ -99,3 +112,5 @@ The first practical pass should not redraw everything at once. It should prove t
 6. A restrained tile palette update if it improves readability without changing topology.
 
 Success criterion: a player should describe the battle as "I am sealing a monster breach" before reading any external explanation.
+
+Use `assets/art_refs/astral_archive_style_portrait.png` as the default visual comparison for this pass.

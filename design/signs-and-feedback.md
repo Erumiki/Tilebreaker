@@ -16,7 +16,7 @@ Do not implement from this file directly. First use it to decide what every acti
 
 | Event | Feedback to define |
 | --- | --- |
-| Battle start | Show the 7x7 board, center anchors or future universal starter, starting hand, empty/filled hold slot, player hearts, monster hearts and gold. |
+| Battle start | Show the 7x7 board, single universal center starter, starting hand, empty/filled hold slot, player hearts, monster hearts and gold. |
 | Select hand card | Show selected card state, valid cells and current hold action. |
 | Hold selected card | Show the held card, hand gap/refill behavior if any, and message only if needed. |
 | Swap held card | Show hand/hold swap animation and preserve clear selected state. |

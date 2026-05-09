@@ -5,10 +5,11 @@ Tilebreaker is a fast roguelite tile-placement battler about a defender of a sta
 The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, one universal red-blue center starter, one hold slot and staged design for future shop cards.
 
 - active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + universal starter + two-color capture-fill + hearts + hand-submit economy`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
-- active art direction: Astral Archive defense; closed contours are completed seals/wards, monsters lose hearts when their intrusion is cut off, `Сдать руку` is an archive overload paid with living light, and detailed guidance lives in `design/art-direction.md`;
+- active art direction: Astral Archive defense; closed contours are completed seals/wards, monsters lose hearts when their intrusion is cut off, `Сдать руку` is an archive overload paid with living light, detailed guidance lives in `design/art-direction.md`, and accepted style references live in `assets/art_refs/`;
 - tiles: `assets/tiles_v2/tile_manifest.json`;
 - MVP art contract: `assets/art_mvp/art_manifest.json`, with placeholder PNGs and artist instructions in `design/art-mvp-brief.md`;
 - battle UI layout contract: `design/ui-mockup.md`; runtime coordinates come from `src/scenes/battleLayout.js` and support desktop plus portrait phone layouts;
+- battle intro: every battle now starts from a `battleIntro` scene using `configs/levels.json` plus `assets/art_mvp` placeholder intro/backdrop/monster art, then enters the board with one `Битва` button;
 - active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
 - board: 7x7 macro tiles, each tile is 3x3 micro-cells;
 - legacy battles start with one board-only `starter_universal_line_v` at `(3,3)`: a vertical `*` boundary with matrix `.*. / .*. / .*.` that red or blue vertical continuations can attach to;
@@ -35,14 +36,18 @@ The current MVP after the manual playtest pass is built around the `legacy` resc
 ## Where Things Live
 
 - `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting player hearts, heart conversion, hand-submit cost, gold/strike economy, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
-- `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
+- `configs/levels.json` - battle list, enemy hearts, intro ante/reward preview and red/blue color attacks by round.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
 - `assets/art_mvp/art_manifest.json` - stable presentation asset ids, states, filenames and placeholder PNG contract for the beautiful MVP track.
+- `assets/art_refs/` - accepted Astral Archive fake-screenshot references for future monster, UI, backdrop and effect work.
+- `design/core.md` - current Core 1 Rescue gameplay summary and boundaries.
 - `design/art-direction.md` - accepted Astral Archive defense setting, visual language, monster escalation and asset mapping.
 - `design/art-mvp-brief.md` - technical artist brief: safe replacement rules, topology locks, required asset categories and future art-loading plan.
+- `design/monster-roster.md` - art-facing list of the five MVP monsters with portrait/icon/backdrop ids and silhouette notes.
 - `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.
 - `design/ui-mockup.md` - named battle layout slots, portrait viewport contract and debug UI states.
 - `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.
+- `src/scenes/battleIntro.js` - pre-battle monster presentation scene and responsive intro layout.
 - `src/scenes/battleLayout.js` - pure battle layout calculation for desktop and portrait mode.
 - `todo/tasks.md` - the only backlog, work order, next-step, acceptance and status list.
 - `todo/current.md` - current version snapshot and design context without a task list.

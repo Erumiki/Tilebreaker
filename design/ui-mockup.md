@@ -2,6 +2,12 @@
 
 This is the implementation contract for the current battle screen. The runtime source of truth is `src/scenes/battleLayout.js`; this note records the named slots and viewport targets so UI, tests and future art replacement stay aligned.
 
+## Accepted Style Reference
+
+Use `assets/art_refs/astral_archive_style_portrait.png` as the primary mood reference for portrait battle UI polish: compact HUD, monster breach banner, centered ward board, feedback rows, hand/hold area and bottom primary action. Use `assets/art_refs/astral_archive_style_landscape.png` only as a secondary reference for desktop atmosphere.
+
+These references guide visual tone, density, icon treatment and monster pressure. They do not override this layout contract, viewport fit, tap targets or the strict 3x3 tile readability rules.
+
 ## Named Slots
 
 Every battle layout returns these names:
@@ -52,7 +58,50 @@ Battle debug exposes a primary state plus hold/submit facets:
 
 `battleIntro`, `placing`, `cardSelected`, `holdEmpty`, `holdFilled`, `invalidPlacement`, `closureScored`, `submitPaid`, `submitBlocked`, `lastChanceHand`, `victory`, `defeat`.
 
-`battleIntro` is reserved for the next intro-scene task; the battle screen currently reports the in-battle states.
+`battleIntro` is now implemented as a separate pre-battle scene. The battle screen still reports only the in-battle states after the player presses `Битва`.
+
+## Battle Intro Contract
+
+The runtime source is `src/scenes/battleIntro.js`. The intro is presentation-only: it reads the current battle from `configs/levels.json`, shows monster identity, enemy hearts, danger/ante, current player hearts/gold and an honest pending reward preview, then enters battle through one `Битва` button.
+
+Intro debug exposes `layout.mode`, named rects, `layout.viewport.overflows`, `layout.minTouchTarget`, `buttonRect`, `monsterPreview`, `danger`, `rewardPreview`, player hearts/gold, battle number and total battles. Smoke checks the scene on desktop and the same portrait targets as the battle layout.
+
+### UIX Screen: Battle Intro
+
+The UIX target is a one-decision staging screen, not a tutorial page.
+
+Portrait order:
+
+1. compact run HUD: battle number, player hearts and gold;
+2. monster name;
+3. monster portrait with compact icon overlay;
+4. danger/ante and 3-4 stat rows;
+5. pending reward preview;
+6. fixed full-width `Битва` button.
+
+Desktop order:
+
+1. top-left run title and one-line premise;
+2. large backdrop/portrait area in the same visual footprint as the battle board;
+3. side details panel for monster name, danger, hearts, ante, player resources and reward preview;
+4. primary `Битва` button in the same bottom-right action rhythm as battle.
+
+Copy rules:
+
+- Keep reward copy as a preview until monster kill bounty is implemented.
+- Do not add extra choices, deck previews, attack schedules or lore paragraphs to this screen.
+- Monster art guidance and names live in `design/monster-roster.md`; UIX should keep text/layout stable even if final monster names change later.
+
+### Monster Icon Usage
+
+The monster icon inventory lives in `design/monster-roster.md` under `UIX Monster Asset Usage`. Current required icon placements:
+
+- battle intro portrait mobile: compact icon overlay on the portrait;
+- battle intro desktop: compact icon in the details panel;
+- future Art Track 2 battle HUD: compact icon inside `monsterBanner`;
+- future Art Track 2 desktop battle side panel: compact icon before the monster/battle name.
+
+Result and shop monster icons are optional polish until the economy/shop route exists.
 
 ## UIX Review Notes
 

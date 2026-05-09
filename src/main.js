@@ -19,6 +19,7 @@ import {
     createTilesFromManifest,
 } from './entities/tileBattle.js';
 import { createUiRenderer } from './render/ui.js';
+import { createBattleIntroScene } from './scenes/battleIntro.js';
 import { createBattleScene } from './scenes/battle.js';
 import { createMainMenuScene } from './scenes/mainmenu.js';
 import { createBattleResultScene } from './scenes/result.js';
@@ -32,6 +33,7 @@ const ui = createUiRenderer(PIXI, app.stage);
 const battles = config.levels.battles;
 const tiles = createTilesFromManifest(config.tileManifest, config.game.tileBattle);
 const tileTextures = await loadTileTextures(PIXI, tiles, config.game.tileBattle);
+const artTextures = await loadArtTextures(PIXI);
 const totalBattles = Math.min(config.game.run.totalBattles, battles.length);
 const debugOverrides = getDebugOverrides();
 let run = null;
@@ -78,6 +80,42 @@ async function loadTileTextures(PIXI, tileDefs, tileSettings) {
     }));
 
     return new Map(entries.filter(Boolean));
+}
+
+async function loadArtTextures(PIXI) {
+    try {
+        const response = await fetch('assets/art_mvp/art_manifest.json', {
+            cache: 'reload',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load art manifest: ${response.status}`);
+        }
+
+        const manifest = await response.json();
+        const root = manifest.root ?? 'assets/art_mvp';
+        const cacheBust = manifest.cacheBust ?? Date.now().toString(36);
+        const entries = await Promise.all((manifest.assets ?? []).map(async (asset) => {
+            try {
+                const url = `${root}/${asset.file}?v=${encodeURIComponent(cacheBust)}`;
+                return [asset.id, await PIXI.Assets.load(url)];
+            } catch (error) {
+                console.warn(`Failed to load art texture ${asset.file}`, error);
+                return null;
+            }
+        }));
+
+        return {
+            manifest,
+            textures: new Map(entries.filter(Boolean)),
+        };
+    } catch (error) {
+        console.warn('Art manifest unavailable; using drawn fallbacks', error);
+        return {
+            manifest: null,
+            textures: new Map(),
+        };
+    }
 }
 
 function parseSeed(value) {
@@ -162,7 +200,19 @@ function showBattle() {
         run,
         battle: getCurrentBattle(run, battles),
         tileTextures,
+        artTextures,
         onFinish: showResult,
+    });
+}
+
+function showBattleIntro() {
+    scene = createBattleIntroScene({
+        input,
+        ui,
+        run,
+        battle: getCurrentBattle(run, battles),
+        artTextures,
+        onStart: showBattle,
     });
 }
 
@@ -191,7 +241,7 @@ function showUpgrades() {
         upgrades: getRewardChoices(run, tiles, config.game.tileBattle),
         onChoose(upgrade) {
             applyUpgrade(run, upgrade);
-            showBattle();
+            showBattleIntro();
         },
     });
 }
@@ -206,7 +256,7 @@ function startRun(gameplayVariantId = config.game.tileBattle.gameplayVariant) {
         seed: lastRunSeed,
         settings: config.game.tileBattle,
     });
-    showBattle();
+    showBattleIntro();
 }
 
 applyDebugOverrides();
@@ -236,6 +286,9 @@ window.__tilebreakerDebug = {
     },
     getBattleDebug() {
         return scene?.getDebugState?.() ?? null;
+    },
+    getBattleIntroDebug() {
+        return scene?.name === 'battleIntro' ? scene.getDebugState?.() ?? null : null;
     },
     getUpgradeDebug() {
         return scene?.name === 'upgrades' ? scene.getDebugState?.() ?? null : null;

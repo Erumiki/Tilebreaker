@@ -13,7 +13,7 @@ This brief covers presentation assets for the active Core 1 MVP:
 - red and blue active combat colors;
 - one board-only universal red-blue starter at the center;
 - full-hand draw, one hold slot, `Сдать руку`, hearts, gold and strikes;
-- later shop, monster intro and field resource tasks.
+- implemented static monster intro, plus later shop and field resource tasks.
 
 ## Accepted Art Direction
 
@@ -33,15 +33,24 @@ Art language:
 
 Detailed direction lives in `design/art-direction.md`.
 
+Accepted style references live in `assets/art_refs/`:
+
+- `astral_archive_style_portrait.png` is the primary reference for portrait battle UI, monster presentation and overall mood.
+- `astral_archive_style_landscape.png` is the secondary reference for desktop composition and broader backdrop atmosphere.
+
+Future art prompts and replacement passes should cite these references unless a later art-direction decision supersedes them.
+
 The tile topology itself remains owned by gameplay data. Tile `matrix`, `edges`, `color`, `pattern`, `special` rules and scoring semantics live in `assets/tiles_v2/tile_manifest.json` and `configs/game.json`. Repainting a PNG must not change any of those values.
 
 ## Source Files
 
 - Art manifest: `assets/art_mvp/art_manifest.json`
+- Accepted style references: `assets/art_refs/`
 - Placeholder generator: `scripts/generate-art-mvp-placeholders.js`
 - Tile topology and tile PNG pack: `assets/tiles_v2/tile_manifest.json`
 - Active rules/config: `configs/game.json`
 - Battle definitions: `configs/levels.json`
+- Monster roster for painting: `design/monster-roster.md`
 
 Run this after changing manifest entries:
 
@@ -75,6 +84,34 @@ The manifest already reserves ids and files for these MVP categories:
 - Capture overlays: red/blue capture, valid/invalid placement, selected/hover tile, target/gate markers.
 - Basic effects: capture flash, gold pickup, heart heal, strike burst and submit damage.
 
+## Artist Screen: Battle Intro
+
+Runtime source: `src/scenes/battleIntro.js`.
+
+Purpose: show the next archive intrusion before the board appears. The player should understand "this is the thing I am sealing" before seeing the tile grid.
+
+The intro screen currently uses these MVP art ids:
+
+| Screen element | Asset id pattern | File pattern | Notes |
+| --- | --- | --- | --- |
+| Full-screen intro background | `screen_background_battle_intro` | `screen_background_battle_intro.png` | Generic pre-battle mood. Keep it quiet enough for text and portrait readability. |
+| Per-battle backdrop | `level_backdrop_battle_0N` | `level_backdrop_battle_0N.png` | Archive room under siege. Also used as a battle-intro visual field on desktop. |
+| Monster portrait | `monster_portrait_battle_0N` | `monster_portrait_battle_0N.png` | 512x512 transparent portrait. See `design/monster-roster.md` for each monster. |
+| Monster icon | `monster_icon_battle_0N` | `monster_icon_battle_0N.png` | 128x128 transparent HUD/icon silhouette. Must read at phone size. |
+| Primary button | `button_primary_*` | `button_primary_*.png` | Future Art Track 2 will route buttons through these states. Current intro still has drawn fallback buttons. |
+
+Portrait composition priority:
+
+1. Monster silhouette.
+2. Monster name and danger/ante text.
+3. Player hearts/gold.
+4. Pending reward preview.
+5. `Битва` button.
+
+Do not draw detailed board cells or tile-like red/blue exits inside the monster portrait or backdrop. Red/blue ward light is fine as atmosphere, but it must not look like a playable tile contour.
+
+Monster icon/portrait usage and the art director production task live in `design/monster-roster.md`. Draw the five `monster_icon_battle_0N.png` files first; they are needed by both the implemented intro and the planned battle HUD.
+
 ## Gameplay-Safe Vs Gameplay-Breaking Changes
 
 Safe art changes:
@@ -100,7 +137,7 @@ The current runtime loads tile textures directly from `tile_manifest.json`. The 
 1. Load `assets/art_mvp/art_manifest.json`.
 2. Validate unique ids/files, lowercase names, declared states and existing PNGs.
 3. Load all referenced PNGs into a `Map<assetId, texture>`.
-4. Route low-risk screens first through manifest ids: menu, result, battle intro and shop.
+4. Route low-risk screens first through manifest ids: menu, result, battle intro and shop. The current runtime already loads the manifest for `battleIntro` and uses the reserved intro/backdrop/monster ids with drawn fallbacks.
 5. After the UI layout contract exists, route battle board cells, slots, buttons, monster portraits, resource icons and overlays through the same asset map.
 6. Keep tile topology and tile PNG loading separate, but allow card/shop frames to compose with tile textures.
 

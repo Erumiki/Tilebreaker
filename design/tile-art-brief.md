@@ -4,6 +4,8 @@ Date: 2026-05-08.
 
 Goal: produce a v2 tile asset pack for the Tilebreaker MVP. Tiles must match the simulation results from `design/tile-feasibility.md`: 3x3 micro-land matrix, strict edge compatibility, large captured areas as the main risk and reward.
 
+Current active gameplay uses the v2 pack as a source library, not as a full starting deck. Core 1 Rescue uses a 7x7 board, red/blue active colors, no gray blank in the starting deck, no plus in the starting deck and one board-only universal starter from `configs/game.json`. Green, gray and plus remain in the manifest for tooling, archived variants, future rewards and shop work.
+
 ## Short Brief For AI Artist
 
 Draw a set of top-down game tiles for a 2D board-game interface. Each tile is a square piece with a clearly readable `3x3` micro-land grid inside it.
@@ -20,7 +22,7 @@ The most important thing is not isolated beauty, but exact gameplay readability:
 - the player must see which 3 micro-cells exit on each tile edge;
 - matching edges must visually connect without a break;
 - decoration must not create false colored exits;
-- all 9 micro-cells must remain readable at small size on a 6x6 board.
+- all 9 micro-cells must remain readable at small size on the active 7x7 board.
 
 ## Technical Model
 
@@ -153,7 +155,9 @@ Requirements:
 
 ## Tile Set
 
-Need 36 tiles.
+Need 36 tiles for the full v2 manifest.
+
+The active Core 1 Rescue starting deck is a 24-card red/blue subset built by `startingDeckRecipe`: red/blue `line_h x2`, `line_v x2`, each `tee` x1, each `corner` x1, no `plus` and no gray blank.
 
 For each combat color `red`, `blue`, `green`, need 11 patterns. Gray cells are marked `.`. Combat color is marked `X`.
 

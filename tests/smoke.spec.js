@@ -36,6 +36,15 @@ async function getBattleDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getBattleDebug());
 }
 
+async function getBattleIntroDebug(page) {
+  await expect.poll(() => page.evaluate(() => {
+    const debug = window.__tilebreakerDebug?.getBattleIntroDebug?.();
+    return Boolean(debug?.layout?.primaryButton?.width);
+  })).toBe(true);
+
+  return page.evaluate(() => window.__tilebreakerDebug.getBattleIntroDebug());
+}
+
 async function getMainMenuDebug(page) {
   await expect.poll(() => page.evaluate(() => {
     const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
@@ -53,6 +62,55 @@ function expectRectInsideViewport(rect, viewport, label) {
   expect(rect.y, `${label}.y`).toBeGreaterThanOrEqual(0);
   expect(rect.x + rect.width, `${label}.right`).toBeLessThanOrEqual(viewport.width);
   expect(rect.y + rect.height, `${label}.bottom`).toBeLessThanOrEqual(viewport.height);
+}
+
+function expectBattleIntroFits(debug) {
+  expect(debug.layout.viewport.overflows).toBe(false);
+  expect(debug.layout.minTouchTarget).toBeGreaterThanOrEqual(44);
+  expect(debug.monsterPreview).toEqual(expect.objectContaining({
+    id: expect.any(String),
+    name: expect.any(String),
+    enemyHp: expect.any(Number),
+  }));
+  expect(debug.monsterPreview.assetIds).toEqual(expect.objectContaining({
+    background: 'screen_background_battle_intro',
+    backdrop: expect.stringMatching(/^level_backdrop_battle_/),
+    portrait: expect.stringMatching(/^monster_portrait_battle_/),
+    icon: expect.stringMatching(/^monster_icon_battle_/),
+  }));
+  expect(debug.artImageIds).toEqual(expect.arrayContaining([
+    debug.monsterPreview.assetIds.background,
+    debug.monsterPreview.assetIds.backdrop,
+    debug.monsterPreview.assetIds.portrait,
+    debug.monsterPreview.assetIds.icon,
+  ]));
+  expect(debug.danger).toEqual(expect.objectContaining({
+    ante: expect.any(Number),
+    label: expect.any(String),
+  }));
+  expect(debug.rewardPreview).toEqual(expect.any(String));
+  expect(debug.player).toEqual(expect.objectContaining({
+    hearts: expect.any(Number),
+    gold: expect.any(Number),
+  }));
+
+  const viewport = debug.layout.viewport.screen;
+  [
+    ['hud', debug.layout.hud],
+    ['portrait', debug.layout.portrait],
+    ['icon', debug.layout.icon],
+    ['details', debug.layout.details],
+    ['primaryButton', debug.layout.primaryButton],
+  ].forEach(([label, rect]) => expectRectInsideViewport(rect, viewport, `intro.${label}`));
+}
+
+async function enterBattleFromIntro(page) {
+  await expectScene(page, 'battleIntro');
+  const introDebug = await getBattleIntroDebug(page);
+  expectBattleIntroFits(introDebug);
+  await clickRect(page, introDebug.buttonRect);
+  await expectScene(page, 'battle');
+  return introDebug;
 }
 
 async function placeHandIndex(page, handIndex, cellX, cellY) {
@@ -371,6 +429,8 @@ async function playUntilBattleResult(page) {
 }
 
 test('player can complete the 5-battle prototype loop', async ({ page }) => {
+  test.setTimeout(60_000);
+
   await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
 
   await expect(page.locator('#game')).toBeVisible();
@@ -379,7 +439,10 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   let menuDebug = await getMainMenuDebug(page);
   expect(menuDebug.selectedVariant).toBe('legacy');
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  let introDebug = await enterBattleFromIntro(page);
+  expect(introDebug.battleNumber).toBe(1);
+  expect(introDebug.monsterPreview.name).toBe('Теневая пиявка');
+  expect(introDebug.monsterPreview.battleName).toBe('Первый раунд');
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
   await expect.poll(() => page.evaluate(() => window.__tilebreakerDebug.getRunSeed())).toBe(20260508);
@@ -406,6 +469,25 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     pattern: 'universal_line_v',
   }));
   expect(battleDebug.tileImageIds).toContain('starter_universal_line_v');
+  expect(battleDebug.battleArtIds).toEqual(expect.objectContaining({
+    background: 'screen_background_battle',
+    monsterIcon: 'monster_icon_battle_01',
+    heart: 'icon_heart_full',
+    gold: 'icon_gold',
+    hold: 'icon_hold',
+    submit: 'icon_submit',
+  }));
+  expect(battleDebug.artImageIds).toEqual(expect.arrayContaining([
+    'monster_icon_battle_01',
+    'monster_icon_battle_02',
+    'monster_icon_battle_03',
+    'monster_icon_battle_04',
+    'monster_icon_battle_05',
+    'icon_heart_full',
+    'icon_gold',
+    'icon_hold',
+    'icon_submit',
+  ]));
   expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
   expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
   expect(
@@ -436,7 +518,8 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
         'boost_color',
       ]);
       await clickRect(page, upgradeDebug.layout.choices[2]);
-      await expectScene(page, 'battle');
+      introDebug = await enterBattleFromIntro(page);
+      expect(introDebug.battleNumber).toBe(battle + 1);
       const upgradedRun = await page.evaluate(() => window.__tilebreakerDebug.getRun());
       expect(upgradedRun.upgrades).toHaveLength(battle);
       expect(Object.values(upgradedRun.colorMultipliers).some((value) => value > 1)).toBe(true);
@@ -454,7 +537,7 @@ test('player can hold and swap one hand card', async ({ page }) => {
 
   const menuDebug = await getMainMenuDebug(page);
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  await enterBattleFromIntro(page);
 
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
@@ -509,7 +592,8 @@ for (const viewport of [
 
     const menuDebug = await getMainMenuDebug(page);
     await clickRect(page, menuDebug.layout.startButton);
-    await expectScene(page, 'battle');
+    const introDebug = await enterBattleFromIntro(page);
+    expect(introDebug.layout.mode).toBe('portrait');
 
     let battleDebug = await getBattleDebug(page);
 
@@ -571,7 +655,7 @@ test('player can choose a kept experiment from the temporary variant picker', as
   menuDebug = await getMainMenuDebug(page);
 
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  await enterBattleFromIntro(page);
 
   const variant = await page.evaluate(() => window.__tilebreakerDebug.getGameplayVariant());
   expect(variant.id).toBe('connect_targets');
@@ -592,7 +676,7 @@ test('one-color chain variant is playable through the first two battles', async 
   const menuDebug = await getMainMenuDebug(page);
   expect(menuDebug.selectedVariant).toBe('one_color_chain');
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  await enterBattleFromIntro(page);
 
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
@@ -614,7 +698,7 @@ test('one-color chain variant is playable through the first two battles', async 
       await expectScene(page, 'upgrades');
       const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
       await clickRect(page, upgradeDebug.layout.choices[2]);
-      await expectScene(page, 'battle');
+      await enterBattleFromIntro(page);
 
       battleDebug = await getBattleDebug(page);
       expect(battleDebug.gameplayVariant).toBe('one_color_chain');
@@ -631,7 +715,7 @@ test('connect-targets variant is playable through the first two battles', async 
   const menuDebug = await getMainMenuDebug(page);
   expect(menuDebug.selectedVariant).toBe('connect_targets');
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  await enterBattleFromIntro(page);
 
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);
@@ -657,7 +741,7 @@ test('connect-targets variant is playable through the first two battles', async 
       await expectScene(page, 'upgrades');
       const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
       await clickRect(page, upgradeDebug.layout.choices[2]);
-      await expectScene(page, 'battle');
+      await enterBattleFromIntro(page);
 
       battleDebug = await getBattleDebug(page);
       expect(battleDebug.gameplayVariant).toBe('connect_targets');
@@ -675,7 +759,7 @@ test('road-mode variant remains URL-playable with visible gates', async ({ page 
   const menuDebug = await getMainMenuDebug(page);
   expect(menuDebug.selectedVariant).toBe('road_mode');
   await clickRect(page, menuDebug.layout.startButton);
-  await expectScene(page, 'battle');
+  await enterBattleFromIntro(page);
 
   let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
   let battleDebug = await getBattleDebug(page);

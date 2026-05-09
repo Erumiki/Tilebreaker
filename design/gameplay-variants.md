@@ -165,7 +165,7 @@ The game entry temporarily shows only variants kept for discussion. Modes remove
 The simulator prints active variant and overall order:
 
 ```sh
-GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simulate-tiles.js 20260508
+GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=hand ./scripts/node.sh scripts/simulate-tiles.js 20260508
 ```
 
 ## Manual Scorecard
@@ -182,7 +182,7 @@ Scores are given after the first 1-2 battles. Scale: `1` bad, `3` tolerable, `5`
 
 ## Variant A: Placement Payoff
 
-`placement_payoff` adds Focus on top of the current two-color queue/capture-fill:
+`placement_payoff` adds Focus on top of the current two-color capture-fill ruleset:
 
 - useful placement next to existing land that does not close a zone gives `Focus +1`;
 - the first isolated tile and the closing placement do not farm Focus by themselves;

@@ -285,7 +285,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ### ~~[2026-05-09] Art direction pass: Astral Archive defense~~ DONE
 
-**Status:** accepted the active setting as Astral Archive defense and recorded it in `design/art-direction.md`, `design/art-mvp-brief.md`, `design/decisions.md`, `todo/current.md` and README. The core fantasy is now defensive: the player is the defender of a star archive, red/blue contours are solar/lunar wards, closures seal parts of an invading monster breach, `Сдать руку` overloads the archive mechanism with living light, and monster/level art should show an escalating siege.
+**Status:** accepted the active setting as Astral Archive defense and recorded it in `design/art-direction.md`, `design/art-mvp-brief.md`, `design/decisions.md`, `todo/current.md` and README. The core fantasy is now defensive: the player is the defender of a star archive, red/blue contours are solar/lunar wards, closures seal parts of an invading monster breach, `Сдать руку` overloads the archive mechanism with living light, and monster/level art should show an escalating siege. Accepted fake-screenshot references were saved to `assets/art_refs/`, with `astral_archive_style_portrait.png` as the primary future style target and `astral_archive_style_landscape.png` as secondary.
 
 **Priority:** must
 
@@ -322,22 +322,9 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP UIX Track 2: monster intro before each battle
+### ~~[2026-05-09] MVP UIX Track 2: monster intro before each battle~~ DONE
 
-**Idea:** add a short pre-battle presentation scene so each level starts with the monster and the stakes instead of dropping directly into the board.
-
-**Why:** the player needs a clean beat before combat: who is coming, how dangerous it is, what reward is possible, and when the actual battle begins.
-
-**MVP:**
-
-- add `battleIntro` between menu/shop/result and `battle`;
-- show monster icon/portrait, monster name, hearts, danger/ante, current player gold/hearts, future reward preview and one primary button `Битва`;
-- wire monster art through config/manifest ids with procedural or placeholder fallback until final portraits exist;
-- use `configs/levels.json` data for battle name, `enemyHp`, `ante` and `reward`;
-- once kill bounty is implemented, show the concrete `+N золота` reward; before that, show the honest pending reward text without pretending the gold is paid;
-- expose `getBattleIntroDebug()` with monster preview, reward preview, danger, button rect and layout mode.
-
-**Acceptance:** every non-final victory route goes result/shop/intro/battle, the intro has one clear `Битва` action, and mobile/desktop smoke tests can click through it.
+**Status:** added a standalone `battleIntro` scene between menu/upgrades and battle. It shows the current monster name, portrait/icon, hearts, danger/ante, player hearts/gold and honest pending reward preview from `configs/levels.json`, uses `assets/art_mvp` intro/backdrop/monster ids with fallbacks, exposes `getBattleIntroDebug()`, and routes through one `Битва` button before battle state is created. Smoke covers desktop, portrait viewports and non-final victory routes through intro. Artist/UIX handoff now lives in `design/art-mvp-brief.md`, `design/ui-mockup.md` and `design/monster-roster.md`.
 
 **Priority:** must
 
@@ -466,6 +453,33 @@ The single list of planned features, improvements, work order and statuses for T
 - run an art-lead audit after the extraction pass and record any remaining hardcoded prototype visuals as follow-up tasks.
 
 **Acceptance:** normal MVP screens render from manifest-backed textures for backgrounds, UI chrome, buttons, board/slot states, monsters, resources and tile states; validation catches missing files; the art-lead audit confirms that no major prototype art remains hidden in code except an explicit allowlist.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Art Director Task: MVP monster icon and portrait pack
+
+**Idea:** give the artist a concrete monster production order for the implemented battle intro and planned battle HUD.
+
+**Why:** monster intro now exists, but placeholder monsters do not yet sell the Astral Archive breach fantasy. The compact icons will also be reused in the battle HUD, result/shop previews and future art extraction, so they need to be designed as a coherent set.
+
+**MVP:**
+
+- use `design/monster-roster.md` as the source of truth;
+- draw all five `monster_icon_battle_0N.png` files first, because they must read at 32px/48px/86px;
+- draw `monster_portrait_battle_01.png` next as the first style proof;
+- then draw the remaining portraits in battle order;
+- keep filenames, dimensions, alpha rules and manifest ids unchanged;
+- do not draw fake tile exits, board cells or gameplay contours into monster art.
+
+**Acceptance:** all five monster icons are distinct at HUD scale, the first portrait proves the Astral Archive breach style in the implemented intro screen, and the files can replace placeholders in `assets/art_mvp` without code or manifest changes.
+
+**Progress:** first generated art pass is in place: all five `monster_icon_battle_0N.png` files were replaced with transparent 128x128 Astral Archive breach silhouettes, and `monster_portrait_battle_01.png` was replaced with a transparent 512x512 Shadow Leech style proof. Runtime now also passes manifest art into battle and uses the monster icon pack plus heart/gold/deck/discard/hold/submit/strike HUD icons during normal play. Remaining art work: portraits for battles 2-5 and optional level backdrops.
+
+**Parallelization:** art can start immediately and does not block the next coding task.
 
 **Priority:** must
 
