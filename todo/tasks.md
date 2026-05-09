@@ -250,6 +250,240 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
+### ~~[2026-05-09] Lead planning pass: beautiful MVP split into economy, shop, UIX and art tracks~~ DONE
+
+**Status:** discussed the next MVP scope with three agents: economy/shop, UIX/mobile layout and art lead. The plan below keeps art unblocked early, extends battle economy with field resources, replaces the old `1 of 3` upgrade screen with a gold card shop, moves UI layout into explicit mockups/config and records a later art-lead audit so hardcoded prototype visuals do not silently remain.
+
+---
+
+### [2026-05-09] MVP Art Track 1: asset contract, placeholder pack and artist tech brief
+
+**Idea:** start the art lane before the rest of the MVP work so mechanics and UI can attach to stable asset ids while the actual art is improved in parallel.
+
+**Why:** the current tile PNGs are file-backed, but most UI, buttons, panels, backgrounds, hearts, gold, monster presentation, board cells, overlays and effects are still hardcoded in Pixi drawing code. The artist needs a contract that says what files may change and which gameplay semantics must not change.
+
+**MVP:**
+
+- create `assets/art_mvp/art_manifest.json` with stable ids and state names for screen backgrounds, level backdrops, board cells, hand/hold slots, card frames, buttons, monster portraits, hearts, gold, strike, deck/discard icons, capture overlays and basic effects;
+- create placeholder PNGs with final lowercase underscore filenames, even where the image is still prototype art;
+- add `design/art-mvp-brief.md` or `techspec/art-assets.md` with the technical artist instructions: active `legacy` rules, 7x7 board, red/blue boundaries, universal starter, hearts/gold/submit loop, required file sizes, alpha/background rules, naming rules and export checklist;
+- explicitly state that tile topology is not art-editable: the `matrix`, `edges`, color, pattern and special semantics in manifests/configs are gameplay data and must not be changed by repainting a PNG;
+- list required asset categories: level underlays, screen backgrounds, buttons, closed/unclosed tile states, selected/hover/valid/invalid overlays, monster icons/portraits, gold, hearts, shop cards, deck/discard/hold icons, strike/multiplier icons and capture/closure effects;
+- extend the loading plan from tile-only textures toward a general `loadArtAssets` path, without requiring final art before gameplay tasks continue.
+
+**Acceptance:** a developer and an artist can open one art manifest and one technical brief, see every MVP asset id/file/state needed, replace placeholder files without touching gameplay code, and know which visual changes are safe versus gameplay-breaking.
+
+**Parallelization:** after this task, artists can replace files while battle economy, shop logic and UIX layout continue. Mechanics own `matrix/edges/rules`; art owns PNG/state visuals.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP UIX Track 1: coordinate mockup and portrait battle layout
+
+**Idea:** move battle UI layout from ad hoc scene math into an explicit mockup/layout contract optimized for portrait mobile play.
+
+**Why:** the current battle screen is still desktop-first: board on the left, side panel on the right, hand at the bottom. On mobile width this will crowd or leave important controls off-screen. The MVP needs to be playable from a phone in vertical orientation.
+
+**MVP:**
+
+- create a separate UI mockup with coordinates and named slots, either as `design/ui-mockup.md` plus diagrams/tables or as `configs/ui-layout.json` plus a short design note;
+- extract battle layout calculation into a pure layout module that returns named rects: `hud`, `monsterBanner`, `board`, `feedback`, `log`, `hold`, `hand[]`, `primaryButton`, `sidePanel` or equivalent;
+- add portrait mode for narrow screens: top compact HUD with battle number/player hearts/monster hearts/gold, short event line, centered 7x7 board, 1-2 recent feedback lines, hand grid with 7 cards plus hold slot, and a large bottom `Сдать руку (-N)`/result button;
+- keep a desktop layout, but make it use the same named layout contract instead of scene-local coordinate math;
+- add touch/pointer input support so mobile layout is not only visually correct;
+- define UI states for `battleIntro`, `placing`, `cardSelected`, `holdEmpty`, `holdFilled`, `invalidPlacement`, `closureScored`, `submitPaid`, `submitBlocked`, `lastChanceHand`, `victory` and `defeat`;
+- after the coordinate mockup exists, run a UIX agent review over it and fold concrete improvement notes back into this task before implementation is considered done;
+- expose debug layout/test data: layout mode, named rects, viewport overflow/safe-area status, feedback type and key visible state.
+
+**Acceptance:** mobile Playwright checks at `390x844`, `360x740` and `430x932` show the board, hand, hold, HUD and primary button inside the viewport with usable tap targets; the same smoke path still works on desktop.
+
+**Art dependency:** use ids from the art manifest when available, but allow placeholder textures so the UIX task does not wait for final art.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP UIX Track 2: monster intro before each battle
+
+**Idea:** add a short pre-battle presentation scene so each level starts with the monster and the stakes instead of dropping directly into the board.
+
+**Why:** the player needs a clean beat before combat: who is coming, how dangerous it is, what reward is possible, and when the actual battle begins.
+
+**MVP:**
+
+- add `battleIntro` between menu/shop/result and `battle`;
+- show monster icon/portrait, monster name, hearts, danger/ante, current player gold/hearts, future reward preview and one primary button `Битва`;
+- wire monster art through config/manifest ids with procedural or placeholder fallback until final portraits exist;
+- use `configs/levels.json` data for battle name, `enemyHp`, `ante` and `reward`;
+- once kill bounty is implemented, show the concrete `+N золота` reward; before that, show the honest pending reward text without pretending the gold is paid;
+- expose `getBattleIntroDebug()` with monster preview, reward preview, danger, button rect and layout mode.
+
+**Acceptance:** every non-final victory route goes result/shop/intro/battle, the intro has one clear `Битва` action, and mobile/desktop smoke tests can click through it.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Battle Economy: field gold, hearts and monster kill bounty
+
+**Idea:** make battles develop economically, not only tactically, by adding resources on the board and a clear monster reward.
+
+**Why:** gold already exists as closure/strike income, but it does not yet create a map decision or pay out for killing the monster. Field gold and hearts can make the player care about where and when they close territory.
+
+**MVP:**
+
+- keep the existing closure gold and strike gold as the base income;
+- add monster kill bounty paid exactly once on victory, using `battle.reward` from `configs/levels.json`;
+- add board resources as underlay data separate from placed tiles: at minimum `gold` and `heart`;
+- gold can spawn on empty board cells, remain under a placed tile, be picked up when the player places a tile on it, and also pay a closure bonus if it is still on placed cells or inside a closed field at the moment of closure;
+- every gold pickup or closure bonus consumes the resource once, so the same coin cannot pay twice;
+- hearts can spawn on the field and restore player hearts only when the player closes a zone containing them;
+- add `maxPlayerHp` or equivalent healing cap so hearts do not erase the cost pressure of `Сдать руку`;
+- expose resource spawn/collection/heal in debug state and battle log: source, amount, before/after gold, before/after hearts and consumed resource ids/cells;
+- update simulator/smoke enough to cover resource collection and kill bounty without needing final balance.
+
+**Acceptance:** a battle can show gold/heart resources under the board layer, resources do not block tile placement, closure can award field bonus gold and healing, monster death awards the configured bounty once, and all income/heal sources are visible in UI/debug/test output.
+
+**Art dependency:** use placeholder `gold` and `heart` icons from `assets/art_mvp`; final icons can be swapped later.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Card Catalog: prices, offer pool and special-card definitions in JSON
+
+**Idea:** define all buyable cards and prices in data before building the shop UI.
+
+**Why:** between-battle progression should become a gold shop, not a hardcoded reward generator. Prices, rarity, offer counts and special card semantics need to be easy to tune without editing scene code.
+
+**MVP:**
+
+- add `configs/cards.json` as the source of truth for buyable cards, prices and offer rules;
+- include fields such as `id`, `tileId` or special tile definition, `name`, `description`, `cost`, `rarity`, `family`, `offerWeight`, `maxPerShop`, `enabledFromBattle`, `assetId` and optional `rules`;
+- first card pool must include existing red/blue line, tee and corner cards with prices, plus the returned cross/plus as a controlled buyable card;
+- include joker versions as staged entries: at least `joker_line` in the first implementation, with `joker_corner` and `joker_tee` defined or explicitly disabled for later;
+- define the requested double-tile families in data: `double_line` and `double_corner`/`double_curve`, including exact placement/scoring semantics before they are enabled;
+- keep red/blue as the active early shop colors; green cards stay disabled until a separate reintroduction task;
+- record price bands in the JSON and design notes: common plan helpers affordable after a normal win, stronger jokers/doubles expensive enough to require saving or strong gold play;
+- add validation so every enabled card references an existing tile/special definition and asset id.
+
+**Acceptance:** the project has a checked-in card catalog with prices for ordinary cards, cross/plus, jokers and double straight/curve candidates; disabled/staged cards are explicit; code/tests can load and validate the catalog before any shop scene uses it.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Shop: replace 1-of-3 upgrades with card sales
+
+**Idea:** after a won battle, show a shop of random card offers and let the player buy any number they can afford.
+
+**Why:** gold needs a between-battle sink, and the run should feel like deck building instead of choosing one free reward.
+
+**MVP:**
+
+- replace the active `upgrades` flow with a shop scene after non-final victories;
+- generate 5 random offers from `configs/cards.json`, respecting rarity, enabled battle, max-per-shop and active colors;
+- show card art/preview, name, cost, affordability state and enough rule text to distinguish ordinary cards, jokers, cross/plus and doubles;
+- allow buying zero or more cards as long as the player has enough gold;
+- buying spends gold immediately and sends the bought card to discard/deck using the same accounting rules as current add-tile rewards;
+- unaffordable cards remain visible but cannot be bought;
+- add a clear continue button to proceed to the next monster intro;
+- remove or hide the old active `add tile/remove tile/boost color` choice flow from the normal MVP path, while keeping any debug-only helpers explicit if needed;
+- expose shop debug state: offers, prices, bought cards, gold before/after, deck/draw/discard counts and next-battle route.
+
+**Acceptance:** a full smoke run can win a battle, enter the shop, buy multiple affordable cards or skip, see gold/deck counts update correctly, then continue to the next monster intro and battle. The old `1 of 3` upgrade screen is no longer the normal between-battle progression.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Special Cards: jokers, cross and double straight/curve tiles
+
+**Idea:** make the first bought cards tactically exciting without letting every hand solve itself.
+
+**Why:** the player specifically needs shop cards that change planning: joker control, returned cross/plus, and double straight/curve tools.
+
+**MVP:**
+
+- implement enabled special cards one family at a time from `configs/cards.json`;
+- support ordinary red/blue buyable tiles first, then cross/plus, then `joker_line`, then one double family;
+- joker rules use universal boundary semantics: match active combat colors, block flood-fill for the evaluated color, do not make red and blue match directly and do not add free score area;
+- cross/plus returns as a shop card with offer caps and price high enough to watch for small-loop dominance;
+- double straight and double curve must have a single clear MVP behavior before implementation, for example a special tile/card with a defined matrix and asset, not an ambiguous two-placement action unless the UI explicitly supports that;
+- add unit tests for placement legality, capture scoring and deck accounting for each enabled family;
+- add simulation/manual metrics comparing no-shop versus shop: win rate, submit count, gold spent, bought-card use rate, minimal capture share and average captured area.
+
+**Acceptance:** at least one joker, cross/plus and one double straight/curve candidate can be bought, enter discard, appear through normal draw/reshuffle and obey tested placement/scoring rules without direct red-blue merging or runaway small-square closures.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Art Track 2: replace hardcoded prototype visuals and run art-lead audit
+
+**Idea:** move current prototype visuals out of scene code and verify that the game can be reskinned by files/manifests.
+
+**Why:** `drawRect` and hardcoded colors are fine for mechanics, but a beautiful MVP needs the project to select asset ids and states, not draw almost all presentation in code.
+
+**MVP:**
+
+- extend the Pixi UI renderer with sprite/stateful asset helpers such as `drawSprite`, `drawNineSlice`, `drawIcon` and `drawStatefulButton`;
+- keep `drawText` as a system text layer, but move panels, buttons, board cells, slots, frames, icons, backgrounds, overlays and resource visuals to files from the art manifest;
+- convert low-risk scenes first: menu, result and shop;
+- convert battle after the layout contract exists: board base/cells, valid/hover/invalid placement overlays, hand/hold slots, selected/held frames, capture/closure overlays, gold/heart underlays, monster portrait and battle backgrounds;
+- remove the procedural tile fallback from active presentation: missing tile art should show an explicit missing asset state or fail validation instead of silently drawing a colored 3x3 fallback;
+- add static checks with a small allowlist for remaining hardcoded drawing/color usage in `src/scenes` and `src/render`;
+- add manifest validation: unique ids, files exist, lowercase underscore names, expected dimensions and loadable PNGs;
+- run an art-lead audit after the extraction pass and record any remaining hardcoded prototype visuals as follow-up tasks.
+
+**Acceptance:** normal MVP screens render from manifest-backed textures for backgrounds, UI chrome, buttons, board/slot states, monsters, resources and tile states; validation catches missing files; the art-lead audit confirms that no major prototype art remains hidden in code except an explicit allowlist.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Polish Pass: feedback, juice and packaging after shop/art foundations
+
+**Idea:** turn the newly expanded MVP into a player-ready build after economy, shop, UIX and art extraction are in place.
+
+**Why:** polish before the shop/art contracts would be throwaway. Once the main loop is stable, the game needs feedback and build packaging that make it understandable without chat explanations.
+
+**MVP:**
+
+- valid-cell highlighting and invalid placement reasons;
+- captured-area/closure highlight followed by monster heart loss, gold pickup and strike feedback;
+- field gold/heart pickup feedback;
+- hand-submit heart loss and last-chance hand warning;
+- shop buy, unaffordable and continue feedback;
+- monster intro polish for each battle;
+- mobile and desktop smoke screenshots with stable seed;
+- README/current docs synced to the new MVP loop.
+
+**Acceptance:** a new player can open the build, understand the monster intro, play a battle, read closure/gold/heart feedback, buy cards in the shop and continue the run without external explanation.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
 ### [2026-05-09] Spike: Kingdomino-like colored damage
 
 **Idea:** separately test a Kingdomino-like core: three-color pieces connect by domino logic, colors deal matching damage, and limited piece replacements give control over the draw.
