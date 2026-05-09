@@ -11,8 +11,6 @@ Unsynced ideas, observations and improvements that appeared during work but have
 
 ## Inbox
 
-- [2026-05-09] Possible small review idea: instead of full rotate, give a "rotate token" as a rare battle resource or reward. This may relieve orientation frustration without buffing every corner permanently or bringing back small-square dominance.
-
 - [2026-05-09] Tooling if variants return: `scripts/simulate-tiles.js` can print active `GAMEPLAY_VARIANT=one_color_chain`, but does not model Chain accumulation and Chain bonus. For Variant B evaluation, use real playable/debug for now; when comparing variants again, update the simulator to count connected region continuity, `chainSpent/chainBonus` and single-lane threat next to the usual capture metrics.
 
 - [2026-05-09] Tooling if variants return: `scripts/simulate-tiles.js` prints active `GAMEPLAY_VARIANT=placement_payoff`, but the current theoretical battle model does not apply Focus. For Variant A balance, use real playable/debug for now or update the simulator to count Focus gain along the placement sequence, cap, conversion on closure and print `focus spent/bonus` next to damage.
