@@ -94,12 +94,12 @@ Gold rules for the first implementation pass:
 - field hearts heal only when sealed in a closed zone and respect `hearts.maxPlayerHp`;
 - battle win rewards now pay the configured `battle.reward` once as monster kill bounty;
 - between-battle shop offers 5 catalog-driven card buys; bought cards spend gold immediately and go to both deck and discard;
-- bought cards remain marked `balanceStatus: "unverified"` until a separate card-balance pass keeps, nerfs or disables that family.
+- bought cards now carry the final MVP `balanceStatus` from `configs/cards.json`.
 
 Later shop/card services:
 
 - reroll/remove costs and reward pacing after shop playtest;
-- card-family balance validation for common buys, plus/cross and `joker_line_v`;
+- any post-MVP revalidation for staged joker/double candidates;
 - rotate tools or double-color cards only after the current shop pool is tested.
 
 Card GD / universal starter status 2026-05-09: accepted design lives in `design/card-pool.md`, and the board-only starter is now implemented in active `legacy`.

@@ -152,6 +152,13 @@ function getOfferTileId(offer) {
     return offer.tileId ?? offer.specialTile?.id ?? null;
 }
 
+function getCardBalanceStatus(card, catalog) {
+    return card.balanceStatus
+        ?? card.rules?.balanceStatus
+        ?? catalog?.shop?.familyBalanceStatus?.[card.family]
+        ?? 'unverified';
+}
+
 function snapshotDeckStats(run) {
     return {
         deck: run.deck.length,
@@ -160,7 +167,7 @@ function snapshotDeckStats(run) {
     };
 }
 
-function createOfferFromCard(card, index) {
+function createOfferFromCard(card, index, catalog) {
     return {
         ...card,
         offerId: `${card.id}_${index + 1}`,
@@ -168,8 +175,32 @@ function createOfferFromCard(card, index) {
         type: 'shop_card',
         tileId: card.tileId ?? card.specialTile?.id ?? null,
         bought: false,
-        balanceStatus: 'unverified',
+        balanceStatus: getCardBalanceStatus(card, catalog),
     };
+}
+
+function getGuaranteedShopCards(catalog, candidates, battleNumber) {
+    if (!Array.isArray(catalog.shop?.guaranteedOffers)) {
+        return [];
+    }
+
+    const candidateById = new Map(candidates.map((card) => [card.id, card]));
+    const guaranteedCards = [];
+    const guaranteedIds = new Set();
+
+    for (const entry of catalog.shop.guaranteedOffers) {
+        const minBattle = Math.max(1, Math.floor(entry.enabledFromBattle ?? 1));
+        const card = candidateById.get(entry.cardId);
+
+        if (!card || battleNumber < minBattle || guaranteedIds.has(card.id)) {
+            continue;
+        }
+
+        guaranteedCards.push(card);
+        guaranteedIds.add(card.id);
+    }
+
+    return guaranteedCards;
 }
 
 export function createRunState({
@@ -343,7 +374,12 @@ export function createShopState(run, catalog, options = {}) {
         activeColors,
     }).filter((card) => getCardOfferWeight(card, catalog) > 0 && (card.maxPerShop ?? 0) > 0);
     const offerCounts = new Map();
-    const offers = [];
+    const guaranteedCards = getGuaranteedShopCards(catalog, allCandidates, battleNumber)
+        .slice(0, offerCount);
+    const offers = guaranteedCards.map((card, index) => {
+        offerCounts.set(card.id, (offerCounts.get(card.id) ?? 0) + 1);
+        return createOfferFromCard(card, index, catalog);
+    });
 
     while (offers.length < offerCount) {
         const candidates = allCandidates.filter((card) => (
@@ -356,7 +392,7 @@ export function createShopState(run, catalog, options = {}) {
         }
 
         offerCounts.set(card.id, (offerCounts.get(card.id) ?? 0) + 1);
-        offers.push(createOfferFromCard(card, offers.length));
+        offers.push(createOfferFromCard(card, offers.length, catalog));
     }
 
     return {
@@ -369,7 +405,7 @@ export function createShopState(run, catalog, options = {}) {
         goldBefore: run.gold ?? 0,
         goldAfter: run.gold ?? 0,
         continued: false,
-        balanceStatus: 'unverified',
+        balanceStatus: catalog.shop?.balanceStatus ?? 'unverified',
     };
 }
 
@@ -428,7 +464,7 @@ export function buyShopOffer(run, shopState, offerId) {
         rarity: offer.rarity,
         family: offer.family,
         battleNumber: shopState.battleNumber,
-        balanceStatus: 'unverified',
+        balanceStatus: offer.balanceStatus ?? 'unverified',
         goldBefore,
         goldAfter: run.gold,
         deckBefore,

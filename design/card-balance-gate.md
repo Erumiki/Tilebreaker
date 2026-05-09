@@ -71,3 +71,5 @@ Read: the baseline bot can prove battle 1 and battle 2, but battle 3 is still ou
 | Stronger joker/double candidates | Keep staged. | Leave `joker_corner`, `joker_tee` and `double_curve` disabled/staged. | The weaker joker and first double-line did not pass the gate, so stronger variants should not enter MVP by inertia. |
 
 Final MVP card-pool decision before sync: ordinary red/blue line, tee, corner and plus/cross can remain in the active MVP shop with restrained weights/caps; `joker_line_v`, its guarantee and `double_red_line_h` should leave the final MVP active pool.
+
+Sync result: `configs/cards.json` now removes the guaranteed joker offer, lowers common offer pressure, carries final `mvp_keep_*` statuses for active families and stages `joker_line_v`/`double_red_line_h` with `mvp_staged_after_gate` rationale.

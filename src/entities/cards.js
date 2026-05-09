@@ -26,7 +26,39 @@ function artIdSet(artManifest = null) {
     return new Set(artManifest.assets.map((asset) => asset.id));
 }
 
-function validateSpecialTile(card, errors) {
+function validateSegmentReferences(card, segments, tileIds, location, errors) {
+    if (!Array.isArray(segments)) {
+        return;
+    }
+
+    const occupiedOffsets = new Set();
+
+    for (const segment of segments) {
+        if (!isObject(segment)) {
+            addError(errors, `${card.id}: ${location} segment entries must be objects.`);
+            continue;
+        }
+
+        if (!segment.tileId || !tileIds.has(segment.tileId)) {
+            addError(errors, `${card.id}: ${location} references unknown tileId ${segment.tileId ?? '<missing>'}.`);
+        }
+
+        if (!Array.isArray(segment.offset)
+            || segment.offset.length !== 2
+            || !segment.offset.every(Number.isInteger)) {
+            addError(errors, `${card.id}: ${location} segment offsets must be [x, y] integers.`);
+            continue;
+        }
+
+        const offsetKey = segment.offset.join(',');
+        if (occupiedOffsets.has(offsetKey)) {
+            addError(errors, `${card.id}: ${location} has overlapping segment offset ${offsetKey}.`);
+        }
+        occupiedOffsets.add(offsetKey);
+    }
+}
+
+function validateSpecialTile(card, tileIds, errors) {
     const specialTile = card.specialTile;
 
     if (!isObject(specialTile)) {
@@ -56,20 +88,21 @@ function validateSpecialTile(card, errors) {
             addError(errors, `${card.id}: each specialTile.matrix row must be a three-character string.`);
         }
     }
+
+    if (specialTile.special === 'double_macro_tile') {
+        if (!Array.isArray(specialTile.segments) || specialTile.segments.length < 2) {
+            addError(errors, `${card.id}: double_macro_tile needs at least two specialTile.segments.`);
+            return;
+        }
+    }
+
+    validateSegmentReferences(card, specialTile.segments, tileIds, 'specialTile.segments', errors);
 }
 
 function validateRuleTileReferences(card, tileIds, errors) {
     const segments = card.rules?.segments;
 
-    if (!Array.isArray(segments)) {
-        return;
-    }
-
-    for (const segment of segments) {
-        if (!segment.tileId || !tileIds.has(segment.tileId)) {
-            addError(errors, `${card.id}: rules.segments references unknown tileId ${segment.tileId ?? '<missing>'}.`);
-        }
-    }
+    validateSegmentReferences(card, segments, tileIds, 'rules.segments', errors);
 }
 
 function validateCard(card, context, errors) {
@@ -142,7 +175,7 @@ function validateCard(card, context, errors) {
     }
 
     if (card.specialTile) {
-        validateSpecialTile(card, errors);
+        validateSpecialTile(card, tileIds, errors);
     }
 
     validateRuleTileReferences(card, tileIds, errors);
@@ -231,6 +264,24 @@ export function validateCardCatalog(catalog, options = {}) {
 
     for (const id of duplicates) {
         addError(errors, `Duplicate card id ${id}.`);
+    }
+
+    if (Array.isArray(catalog.shop?.guaranteedOffers)) {
+        for (const guaranteed of catalog.shop.guaranteedOffers) {
+            if (!isObject(guaranteed)) {
+                addError(errors, 'shop.guaranteedOffers entries must be objects.');
+                continue;
+            }
+
+            if (!guaranteed.cardId || !ids.has(guaranteed.cardId)) {
+                addError(errors, `shop.guaranteedOffers references unknown cardId ${guaranteed.cardId ?? '<missing>'}.`);
+            }
+
+            if (guaranteed.enabledFromBattle !== undefined
+                && (!Number.isInteger(guaranteed.enabledFromBattle) || guaranteed.enabledFromBattle < 1)) {
+                addError(errors, `shop.guaranteedOffers ${guaranteed.cardId ?? '<missing>'}: enabledFromBattle must be a positive integer.`);
+            }
+        }
     }
 
     const enabledCards = cards.filter(cardEnabled);

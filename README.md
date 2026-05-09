@@ -21,7 +21,7 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - active `legacy` scores closures immediately after placement: monster hearts, gold and strike feedback update before the next placement or hand submit;
 - field resources are board underlays in active `legacy`: gold can be picked up by placing on it or sealed inside a closure, hearts heal only when sealed, and healing is capped by `hearts.maxPlayerHp`;
 - monster kill bounty pays the configured `configs/levels.json` `reward` once on victory;
-- after non-final victories, the run enters a card shop with 5 offers from `configs/cards.json`; the player may buy any number they can afford or skip, and bought cards go to discard while also increasing the persistent deck and staying marked `balanceStatus: "unverified"`;
+- after non-final victories, the run enters a card shop with 5 offers from `configs/cards.json`; the final MVP active pool is restrained red/blue line, tee, corner and plus/cross cards, while joker/double-card candidates are staged; the player may buy any number they can afford or skip, and bought cards go to discard while also increasing the persistent deck and carrying their final `balanceStatus`;
 - `Сдать руку` in `legacy` has an explicit cost: `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, paid immediately before the hand is redealt;
 - an unaffordable dealt hand is a last-chance hand: if the monster survives and the player cannot pay for another hand, the battle ends instead of redealing for free;
 - active hand mode has one hold slot: the selected card can be set aside, swapped with another card later and carried across a hand submit; it returns to discard when the battle ends;
@@ -34,17 +34,17 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - in Variant C, all combat tiles also count as one land color, but the board has A/B targets instead of Chain: if connected land links both cells, the round gains one-time `connectTargets.bonusDamage`, and a new pair appears next round;
 - in Variant D, all combat tiles count as one land color, the board has S/E gates, area-capture payoff is disabled, a short bridge gives a weak finish bonus, and a completed road deals its main damage from extra route length: `roadMode.completeBonus + min(extraLength, roadMode.maxScoredExtraLength) * roadMode.damagePerTile`;
 - the run uses a starting deck from `startingDeckRecipe`, draw pile, discard pile, persistent gold, field resources and card purchases between battles; the starting rescue deck is now 24 tiles: red/blue lines x2, red/blue tees/corners x1, no plus and no gray blank;
-- buyable card data lives in `configs/cards.json`: common red/blue line/tee/corner buys, plus/cross as a controlled uncommon buy, one `joker_line_v` special-card definition, price bands, offer rules and staged double/joker candidates.
+- buyable card data lives in `configs/cards.json`: common red/blue line/tee/corner buys, plus/cross as a controlled uncommon buy, price bands, offer rules, final MVP balance statuses and staged joker/double candidates.
 
 ## Where Things Live
 
 - `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `specialTiles`, `startingBoardTiles`, starting/max player hearts, heart conversion, hand-submit cost, gold/strike economy, field resources, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
 - `configs/levels.json` - battle list, enemy hearts, intro ante/reward preview, kill bounty reward and red/blue color attacks by round.
-- `configs/cards.json` - buyable card catalog, shop offer rules, prices, staged special-card definitions and future double-card semantics.
+- `configs/cards.json` - buyable card catalog, shop offer rules, prices, final balance statuses and staged future joker/double semantics.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
 - `assets/art_mvp/art_manifest.json` - stable presentation asset ids, states, filenames and Astral Archive PNG contract for the beautiful MVP track.
 - `assets/art_refs/` - accepted Astral Archive fake-screenshot references for future monster, UI, backdrop and effect work.
-- `assets/art_review/` - visual proof screenshots and contact-sheet checks for art passes, including board-cell valid/invalid hover examples.
+- `assets/art_review/` - visual proof screenshots and contact-sheet checks for art passes, including board-cell valid/invalid hover examples and the buyable-card special pack.
 - `design/core.md` - current Core 1 Rescue gameplay summary and boundaries.
 - `design/art-direction.md` - accepted Astral Archive defense setting, visual language, monster escalation and asset mapping.
 - `design/art-mvp-brief.md` - technical artist brief: safe replacement rules, topology locks, required asset categories and future art-loading plan.
@@ -52,6 +52,7 @@ The current MVP after the manual playtest and fake-shot art pass is built around
 - `design/card-pool.md` - accepted GD pass for the universal starter, joker/split card semantics, rough shop costs and validation protocol.
 - `design/ui-mockup.md` - named battle layout slots, portrait viewport contract and debug UI states.
 - `src/entities/cards.js` - card catalog validation, enabled-offer filtering and special tile extraction for the shop.
+- `src/entities/tileBattle.js` - tile placement/scoring rules, including catalog special tiles and two-cell macro-card placement.
 - `src/entities/run.js` - run state: deck, draw pile, discard pile, gold, shop offers, card purchases and old debug reward helpers.
 - `src/scenes/upgrades.js` - current between-battle card shop scene; the filename is legacy, but the scene name/debug state is `shop`.
 - `src/scenes/battleIntro.js` - pre-battle monster presentation scene and responsive intro layout.

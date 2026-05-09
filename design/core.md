@@ -167,8 +167,9 @@ Current implemented progression is the card shop:
 - card offers are generated from the validated catalog;
 - the player may buy any number they can afford, or skip;
 - ordinary cards add their tile id to the deck and discard pile;
-- enabled special cards, currently `joker_line_v`, add their special tile id to the deck and discard pile;
-- bought cards are marked `balanceStatus: "unverified"` until a separate balance pass keeps, nerfs or disables the family.
+- final MVP active cards are restrained red/blue line, tee and corner buys, plus red/blue plus/cross as low-pressure control;
+- `joker_line_v`, `double_red_line_h` and stronger joker/double candidates are staged after the balance gate;
+- bought cards carry the final `balanceStatus` from `configs/cards.json` into shop debug/history.
 
 ## Art Fantasy
 
@@ -187,7 +188,7 @@ Detailed art direction lives in `design/art-direction.md`. Accepted style refere
 - Deep permanent meta-progression.
 - Shop reroll, removal service and other shop services.
 - Balanced/approved final card pool.
-- Full art replacement through the MVP art manifest.
+- Complete low-level art replacement through the MVP art manifest.
 - Manual rotation as a default rule.
 - Reintroducing green, gray blank or plus into the active starting deck without a separate decision.
 

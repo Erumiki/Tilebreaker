@@ -115,6 +115,27 @@ Artist guardrails:
 - Field gold/heart icons must remain readable on both empty cells and cells covered by placed tiles.
 - If a new board-cell or hint filename is needed, propose it in the task/status first; do not silently rename existing ids.
 
+## Artist Screen: Buyable Cards And Special Tiles
+
+Runtime source: `src/scenes/upgrades.js`.
+
+Purpose: shop cards should look worth buying at card-preview scale without changing tile topology, card prices or enabled status. Ordinary red/blue line, tee, corner and plus/cross cards reuse the current `assets/tiles_v2` atlas; their shop readability should be judged in the card frame, not only on the tile contact sheet.
+
+New art-lane proof files:
+
+- `assets/tiles_v2/joker_line_v.png` - distinct proposed visual for the staged `joker_line_v` catalog card. It keeps the same universal-boundary visual topology as the catalog entry: `.*. / .*. / .*.`.
+- `assets/tiles_v2/double_red_line_h.png` - distinct proposed hand/shop preview for the staged `double_red_line_h` macro card. It depicts two linked red line segments while leaving placed board segments to ordinary tile art.
+- `assets/art_review/buyable_card_special_pack.png` - contact sheet at current shop-card scale showing ordinary card, cross, joker line and staged special-card concepts.
+
+`joker_line_v.png` and `double_red_line_h.png` are intentionally proposed asset files. Per the parallel art/balance contract in `CLAUDE.md`, the art lane does not change `configs/cards.json`; integration or post-MVP balance should switch the matching catalog `specialTile.file` values only after accepting the new visuals and re-enabling those families.
+
+Staged concepts on the contact sheet:
+
+- joker corner and joker tee use the same universal/gold wildcard language, but are marked `not active`;
+- double line is shown as a staged macro-card preview, not active MVP shop content;
+- double curve remains a clearly two-cell macro-card concept and is marked `not active`;
+- the concepts must not imply free rotation, extra scoring, red-blue merging or enabled gameplay behavior.
+
 ## Artist Screen: Battle Intro
 
 Runtime source: `src/scenes/battleIntro.js`.
@@ -129,7 +150,7 @@ The intro screen currently uses these MVP art ids:
 | Per-battle backdrop | `level_backdrop_battle_0N` | `level_backdrop_battle_0N.png` | Archive room under siege. Also used as a battle-intro visual field on desktop. |
 | Monster portrait | `monster_portrait_battle_0N` | `monster_portrait_battle_0N.png` | 512x512 transparent portrait. See `design/monster-roster.md` for each monster. |
 | Monster icon | `monster_icon_battle_0N` | `monster_icon_battle_0N.png` | 128x128 transparent HUD/icon silhouette. Must read at phone size. |
-| Primary button | `button_primary_*` | `button_primary_*.png` | Future Art Track 2 will route buttons through these states. Current intro still has drawn fallback buttons. |
+| Primary button | `button_primary_*` | `button_primary_*.png` | Runtime routes buttons through manifest-backed art where practical. Current intro keeps drawn fallback buttons if a state texture is unavailable. |
 
 Portrait composition priority:
 
@@ -172,7 +193,7 @@ The current runtime loads tile textures directly from `tile_manifest.json` and r
 5. After the UI layout contract exists, route battle board cells, slots, buttons, monster portraits, resource icons and overlays through the same asset map.
 6. Keep tile topology and tile PNG loading separate, but allow card/shop frames to compose with tile textures.
 
-Until Art Track 2, the placeholders are a contract and a replacement pack, not a full renderer integration.
+The placeholders are now a contract and a partially integrated replacement pack, not a complete renderer migration. Remaining Art Track work should finish low-level battle borders, pressed states, capture/closure effects, resource underlays and debug/variant surfaces without moving topology or balance out of gameplay data.
 
 ## Export Checklist
 

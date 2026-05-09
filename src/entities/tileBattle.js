@@ -156,6 +156,77 @@ function findTileById(tiles, tileId) {
     return tiles.find((tileDef) => tileDef.id === tileId);
 }
 
+function isMacroTile(tileDef) {
+    return tileDef?.special === 'double_macro_tile'
+        && Array.isArray(tileDef.segments);
+}
+
+function getSegmentOffset(segment) {
+    const [x = 0, y = 0] = Array.isArray(segment.offset) ? segment.offset : [];
+
+    return {
+        x: Math.floor(x),
+        y: Math.floor(y),
+    };
+}
+
+function getTilePlacementSegments(tileDef, originX, originY) {
+    if (!isMacroTile(tileDef)) {
+        return [{
+            x: originX,
+            y: originY,
+            tileDef,
+            sourceTileId: tileDef?.id,
+        }];
+    }
+
+    return tileDef.segments.map((segment) => {
+        const offset = getSegmentOffset(segment);
+
+        return {
+            x: originX + offset.x,
+            y: originY + offset.y,
+            tileDef: segment.tileDef,
+            sourceTileId: tileDef.id,
+        };
+    });
+}
+
+export function getTilePlacementCells(tileDef, originX, originY) {
+    return getTilePlacementSegments(tileDef, originX, originY)
+        .map((segment) => ({
+            x: segment.x,
+            y: segment.y,
+            tileDef: segment.tileDef,
+            tileId: segment.tileDef?.id ?? null,
+            sourceTileId: segment.sourceTileId,
+        }));
+}
+
+function getValidTilePlacementSegments(board, tileDef, originX, originY, settings) {
+    const segments = getTilePlacementSegments(tileDef, originX, originY);
+    const segmentByKey = new Map();
+
+    for (const segment of segments) {
+        if (!segment.tileDef || !isInsideBoard(settings.boardSize, segment.x, segment.y)) {
+            return null;
+        }
+
+        const keyValue = boardKey(segment.x, segment.y);
+
+        if (segmentByKey.has(keyValue) || board[segment.y][segment.x]) {
+            return null;
+        }
+
+        segmentByKey.set(keyValue, segment);
+    }
+
+    return {
+        segments,
+        segmentByKey,
+    };
+}
+
 function createStartingBoard(settings, tiles) {
     const board = createEmptyBoard(settings.boardSize);
     const entries = Array.isArray(settings.startingBoardTiles)
@@ -270,6 +341,42 @@ function hasAnyAdjacentPlacement(board, tileDef, settings) {
     }
 
     return false;
+}
+
+function canPlaceMacroTile(board, tileDef, originX, originY, settings) {
+    const placement = getValidTilePlacementSegments(board, tileDef, originX, originY, settings);
+
+    if (!placement) {
+        return false;
+    }
+
+    for (const segment of placement.segments) {
+        for (const direction of DIRECTIONS) {
+            const nextX = segment.x + direction.dx;
+            const nextY = segment.y + direction.dy;
+
+            if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+                continue;
+            }
+
+            const internalNeighbor = placement.segmentByKey.get(boardKey(nextX, nextY));
+
+            if (internalNeighbor) {
+                if (!edgesMatch(segment.tileDef, internalNeighbor.tileDef, direction, settings)) {
+                    return false;
+                }
+                continue;
+            }
+
+            const neighbor = board[nextY][nextX];
+
+            if (neighbor && !edgesMatch(segment.tileDef, neighbor, direction, settings)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 function getDamagePerArea(settings) {
@@ -1788,13 +1895,23 @@ function applyRoadModeToScore(state, score, settings, run = null) {
 }
 
 function createSpecialTile(entry) {
+    const color = entry.color ?? 'universal';
+    const symbol = colorSymbol(color);
+    const rows = entry.matrix.map((row) => row.replaceAll('X', symbol));
+
     return {
         id: entry.id,
         file: entry.file ?? null,
-        color: entry.color ?? 'universal',
+        color,
         pattern: entry.pattern ?? entry.id,
-        cells: pattern(entry.matrix),
+        cells: pattern(rows),
         special: entry.special ?? null,
+        segments: Array.isArray(entry.segments)
+            ? entry.segments.map((segment) => ({
+                tileId: segment.tileId,
+                offset: Array.isArray(segment.offset) ? [...segment.offset] : [0, 0],
+            }))
+            : null,
     };
 }
 
@@ -1820,8 +1937,22 @@ export function createTilesFromManifest(manifest, settings = {}) {
             .filter((entry) => shouldUseStartingBoardTile(entry, settings))
             .map(createSpecialTile)
         : [];
+    const tileMap = createTileMap([...manifestTiles, ...specialTiles]);
+    const resolvedSpecialTiles = specialTiles.map((tileDef) => {
+        if (!isMacroTile(tileDef)) {
+            return tileDef;
+        }
 
-    return [...manifestTiles, ...specialTiles];
+        return {
+            ...tileDef,
+            segments: tileDef.segments.map((segment) => ({
+                ...segment,
+                tileDef: tileMap.get(segment.tileId),
+            })),
+        };
+    });
+
+    return [...manifestTiles, ...resolvedSpecialTiles];
 }
 
 function getTilePattern(tileDef) {
@@ -1973,6 +2104,10 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
         return false;
     }
 
+    if (isMacroTile(tileDef)) {
+        return canPlaceMacroTile(board, tileDef, x, y, settings);
+    }
+
     if (countPlacedTiles(board) === 0) {
         return true;
     }
@@ -1988,6 +2123,22 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
     return true;
 }
 
+function placeTileDefOnBoard(board, tileDef, x, y) {
+    for (const segment of getTilePlacementSegments(tileDef, x, y)) {
+        board[segment.y][segment.x] = segment.tileDef;
+    }
+}
+
+export function createBoardWithTilePlacement(board, tileDef, x, y, settings) {
+    if (!canPlaceTile(board, tileDef, x, y, settings)) {
+        return null;
+    }
+
+    const nextBoard = cloneBoard(board);
+    placeTileDefOnBoard(nextBoard, tileDef, x, y);
+    return nextBoard;
+}
+
 export function placeTile(state, settings, x, y, run = null) {
     const tileDef = state.hand[state.selectedHandIndex];
 
@@ -1997,10 +2148,13 @@ export function placeTile(state, settings, x, y, run = null) {
 
     const placedBefore = countPlacedTiles(state.board);
     const hadDirectNeighbor = hasDirectNeighbor(state.board, x, y, settings);
-    state.board[y][x] = tileDef;
+    const placementSegments = getTilePlacementSegments(tileDef, x, y);
+    placeTileDefOnBoard(state.board, tileDef, x, y);
     state.lastPlacedTileColor = tileDef.color;
     state.lastPlacedTileId = tileDef.id;
-    collectPlacementResources(state, run, x, y);
+    for (const segment of placementSegments) {
+        collectPlacementResources(state, run, segment.x, segment.y);
+    }
     const postPlacementScore = scoreTileBoard(state.board, settings);
     state.lastPlacementClosedZones = postPlacementScore.zones.length;
     state.lastPlacementFocusDelta = 0;

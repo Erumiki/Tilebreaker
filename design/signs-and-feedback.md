@@ -110,7 +110,7 @@ Implemented shop pass:
 
 - Between-round card shop offers 5 catalog cards using gold.
 - Show card price, preview, affordability, bought state and deck/discard update.
-- Bought cards are marked balance-unverified in debug/history until a balance pass approves the family.
+- Bought cards carry their final catalog balance status in debug/history.
 
 Priority 3, later shop polish:
 

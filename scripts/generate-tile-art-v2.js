@@ -4,11 +4,13 @@ import zlib from 'node:zlib';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT_DIR = path.join(ROOT, 'assets', 'tiles_v2');
+const ART_REVIEW_DIR = path.join(ROOT, 'assets', 'art_review');
 const TILE_SIZE = 256;
 const SPRITE_COLUMNS = 6;
 const PREVIEW_COLUMNS = 6;
 const PREVIEW_CELL = { width: 184, height: 216 };
 const PREVIEW_TILE_SIZE = 132;
+const SHOP_CARD = { width: 280, height: 384, gap: 18, margin: 24, columns: 4 };
 
 const activeColors = ['red', 'blue', 'green'];
 
@@ -83,6 +85,20 @@ const specialPatterns = [
         filename: 'starter_universal_line_v.png',
         matrix: ['.*.', '.*.', '.*.'],
         variantSeed: 97,
+    },
+    {
+        color: 'universal',
+        pattern: 'joker_line_v',
+        filename: 'joker_line_v.png',
+        matrix: ['.*.', '.*.', '.*.'],
+        variantSeed: 131,
+    },
+    {
+        color: 'red',
+        pattern: 'double_line_h',
+        filename: 'double_red_line_h.png',
+        matrix: ['...', 'XXX', '...'],
+        variantSeed: 149,
     },
 ];
 
@@ -550,6 +566,77 @@ function drawUniversalGradientColumn(bitmap) {
     drawWardSpark(bitmap, cx + 14, y2, 'blue', 0.5);
 }
 
+function drawJokerUniversalColumn(bitmap) {
+    const p = pathPoints;
+    const red = palette.red;
+    const blue = palette.blue;
+    const universal = palette.universal;
+    const violet = [185, 81, 255, 255];
+    const gold = [246, 196, 105, 255];
+    const white = [255, 246, 218, 255];
+    const cx = p.center.x;
+    const y1 = p.top.y;
+    const y2 = p.bottom.y;
+
+    drawSampledLine(bitmap, cx, y1, cx, y2, 58, withAlpha(violet, 28));
+    drawSampledLine(bitmap, cx, y1, cx, y2, 44, withAlpha(gold, 50));
+    drawSampledLine(bitmap, cx, y1, cx, y2, 30, withAlpha(universal.ink, 152), false);
+
+    const steps = 76;
+    for (let index = 0; index <= steps; index += 1) {
+        const t = index / steps;
+        const y = y1 * (1 - t) + y2 * t;
+        const wave = Math.sin(t * Math.PI * 6) * 5.5;
+        const redX = cx - 18 - wave;
+        const blueX = cx + 18 + wave;
+        drawSoftCircle(bitmap, redX, y, 15, withAlpha(red.neon, 84));
+        drawSoftCircle(bitmap, blueX, y, 15, withAlpha(blue.neon, 92));
+        bitmap.fillCircle(redX, y, 5.5, withAlpha(red.core, 212));
+        bitmap.fillCircle(blueX, y, 5.5, withAlpha(blue.core, 220));
+    }
+
+    drawSampledLine(bitmap, cx, y1 + 2, cx, y2 - 2, 18, withAlpha(gold, 205), false);
+    drawSampledLine(bitmap, cx, y1 + 8, cx, y2 - 8, 9, withAlpha(white, 246), false);
+    drawThinLine(bitmap, cx, y1 + 16, cx, y2 - 16, 2, withAlpha(violet, 190));
+
+    for (const y of [y1 + 32, p.center.y, y2 - 32]) {
+        drawDiamond(bitmap, cx, Math.round(y), 14, withAlpha(gold, 178));
+        drawDiamond(bitmap, cx, Math.round(y), 8, withAlpha(violet, 148));
+        drawDiamond(bitmap, cx, Math.round(y), 4, withAlpha(white, 230));
+    }
+
+    drawWardSpark(bitmap, cx - 18, y1, 'red', 0.58);
+    drawWardSpark(bitmap, cx + 18, y1, 'blue', 0.58);
+    drawWardSpark(bitmap, cx - 18, y2, 'red', 0.58);
+    drawWardSpark(bitmap, cx + 18, y2, 'blue', 0.58);
+}
+
+function drawMiniPlate(bitmap, x, y, size, colorKey, pattern, seed) {
+    const mini = new Bitmap(TILE_SIZE, TILE_SIZE);
+    drawStoneGrid(mini, seed);
+    drawWardPath(mini, colorKey, pattern, seed);
+    drawCompassRune(mini, colorKey);
+    drawBrassFrame(mini, colorKey);
+    bitmap.pasteScaled(mini, x, y, size);
+}
+
+function drawDoubleLineCardPreview(bitmap) {
+    const red = palette.red;
+    const gold = palette.universal.light;
+    const y = 82;
+    const size = 82;
+    const leftX = 38;
+    const rightX = 136;
+
+    drawMiniPlate(bitmap, leftX, y, size, 'red', 'line_h', 401);
+    drawMiniPlate(bitmap, rightX, y, size, 'red', 'line_h', 402);
+    drawSampledLine(bitmap, leftX + size - 2, y + size / 2, rightX + 2, y + size / 2, 12, withAlpha(red.neon, 72));
+    drawThinLine(bitmap, leftX + size - 2, y + size / 2, rightX + 2, y + size / 2, 4, withAlpha(red.core, 210));
+    drawDiamond(bitmap, TILE_SIZE / 2, y + size / 2, 10, withAlpha(gold, 190));
+    drawDiamond(bitmap, TILE_SIZE / 2, y + size / 2, 5, withAlpha(red.core, 220));
+    drawCenteredText(bitmap, 'dual cells', TILE_SIZE / 2, 188, 3, [255, 221, 170, 210]);
+}
+
 function drawWardPath(bitmap, colorKey, pattern, seed) {
     const p = pathPoints;
 
@@ -589,10 +676,17 @@ function drawWardPath(bitmap, colorKey, pattern, seed) {
         drawWardEndpoints(bitmap, colorKey, ['left', 'right', 'top', 'bottom']);
     } else if (pattern === 'universal_line_v') {
         drawUniversalGradientColumn(bitmap);
+    } else if (pattern === 'joker_line_v') {
+        drawJokerUniversalColumn(bitmap);
+    } else if (pattern === 'double_line_h') {
+        drawDoubleLineCardPreview(bitmap);
     }
 
-    drawWardSpark(bitmap, p.center.x, p.center.y, pattern === 'universal_line_v' ? 'universal' : colorKey, pattern === 'line_h' || pattern === 'line_v' ? 0.72 : 0.9);
-    drawPathMotifs(bitmap, pattern === 'universal_line_v' ? 'universal' : colorKey, seed);
+    const universalPath = pattern === 'universal_line_v' || pattern === 'joker_line_v';
+    if (pattern !== 'double_line_h') {
+        drawWardSpark(bitmap, p.center.x, p.center.y, universalPath ? 'universal' : colorKey, pattern === 'line_h' || pattern === 'line_v' ? 0.72 : 0.9);
+        drawPathMotifs(bitmap, universalPath ? 'universal' : colorKey, seed);
+    }
 }
 
 function drawCompassRune(bitmap, colorKey) {
@@ -743,6 +837,186 @@ function createSpriteSheet(entries) {
     return bitmap;
 }
 
+function drawCardFrame(bitmap, rarity = 'common', staged = false) {
+    const accents = {
+        common: [219, 166, 93, 255],
+        uncommon: [117, 189, 255, 255],
+        rare: [215, 117, 255, 255],
+    };
+    const accent = accents[rarity] ?? accents.common;
+    const dark = staged ? [18, 17, 22, 255] : [20, 18, 24, 255];
+    const mid = staged ? [54, 46, 52, 255] : [70, 49, 67, 255];
+
+    bitmap.fillRect(0, 0, bitmap.width, bitmap.height, [8, 9, 14, 255]);
+    for (let y = 8; y < bitmap.height - 8; y += 1) {
+        const t = (y - 8) / Math.max(1, bitmap.height - 16);
+        bitmap.fillRect(8, y, bitmap.width - 16, 1, mix(mid, dark, t * 0.76));
+    }
+
+    bitmap.fillRect(14, 14, bitmap.width - 28, 2, withAlpha(accent, staged ? 88 : 174));
+    bitmap.fillRect(14, bitmap.height - 16, bitmap.width - 28, 2, withAlpha(accent, staged ? 70 : 146));
+    bitmap.fillRect(14, 14, 2, bitmap.height - 28, withAlpha(accent, staged ? 70 : 132));
+    bitmap.fillRect(bitmap.width - 16, 14, 2, bitmap.height - 28, withAlpha(accent, staged ? 70 : 132));
+
+    for (const corner of [[19, 19], [bitmap.width - 20, 19], [19, bitmap.height - 20], [bitmap.width - 20, bitmap.height - 20]]) {
+        drawDiamond(bitmap, corner[0], corner[1], 7, withAlpha(accent, staged ? 90 : 170));
+        drawDiamond(bitmap, corner[0], corner[1], 3, [11, 10, 14, 210]);
+    }
+
+    drawThinLine(bitmap, 28, 52, bitmap.width - 28, 52, 1.5, withAlpha(accent, staged ? 70 : 135));
+    drawThinLine(bitmap, 28, bitmap.height - 70, bitmap.width - 28, bitmap.height - 70, 1.5, withAlpha(accent, staged ? 64 : 126));
+    drawDiamond(bitmap, bitmap.width / 2, 52, 5, withAlpha(accent, staged ? 80 : 160));
+}
+
+function drawStagedRibbon(bitmap) {
+    const red = [241, 83, 87, 255];
+    for (let offset = -bitmap.height; offset < bitmap.width; offset += 7) {
+        drawThinLine(bitmap, offset, bitmap.height - 42, offset + 92, bitmap.height - 134, 3, withAlpha(red, 32));
+    }
+    bitmap.fillRect(0, bitmap.height - 72, bitmap.width, 34, [60, 21, 27, 185]);
+    drawThinLine(bitmap, 0, bitmap.height - 72, bitmap.width, bitmap.height - 72, 2, withAlpha(red, 160));
+    drawThinLine(bitmap, 0, bitmap.height - 38, bitmap.width, bitmap.height - 38, 2, withAlpha(red, 120));
+    drawCenteredText(bitmap, 'not active', bitmap.width / 2, bitmap.height - 60, 3, [255, 219, 173, 255]);
+}
+
+function drawJokerConceptTile(pattern, seed) {
+    const bitmap = new Bitmap(TILE_SIZE, TILE_SIZE);
+    drawStoneGrid(bitmap, seed);
+
+    if (pattern === 'joker_corner') {
+        drawRoundedElbow(bitmap, 'universal', 'top', 'right');
+        drawWardEndpoints(bitmap, 'universal', ['top', 'right']);
+        drawWardSpark(bitmap, pathPoints.top.x - 18, pathPoints.top.y, 'red', 0.5);
+        drawWardSpark(bitmap, pathPoints.right.x, pathPoints.right.y + 18, 'blue', 0.5);
+    } else if (pattern === 'joker_tee') {
+        drawRoundedTee(bitmap, 'universal', 'top', 'left', 'right');
+        drawWardEndpoints(bitmap, 'universal', ['left', 'right', 'top']);
+        drawWardSpark(bitmap, pathPoints.left.x, pathPoints.left.y - 16, 'red', 0.48);
+        drawWardSpark(bitmap, pathPoints.right.x, pathPoints.right.y + 16, 'blue', 0.48);
+        drawWardSpark(bitmap, pathPoints.top.x, pathPoints.top.y, 'universal', 0.52);
+    }
+
+    drawWardSpark(bitmap, pathPoints.center.x, pathPoints.center.y, 'universal', 0.9);
+    drawPathMotifs(bitmap, 'universal', seed);
+    drawCompassRune(bitmap, 'universal');
+    drawBrassFrame(bitmap, 'universal');
+    return bitmap;
+}
+
+function drawCardPreview(card) {
+    const bitmap = new Bitmap(SHOP_CARD.width, SHOP_CARD.height);
+    drawCardFrame(bitmap, card.rarity, card.staged);
+    drawCenteredText(bitmap, card.title, SHOP_CARD.width / 2, 25, 3, card.staged ? [170, 158, 148, 255] : [250, 232, 178, 255]);
+
+    if (card.tile) {
+        bitmap.pasteScaled(card.tile, 82, 72, 116);
+    }
+
+    if (card.tiles) {
+        const y = 89;
+        const size = 84;
+        bitmap.pasteScaled(card.tiles[0], 48, y, size);
+        bitmap.pasteScaled(card.tiles[1], 148, y, size);
+        drawThinLine(bitmap, 132, y + size / 2, 148, y + size / 2, 4, [244, 205, 123, card.staged ? 100 : 184]);
+        drawDiamond(bitmap, 140, y + size / 2, 6, [255, 238, 185, card.staged ? 120 : 220]);
+    }
+
+    drawCenteredText(bitmap, card.note, SHOP_CARD.width / 2, 222, 2, card.staged ? [165, 153, 143, 255] : [215, 226, 235, 255]);
+    drawCenteredText(bitmap, card.status, SHOP_CARD.width / 2, 252, 2, card.staged ? [236, 170, 138, 255] : [181, 231, 190, 255]);
+
+    if (card.staged) {
+        drawStagedRibbon(bitmap);
+        for (let y = 68; y < 196; y += 8) {
+            drawThinLine(bitmap, 42, y, SHOP_CARD.width - 42, y, 1, [120, 114, 123, 32]);
+        }
+    }
+
+    return bitmap;
+}
+
+function createBuyableCardArtPack(entries, specialEntries) {
+    const tileById = new Map([...entries, ...specialEntries].map((entry) => [
+        entry.filename.replace('.png', ''),
+        entry.bitmap,
+    ]));
+    const jokerCorner = drawJokerConceptTile('joker_corner', 211);
+    const jokerTee = drawJokerConceptTile('joker_tee', 223);
+    const cards = [
+        {
+            title: 'red line',
+            note: 'ordinary buy',
+            status: 'active',
+            rarity: 'common',
+            tile: tileById.get('tile_red_line_h'),
+        },
+        {
+            title: 'blue cross',
+            note: 'control buy',
+            status: 'active b2',
+            rarity: 'uncommon',
+            tile: tileById.get('tile_blue_plus'),
+        },
+        {
+            title: 'star line',
+            note: 'any top base',
+            status: 'active b2',
+            rarity: 'uncommon',
+            tile: tileById.get('joker_line_v'),
+        },
+        {
+            title: 'star corner',
+            note: 'concept only',
+            status: 'not enabled',
+            rarity: 'rare',
+            staged: true,
+            tile: jokerCorner,
+        },
+        {
+            title: 'star tee',
+            note: 'concept only',
+            status: 'not enabled',
+            rarity: 'rare',
+            staged: true,
+            tile: jokerTee,
+        },
+        {
+            title: 'double line',
+            note: 'dual cells',
+            status: 'active b3',
+            rarity: 'uncommon',
+            tile: tileById.get('double_red_line_h'),
+        },
+        {
+            title: 'double curve',
+            note: 'dual cells',
+            status: 'not enabled',
+            rarity: 'uncommon',
+            staged: true,
+            tiles: [tileById.get('tile_blue_corner_rd'), tileById.get('tile_blue_corner_lu')],
+        },
+    ];
+
+    const rows = Math.ceil(cards.length / SHOP_CARD.columns);
+    const width = SHOP_CARD.margin * 2 + SHOP_CARD.columns * SHOP_CARD.width + (SHOP_CARD.columns - 1) * SHOP_CARD.gap;
+    const height = SHOP_CARD.margin * 2 + 40 + rows * SHOP_CARD.height + (rows - 1) * SHOP_CARD.gap;
+    const bitmap = new Bitmap(width, height);
+    bitmap.fillRect(0, 0, width, height, [8, 12, 19, 255]);
+    drawCenteredText(bitmap, 'buyable cards', width / 2, 18, 4, [241, 211, 145, 255]);
+
+    cards.forEach((card, index) => {
+        const col = index % SHOP_CARD.columns;
+        const row = Math.floor(index / SHOP_CARD.columns);
+        const cardBitmap = drawCardPreview(card);
+        bitmap.paste(
+            cardBitmap,
+            SHOP_CARD.margin + col * (SHOP_CARD.width + SHOP_CARD.gap),
+            SHOP_CARD.margin + 40 + row * (SHOP_CARD.height + SHOP_CARD.gap),
+        );
+    });
+
+    return bitmap;
+}
+
 function createManifest(entries) {
     return {
         source: 'scripts/generate-tile-art-v2.js',
@@ -829,11 +1103,13 @@ function validate(entries, specialEntries = []) {
         tileFiles: entries.length,
         specialFiles: specialEntries.length,
         previewFiles: 2,
+        proofFiles: 1,
         manifestFiles: 1,
     };
 }
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.mkdirSync(ART_REVIEW_DIR, { recursive: true });
 
 const entries = buildEntries().map((entry, index) => ({
     ...entry,
@@ -855,9 +1131,13 @@ for (const entry of specialEntries) {
 writeBitmap('tile_sprite_sheet_6x6.png', createSpriteSheet(entries));
 writeBitmap('tile_contact_sheet.png', createPreview(entries));
 fs.writeFileSync(
+    path.join(ART_REVIEW_DIR, 'buyable_card_special_pack.png'),
+    encodePng(createBuyableCardArtPack(entries, specialEntries)),
+);
+fs.writeFileSync(
     path.join(OUT_DIR, 'tile_manifest.json'),
     `${JSON.stringify(createManifest(entries), null, 2)}\n`,
 );
 
 const result = validate(entries, specialEntries);
-console.log(`Generated ${result.tileFiles} v2 tile PNGs, ${result.specialFiles} special tile PNG, ${result.previewFiles} sheets, and ${result.manifestFiles} manifest.`);
+console.log(`Generated ${result.tileFiles} v2 tile PNGs, ${result.specialFiles} special tile PNGs, ${result.previewFiles} sheets, ${result.proofFiles} proof sheet, and ${result.manifestFiles} manifest.`);

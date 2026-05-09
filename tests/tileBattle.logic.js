@@ -18,6 +18,7 @@ import {
     buyShopOffer,
     createShopState,
     createRunState,
+    drawTileIds,
     finishShop,
     getRewardChoices,
     resolveBattle,
@@ -47,10 +48,20 @@ const settings = {
 };
 
 const tiles = createTilesFromManifest(manifest, settings);
+const catalogSpecialTiles = getCatalogSpecialTiles(cardCatalog);
+const stagedCatalogSpecialTiles = getCatalogSpecialTiles(cardCatalog, { includeStaged: true });
 const cardValidationTiles = [
     ...manifest.tiles,
     ...gameConfig.tileBattle.specialTiles,
+    ...stagedCatalogSpecialTiles,
 ];
+
+function getTestCardBalanceStatus(card) {
+    return card.balanceStatus
+        ?? card.rules?.balanceStatus
+        ?? cardCatalog.shop.familyBalanceStatus?.[card.family]
+        ?? 'unverified';
+}
 
 test('card catalog validates buyable tiles, prices, and staged special families', () => {
     const result = validateCardCatalog(cardCatalog, {
@@ -59,10 +70,13 @@ test('card catalog validates buyable tiles, prices, and staged special families'
 
     assert.equal(result.enabledCards.some((card) => card.id === 'card_red_line_h'), true);
     assert.equal(result.enabledCards.some((card) => card.id === 'card_blue_plus'), true);
-    assert.equal(result.enabledCards.some((card) => card.id === 'card_joker_line_v'), true);
+    assert.equal(result.enabledCards.some((card) => card.id === 'card_joker_line_v'), false);
+    assert.equal(result.enabledCards.some((card) => card.family === 'double_line'), false);
+    assert.equal(result.stagedCards.some((card) => card.id === 'card_joker_line_v'), true);
     assert.equal(result.stagedCards.some((card) => card.family === 'double_line'), true);
     assert.equal(result.stagedCards.some((card) => card.family === 'double_curve'), true);
     assert.equal(result.enabledCards.every((card) => card.cost > 0), true);
+    assert.equal(result.enabledCards.every((card) => getTestCardBalanceStatus(card).startsWith('mvp_keep')), true);
 });
 
 test('shop card filtering respects battle unlocks and active early colors', () => {
@@ -77,18 +91,34 @@ test('shop card filtering respects battle unlocks and active early colors', () =
 
     assert.equal(battleOneCards.some((card) => card.family === 'plus'), false);
     assert.equal(battleOneCards.some((card) => card.family === 'joker_line'), false);
+    assert.equal(battleTwoCards.some((card) => card.family === 'double_line'), false);
     assert.equal(battleOneCards.some((card) => card.color === 'green'), false);
     assert.equal(battleTwoCards.some((card) => card.id === 'card_red_plus'), true);
-    assert.equal(battleTwoCards.some((card) => card.id === 'card_joker_line_v'), true);
+    assert.equal(battleTwoCards.some((card) => card.id === 'card_joker_line_v'), false);
+
+    const battleThreeCards = getEnabledShopCards(cardCatalog, {
+        battleNumber: 3,
+        activeColors: ['red', 'blue'],
+    });
+    assert.equal(battleThreeCards.some((card) => card.id === 'card_double_line'), false);
 });
 
-test('card catalog exposes enabled special tile definitions for future shop use', () => {
+test('card catalog keeps staged special tile definitions out of the active shop', () => {
     const specialTiles = getCatalogSpecialTiles(cardCatalog);
 
-    assert.deepEqual(specialTiles.map((tileDef) => tileDef.id), ['joker_line_v']);
-    assert.equal(specialTiles[0].matrix.join('/'), '.*./.*./.*.');
-    assert.equal(specialTiles[0].special, 'universal_boundary');
-    assert.equal(specialTiles[0].sourceCardId, 'card_joker_line_v');
+    assert.deepEqual(specialTiles.map((tileDef) => tileDef.id), []);
+
+    const stagedSpecialTiles = getCatalogSpecialTiles(cardCatalog, { includeStaged: true });
+
+    assert.deepEqual(stagedSpecialTiles.map((tileDef) => tileDef.id), ['joker_line_v', 'double_red_line_h']);
+    assert.equal(stagedSpecialTiles[0].matrix.join('/'), '.*./.*./.*.');
+    assert.equal(stagedSpecialTiles[0].special, 'universal_boundary');
+    assert.equal(stagedSpecialTiles[0].sourceCardId, 'card_joker_line_v');
+    assert.equal(stagedSpecialTiles[1].special, 'double_macro_tile');
+    assert.deepEqual(stagedSpecialTiles[1].segments.map((segment) => segment.tileId), [
+        'tile_red_line_h',
+        'tile_red_line_h',
+    ]);
 });
 
 test('shop generation creates deterministic card offers for the next battle', () => {
@@ -108,12 +138,15 @@ test('shop generation creates deterministic card offers for the next battle', ()
 
     assert.equal(shop.nextBattle, 2);
     assert.equal(shop.offers.length, cardCatalog.shop.offerCount);
-    assert.equal(shop.balanceStatus, 'unverified');
+    assert.equal(shop.balanceStatus, 'mvp_balance_synced');
+    assert.equal(shop.offers.some((offer) => offer.cardId === 'card_joker_line_v'), false);
+    assert.equal(shop.offers.some((offer) => offer.cardId === 'card_double_line'), false);
 
     for (const offer of shop.offers) {
         counts.set(offer.cardId, (counts.get(offer.cardId) ?? 0) + 1);
+        const catalogCard = cardCatalog.cards.find((card) => card.id === offer.cardId);
         assert.equal(offer.type, 'shop_card');
-        assert.equal(offer.balanceStatus, 'unverified');
+        assert.equal(offer.balanceStatus, getTestCardBalanceStatus(catalogCard));
         assert.equal(offer.enabledFromBattle <= 2, true);
         assert.equal(!offer.color || ['red', 'blue'].includes(offer.color), true);
         assert.equal(offer.cost > 0, true);
@@ -123,6 +156,28 @@ test('shop generation creates deterministic card offers for the next battle', ()
     for (const [cardId, count] of counts) {
         const catalogCard = cardCatalog.cards.find((card) => card.id === cardId);
         assert.equal(count <= catalogCard.maxPerShop, true);
+    }
+});
+
+test('balance-synced shop keeps staged joker and double cards out of generated offers', () => {
+    for (let seed = 1; seed <= 20; seed += 1) {
+        const run = createRunState({
+            totalBattles: 5,
+            playerHp: 18,
+            startingDeck: ['tile_red_line_h', 'tile_blue_line_h'],
+            seed,
+            settings: { activeCombatColors: ['red', 'blue'] },
+        });
+
+        run.completedBattles = 1;
+        let shop = createShopState(run, cardCatalog);
+        assert.equal(shop.offers.some((offer) => offer.cardId === 'card_joker_line_v'), false);
+        assert.equal(shop.offers.some((offer) => offer.cardId === 'card_double_line'), false);
+
+        run.completedBattles = 2;
+        shop = createShopState(run, cardCatalog);
+        assert.equal(shop.offers.some((offer) => offer.cardId === 'card_joker_line_v'), false);
+        assert.equal(shop.offers.some((offer) => offer.cardId === 'card_double_line'), false);
     }
 });
 
@@ -152,7 +207,7 @@ test('buying shop offers spends gold and sends cards to discard', () => {
     assert.equal(run.deck.at(-1), offer.tileId);
     assert.equal(run.discardPile.at(-1), offer.tileId);
     assert.equal(run.purchasedCards.at(-1).cardId, offer.cardId);
-    assert.equal(run.purchasedCards.at(-1).balanceStatus, 'unverified');
+    assert.equal(run.purchasedCards.at(-1).balanceStatus, offer.balanceStatus);
 
     const secondOffer = shop.offers.find((candidate) => !candidate.bought && candidate.cost <= run.gold);
     const secondResult = buyShopOffer(run, shop, secondOffer.offerId);
@@ -195,6 +250,72 @@ test('unaffordable shop offers stay visible and cannot be bought', () => {
     assert.equal(shop.offers[0].bought, false);
     assert.equal(run.deck.length, 2);
     assert.equal(run.discardPile.length, 0);
+});
+
+function createSingleOfferShop(card) {
+    return {
+        id: `test_shop_${card.id}`,
+        battleNumber: Math.max(1, card.enabledFromBattle ?? 1),
+        nextBattle: Math.max(1, card.enabledFromBattle ?? 1),
+        offers: [{
+            ...card,
+            offerId: `${card.id}_test`,
+            cardId: card.id,
+            type: 'shop_card',
+            tileId: card.tileId ?? card.specialTile?.id ?? null,
+            bought: false,
+            balanceStatus: getTestCardBalanceStatus(card),
+        }],
+        boughtCards: [],
+        goldBefore: 20,
+        goldAfter: 20,
+        continued: false,
+        balanceStatus: cardCatalog.shop.balanceStatus,
+    };
+}
+
+test('plus and staged special debug offers can be bought and enter discard', () => {
+    for (const cardId of ['card_red_plus', 'card_joker_line_v', 'card_double_line']) {
+        const card = cardCatalog.cards.find((entry) => entry.id === cardId);
+        const run = createRunState({
+            totalBattles: 5,
+            playerHp: 18,
+            startingDeck: ['tile_red_line_h'],
+            seed: 20260508,
+            settings: { activeCombatColors: ['red', 'blue'] },
+        });
+        const shop = createSingleOfferShop(card);
+
+        run.gold = 20;
+
+        const result = buyShopOffer(run, shop, shop.offers[0].offerId);
+
+        assert.equal(result.bought, true, cardId);
+        assert.equal(run.deck.at(-1), shop.offers[0].tileId);
+        assert.equal(run.discardPile.at(-1), shop.offers[0].tileId);
+        assert.equal(run.purchasedCards.at(-1).cardId, cardId);
+        assert.equal(run.purchasedCards.at(-1).balanceStatus, getTestCardBalanceStatus(card));
+    }
+});
+
+test('bought double-line card appears through normal discard reshuffle draw', () => {
+    const card = cardCatalog.cards.find((entry) => entry.id === 'card_double_line');
+    const run = createRunState({
+        totalBattles: 5,
+        playerHp: 18,
+        startingDeck: ['tile_red_line_h'],
+        seed: 20260508,
+        settings: { activeCombatColors: ['red', 'blue'] },
+    });
+    const shop = createSingleOfferShop(card);
+
+    run.gold = 20;
+    assert.equal(buyShopOffer(run, shop, shop.offers[0].offerId).bought, true);
+
+    run.drawPile = [];
+
+    assert.deepEqual(drawTileIds(run, 1), ['double_red_line_h']);
+    assert.equal(run.reshuffles, 1);
 });
 
 test('gameplay variants keep one comparison order and URL aliases', () => {
@@ -465,6 +586,116 @@ test('universal boundary assists closure without adding wildcard cells to score 
     assert.equal(universalScore.zones[0].color, 'red');
     assert.equal(universalScore.zones[0].wildcardBoundarySize, 3);
     assert.equal(redOnlyScore.zones[0].area - universalScore.zones[0].area, 3);
+});
+
+test('staged joker line keeps universal boundary placement without direct red-blue merging', () => {
+    const jokerSettings = {
+        ...settings,
+        boardSize: 7,
+        gameplayVariant: 'legacy',
+        activeCombatColors: ['red', 'blue'],
+        specialTiles: stagedCatalogSpecialTiles,
+    };
+    const jokerTiles = createTilesFromManifest(manifest, jokerSettings);
+    const jokerTile = (id) => jokerTiles.find((tileDef) => tileDef.id === id);
+    const board = Array.from({ length: 7 }, () => Array(7).fill(null));
+
+    board[3][3] = jokerTile('joker_line_v');
+
+    assert.equal(canPlaceTile(board, jokerTile('tile_red_line_v'), 3, 2, jokerSettings), true);
+    assert.equal(canPlaceTile(board, jokerTile('tile_blue_line_v'), 3, 4, jokerSettings), true);
+
+    const redBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
+    redBoard[3][3] = jokerTile('tile_red_line_v');
+    assert.equal(canPlaceTile(redBoard, jokerTile('tile_blue_line_v'), 3, 2, jokerSettings), false);
+});
+
+test('double-line macro card places two ordinary segments and discards one bought card id', () => {
+    const macroSettings = {
+        ...settings,
+        boardSize: 7,
+        gameplayVariant: 'legacy',
+        specialTiles: stagedCatalogSpecialTiles,
+    };
+    const macroTiles = createTilesFromManifest(manifest, macroSettings);
+    const macroTile = (id) => macroTiles.find((tileDef) => tileDef.id === id);
+    const state = {
+        round: 1,
+        playerHp: 12,
+        enemyHp: 3,
+        board: Array.from({ length: 7 }, () => Array(7).fill(null)),
+        boardResources: [
+            { id: 'gold_left', type: 'gold', x: 1, y: 2, amount: 1, consumed: false },
+            { id: 'gold_right', type: 'gold', x: 2, y: 2, amount: 1, consumed: false },
+        ],
+        hand: [macroTile('double_red_line_h')],
+        heldTile: null,
+        selectedHandIndex: 0,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        battleLog: [],
+        resourceEvents: [],
+        outcome: null,
+    };
+    const run = {
+        gold: 0,
+        discardPile: [],
+    };
+
+    assert.equal(canPlaceTile(state.board, macroTile('double_red_line_h'), 1, 2, macroSettings), true);
+    assert.equal(placeTile(state, macroSettings, 1, 2, run), true);
+    assert.equal(state.board[2][1].id, 'tile_red_line_h');
+    assert.equal(state.board[2][2].id, 'tile_red_line_h');
+    assert.deepEqual(state.playedThisRound, ['double_red_line_h']);
+    assert.equal(state.hand[0], null);
+    assert.equal(run.gold, 2);
+    assert.equal(state.boardResources.every((resource) => resource.consumed), true);
+
+    discardRoundHand(run, state);
+    assert.deepEqual(run.discardPile, ['double_red_line_h']);
+});
+
+test('double-line macro card obeys outside edge legality and can score as ordinary segments', () => {
+    const macroSettings = {
+        ...settings,
+        boardSize: 7,
+        gameplayVariant: 'legacy',
+        specialTiles: stagedCatalogSpecialTiles,
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+    };
+    const macroTiles = createTilesFromManifest(manifest, macroSettings);
+    const macroTile = (id) => macroTiles.find((tileDef) => tileDef.id === id);
+    const blockedBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
+
+    blockedBoard[2][3] = macroTile('tile_blue_line_v');
+
+    assert.equal(canPlaceTile(blockedBoard, macroTile('double_red_line_h'), 1, 2, macroSettings), false);
+
+    const scoringBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
+    scoringBoard[2][1] = macroTile('tile_red_corner_rd');
+    scoringBoard[2][2] = macroTile('tile_red_line_h');
+    scoringBoard[2][3] = macroTile('tile_red_line_h');
+    scoringBoard[2][4] = macroTile('tile_red_corner_dl');
+    scoringBoard[3][1] = macroTile('tile_red_corner_ur');
+    scoringBoard[3][2] = macroTile('tile_red_line_h');
+    scoringBoard[3][3] = macroTile('tile_red_line_h');
+    scoringBoard[3][4] = macroTile('tile_red_corner_lu');
+
+    const score = scoreTileBoard(scoringBoard, macroSettings);
+
+    assert.equal(score.zones.length, 1);
+    assert.equal(score.zones[0].color, 'red');
+    assert.equal(score.zones[0].damage >= 1, true);
 });
 
 test('hold slot stores one hand tile, swaps it, and keeps it through a new pick', () => {

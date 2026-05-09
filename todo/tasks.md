@@ -37,7 +37,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Balance Sync: apply card decisions to config and docs
+### ~~[2026-05-09] MVP Balance Sync: apply card decisions to config and docs~~
 
 **Idea:** apply the balance-gate decisions cleanly after measurement, without mixing the measuring pass with final tuning.
 
@@ -56,6 +56,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Priority:** must
 
 **Layer:** MVP
+
+**Completed 2026-05-09:** synced `design/card-balance-gate.md` into `configs/cards.json` and docs. Active MVP shop now keeps restrained line/tee/corner and plus/cross with final `mvp_keep_*` statuses; guaranteed `joker_line_v`, `double_red_line_h` and stronger joker/double candidates are staged with `mvp_staged_after_gate`. Runtime shop offers and purchase history now propagate catalog balance statuses. Verified with `./scripts/npm.sh run check`, `./scripts/node.sh --test tests/tileBattle.logic.js` and `./scripts/npm.sh run test:e2e -- --grep "shop sells an affordable card"`.
 
 ---
 

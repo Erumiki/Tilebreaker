@@ -6,9 +6,11 @@ Goal: before implementing and tuning the battle scene, check whether the tile-pl
 
 ## Current Status Note
 
-This file is a chronological feasibility log. The current active truth is the Core 1 Rescue snapshot in `todo/current.md` and the core summary in `design/core.md`: `legacy`, `drawMode: "hand"`, 7x7 board, red/blue active colors, 24-card rescue deck, one universal center starter, hold, hearts, hand submit, immediate closure scoring, field resources, monster bounty and the implemented gold card shop.
+This file is a chronological feasibility log. The current active truth is the Core 1 Rescue snapshot in `todo/current.md` and the core summary in `design/core.md`: `legacy`, `drawMode: "hand"`, 7x7 board, red/blue active colors, 24-card rescue deck, one universal center starter, hold, hearts, hand submit, immediate closure scoring, field resources, monster bounty and the implemented gold card shop. The final MVP shop keeps restrained ordinary red/blue line, tee and corner cards plus controlled plus/cross cards; guaranteed `joker_line_v` and `double_red_line_h` are staged after the balance gate.
 
 Older sections below intentionally preserve the experiments that led here. When they mention 6x6, queue as active mode, three active colors, gray in the starting deck, round-end attack damage or the pre-shop upgrade flow, read those details as historical context unless the current status note or config says otherwise.
+
+Shop balance gate note 2026-05-09: `scripts/simulate-card-balance.js` now runs fixed-seed active-loop comparisons for no-shop, forced family buys, live shop and forced top-deck probes. The recorded decision is in `design/card-balance-gate.md`: keep restrained ordinary line/tee/corner and plus/cross for MVP; stage/disable guaranteed `joker_line_v` and `double_red_line_h`. The follow-up config sync has applied that decision.
 
 ## Test Model
 
@@ -25,6 +27,7 @@ Current parameters:
 - active default `drawMode` is `hand`; `queue` remains available for comparison;
 - closure damage is still computed from area, then active `legacy` converts it to monster hearts;
 - active `legacy` scores closures immediately and removes separate player damage from color attack shortage;
+- the shop special-card pool is present for manual testing, but this simulator does not yet model shop purchases, guaranteed offers or macro-card placement as a run-economy comparison;
 - archived variants and older log sections may still use the old round resolver for comparison.
 
 Temporary tile model for the test: each tile is a 3x3 micro-land grid. Tile edges match by a 3-character signature. The current simulation version counts area capture by colored boundary, not closed colored components.
@@ -41,7 +44,7 @@ Active v3 experiment without new art:
 - green remains in the manifest and UI, but is not part of the starting deck, early rewards or the first two attack tables;
 - starting deck is 25 tiles: for red/blue `line_h x2`, `line_v x2`, each `tee` x1, each `corner` x1, `plus x0`, plus `tile_gray_blank_01 x1`;
 - opening bag: `corner <= 2`, `plus <= 0`, `line >= 4`, `tee >= 4`, red/blue minimum 4 each, `grayMax = 1`;
-- active mode remains `queue`; `hand` is available through `?drawMode=hand` for comparison.
+- historical active mode for this experiment was `queue`; the current MVP default is now `hand`, with `queue` still available through `?drawMode=queue` for comparison.
 
 Short run of active `queue + opening bag`:
 
@@ -66,7 +69,7 @@ Core 1 follow-up status:
 - green is removed from visible legacy combat rows and active attack tables;
 - the starting universal red-blue center tile is implemented, so the first move is not "find where to start" but "where to develop";
 - one hold slot is implemented in hand mode;
-- limited rotate and red/blue double-color cards remain later levers after checking the universal starter and the implemented shop/card-pool economy.
+- limited rotate, split-color red/blue cards, joker corner/tee and double-curve cards remain later levers after checking the universal starter and implemented shop economy; the implemented `double_red_line_h` macro-card behavior is retained in code/data but staged out of the final MVP shop.
 
 Sanity run after config change:
 

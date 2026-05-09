@@ -5,6 +5,7 @@ import {
     advanceTileQueue,
     canPlaceTile,
     COMBAT_COLORS,
+    createBoardWithTilePlacement,
     createTileBattleState,
     createTilesFromManifest,
     discardRoundHand,
@@ -12,6 +13,7 @@ import {
     getRoundAttack,
     getConnectedCombatTileKeys,
     getShortestCombatPathKeys,
+    getTilePlacementCells,
     holdSelectedTile,
     placeTile,
     resolveHandSubmitDefeatIfNeeded,
@@ -267,6 +269,21 @@ function drawPlacementPreview(ui, rect, tileDef, settings, tileTextures) {
         background: '#2b251f',
     });
     drawBorder(ui, previewRect, '#f6d88a', Math.max(1, Math.floor(rect.width * 0.025)), 0.48);
+}
+
+function drawPlacementPreviewOnBoard(ui, layout, tileDef, x, y, settings, tileTextures) {
+    const cells = getTilePlacementCells(tileDef, x, y);
+
+    for (const cell of cells) {
+        const rect = {
+            x: layout.board.x + cell.x * layout.cellSize,
+            y: layout.board.y + cell.y * layout.cellSize,
+            width: layout.cellSize,
+            height: layout.cellSize,
+        };
+
+        drawPlacementPreview(ui, rect, cell.tileDef, settings, tileTextures);
+    }
 }
 
 function getBattleAssetId(prefix, battle) {
@@ -677,7 +694,7 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
             }
 
             if (isEmpty && isValid && isHovered) {
-                drawPlacementPreview(ui, rect, selectedTile, settings, tileTextures);
+                drawPlacementPreviewOnBoard(ui, layout, selectedTile, x, y, settings, tileTextures);
             }
 
             const targets = state.connectTargets;
@@ -1275,10 +1292,6 @@ function getHoverKey(ui, layout, settings, mouse) {
     ].join('|');
 }
 
-function cloneBoard(board) {
-    return board.map((row) => [...row]);
-}
-
 function cellDistance(left, right) {
     return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
 }
@@ -1343,8 +1356,12 @@ function getRoadPlacementValue(board, x, y, settings, targets) {
 }
 
 function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewTile = null, targets = null) {
-    const nextBoard = cloneBoard(board);
-    nextBoard[y][x] = tileDef;
+    const nextBoard = createBoardWithTilePlacement(board, tileDef, x, y, settings);
+
+    if (!nextBoard) {
+        return -Infinity;
+    }
+
     const score = scoreTileBoard(nextBoard, settings, run);
     const immediateValue = score.totalDamage * 12 + score.zones.length * 40;
     let previewValue = 0;
@@ -1356,8 +1373,18 @@ function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewT
                     continue;
                 }
 
-                const previewBoard = cloneBoard(nextBoard);
-                previewBoard[previewY][previewX] = previewTile;
+                const previewBoard = createBoardWithTilePlacement(
+                    nextBoard,
+                    previewTile,
+                    previewX,
+                    previewY,
+                    settings,
+                );
+
+                if (!previewBoard) {
+                    continue;
+                }
+
                 const previewScore = scoreTileBoard(previewBoard, settings, run);
                 previewValue = Math.max(
                     previewValue,

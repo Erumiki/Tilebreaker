@@ -1,6 +1,6 @@
 # Card Pool GD Pass
 
-Status 2026-05-09: universal starter implemented; buyable shop cards have validated data in `configs/cards.json`; the between-battle shop now sells catalog offers for gold and sends bought cards to the persistent deck and discard.
+Status 2026-05-09: universal starter implemented; buyable shop cards have validated data in `configs/cards.json`; the between-battle shop now sells catalog offers for gold and sends bought cards to the persistent deck and discard. The balance gate in `design/card-balance-gate.md` has been synced into the catalog: restrained ordinary line/tee/corner and plus/cross remain active for MVP, while the guaranteed `joker_line_v` offer and `double_red_line_h` have been staged out of the final active pool.
 
 This pass records the current card vocabulary used by the implemented gold card shop. The goal is to give Core 1 Rescue more planning control without turning the closure puzzle into an always-wildcard deck.
 
@@ -47,6 +47,20 @@ Rule intent:
 - Red and blue cells on the same card do not convert into one color and do not match each other on adjacent edges.
 - A split card is a compact way to support two nearby plans, not a color merger.
 - Split cards should be tested as bought control cards, not as the starter, because they are harder to explain than a universal adapter.
+
+### Double Macro Tile
+
+First implemented candidate: `double_red_line_h`.
+
+Rule intent:
+
+- The card is bought, stored, drawn and discarded as one deck id.
+- On placement it expands into two adjacent ordinary macro-cell segments: `tile_red_line_h` at offset `[0, 0]` and another `tile_red_line_h` at `[1, 0]`.
+- Both target cells must be empty and inside the board.
+- The internal shared edge and all outside edges use normal tile edge legality.
+- Field resources on either covered cell are collected normally.
+- Scoring treats the placed board segments exactly like ordinary red line tiles. The card gives reach/control, not bonus damage.
+- Current shop state: staged after the balance gate. The code/data behavior remains available for post-MVP revalidation, but it is not offered in the final MVP shop.
 
 ## Universal Starter Candidate
 
@@ -187,12 +201,11 @@ Success bar:
 
 ### Step 2: Minimal Shop Pool
 
-Initial shop pool now represented in `configs/cards.json`:
+Final MVP shop pool now represented in `configs/cards.json`:
 
 - Colored line.
 - Colored tee.
 - Colored corner.
-- Joker line.
 - Controlled plus/cross cards from battle 2 onward.
 
 Automated checks:
@@ -222,4 +235,18 @@ Each candidate needs one clear answer: does it create a better plan, or only mak
 
 ## Current Lead Decision
 
-The active battle deck starts with ordinary red/blue rescue cards and the board-only `starter_universal_line_v`. The live shop consumes `configs/cards.json`: ordinary red/blue lines, tees and corners are active from battle 1; red/blue plus and `joker_line_v` unlock from battle 2; stronger joker corner/tee and double line/curve candidates stay staged until their placement/scoring UX is implemented. All bought card families remain `balanceStatus: "unverified"` until the separate balance pass records keep, tuning or disable decisions.
+The active battle deck starts with ordinary red/blue rescue cards and the board-only `starter_universal_line_v`. The live shop consumes `configs/cards.json`: ordinary red/blue lines, tees and corners are active from battle 1 with restrained weights; red/blue plus/cross unlock from battle 2 at low offer pressure. `joker_line_v`, the former guaranteed joker offer, `double_red_line_h`, stronger joker corner/tee and double-curve candidates are staged for post-MVP revalidation. Bought cards carry final MVP `balanceStatus` values from the catalog into shop debug/history.
+
+## Balance Gate Decision
+
+Automated fixed-seed gate: `CARD_BALANCE_RUNS=40 ./scripts/node.sh scripts/simulate-card-balance.js`.
+
+Detailed metrics and rationale live in `design/card-balance-gate.md`. Summary:
+
+- keep ordinary red/blue line, tee and corner cards only as a restrained common pool; do not tune toward repeated multi-common buys;
+- keep plus/cross for MVP at low offer pressure because it was neutral-to-positive and did not increase minimal-loop share;
+- remove the guaranteed `joker_line_v` offer and stage/disable `joker_line_v` for the final MVP pool;
+- stage/disable `double_red_line_h` for the final MVP pool;
+- keep stronger joker and double candidates staged.
+
+Sync result: `configs/cards.json` now has no guaranteed joker offer, active family status values under `shop.familyBalanceStatus`, lower common offer pressure and staged `joker_line_v`/`double_red_line_h` entries with `mvp_staged_after_gate` rationale.

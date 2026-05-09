@@ -172,7 +172,7 @@ async function buyAffordableShopOffers(page, maxBuys) {
     expect(debug.boughtCards.at(-1)).toEqual(expect.objectContaining({
       cardId: offer.cardId,
       cost: offer.cost,
-      balanceStatus: 'unverified',
+      balanceStatus: offer.balanceStatus,
     }));
     bought += 1;
   }
@@ -185,7 +185,9 @@ async function continueFromShop(page, { maxBuys = 0 } = {}) {
   let shopDebug = await getShopDebug(page);
 
   expect(shopDebug.offers).toHaveLength(5);
-  expect(shopDebug.offers.every((offer) => offer.balanceStatus === 'unverified')).toBe(true);
+  expect(shopDebug.shop.balanceStatus).toBe('mvp_balance_synced');
+  expect(shopDebug.offers.every((offer) => offer.balanceStatus.startsWith('mvp_keep'))).toBe(true);
+  expect(shopDebug.offers.some((offer) => ['card_joker_line_v', 'card_double_line'].includes(offer.cardId))).toBe(false);
   expect(shopDebug.offers.every((offer) => offer.cardId.startsWith('card_'))).toBe(true);
 
   if (maxBuys > 0) {

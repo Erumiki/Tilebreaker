@@ -10,6 +10,13 @@
             "uncommon": 35,
             "rare": 10
         },
+        "balanceStatus": "mvp_balance_synced",
+        "familyBalanceStatus": {
+            "line": "mvp_keep_restrained",
+            "tee": "mvp_keep_lower_offer",
+            "corner": "mvp_keep_capped",
+            "plus": "mvp_keep_control"
+        },
         "rareEnabledFromBattle": 3,
         "priceBands": [
             {
@@ -44,7 +51,7 @@
             "family": "line",
             "color": "red",
             "pattern": "line_h",
-            "offerWeight": 12,
+            "offerWeight": 8,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -63,7 +70,7 @@
             "family": "line",
             "color": "red",
             "pattern": "line_v",
-            "offerWeight": 12,
+            "offerWeight": 8,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -82,7 +89,7 @@
             "family": "line",
             "color": "blue",
             "pattern": "line_h",
-            "offerWeight": 12,
+            "offerWeight": 8,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -101,7 +108,7 @@
             "family": "line",
             "color": "blue",
             "pattern": "line_v",
-            "offerWeight": 12,
+            "offerWeight": 8,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -120,7 +127,7 @@
             "family": "tee",
             "color": "red",
             "pattern": "tee_u",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -139,7 +146,7 @@
             "family": "tee",
             "color": "red",
             "pattern": "tee_r",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -158,7 +165,7 @@
             "family": "tee",
             "color": "red",
             "pattern": "tee_d",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -177,7 +184,7 @@
             "family": "tee",
             "color": "red",
             "pattern": "tee_l",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -196,7 +203,7 @@
             "family": "tee",
             "color": "blue",
             "pattern": "tee_u",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -215,7 +222,7 @@
             "family": "tee",
             "color": "blue",
             "pattern": "tee_r",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -234,7 +241,7 @@
             "family": "tee",
             "color": "blue",
             "pattern": "tee_d",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -253,7 +260,7 @@
             "family": "tee",
             "color": "blue",
             "pattern": "tee_l",
-            "offerWeight": 8,
+            "offerWeight": 5,
             "maxPerShop": 2,
             "enabledFromBattle": 1,
             "rules": {
@@ -272,7 +279,7 @@
             "family": "corner",
             "color": "red",
             "pattern": "corner_ur",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -291,7 +298,7 @@
             "family": "corner",
             "color": "red",
             "pattern": "corner_rd",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -310,7 +317,7 @@
             "family": "corner",
             "color": "red",
             "pattern": "corner_dl",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -329,7 +336,7 @@
             "family": "corner",
             "color": "red",
             "pattern": "corner_lu",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -348,7 +355,7 @@
             "family": "corner",
             "color": "blue",
             "pattern": "corner_ur",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -367,7 +374,7 @@
             "family": "corner",
             "color": "blue",
             "pattern": "corner_rd",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -386,7 +393,7 @@
             "family": "corner",
             "color": "blue",
             "pattern": "corner_dl",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -405,7 +412,7 @@
             "family": "corner",
             "color": "blue",
             "pattern": "corner_lu",
-            "offerWeight": 5,
+            "offerWeight": 3,
             "maxPerShop": 1,
             "enabledFromBattle": 1,
             "rules": {
@@ -455,16 +462,18 @@
         },
         {
             "id": "card_joker_line_v",
+            "enabled": false,
+            "status": "staged",
             "assetId": "joker_line_v",
             "name": "Joker Line V",
-            "description": "Vertical universal boundary that can continue either active color.",
+            "description": "Vertical universal boundary staged after the balance gate.",
             "cost": 5,
             "rarity": "uncommon",
             "family": "joker_line",
             "pattern": "line_v",
-            "offerWeight": 2,
-            "maxPerShop": 1,
-            "enabledFromBattle": 2,
+            "offerWeight": 0,
+            "maxPerShop": 0,
+            "enabledFromBattle": 99,
             "specialTile": {
                 "id": "joker_line_v",
                 "file": "starter_universal_line_v.png",
@@ -478,7 +487,9 @@
                 "onBuy": "add_to_discard",
                 "edgeMatch": "matches active combat colors only",
                 "capture": "blocks flood-fill for the evaluated color but does not add wildcard cells to score area",
-                "colorMerge": "red and blue do not match directly through the card"
+                "colorMerge": "red and blue do not match directly through the card",
+                "balanceStatus": "mvp_staged_after_gate",
+                "statusReason": "Disabled for MVP after fixed-seed balance: guaranteed/live joker shops underperformed baseline and did not prove blocked-hand recovery."
             }
         },
         {
@@ -497,7 +508,8 @@
             "enabledFromBattle": 99,
             "rules": {
                 "kind": "universal_boundary",
-                "statusReason": "Postpone until joker_line does not revive automatic small closures."
+                "balanceStatus": "mvp_staged_after_gate",
+                "statusReason": "Postpone until joker_line is revalidated after the MVP."
             }
         },
         {
@@ -516,23 +528,37 @@
             "enabledFromBattle": 99,
             "rules": {
                 "kind": "universal_boundary",
-                "statusReason": "Enable only if ordinary buys and joker_line still leave the deck too dry."
+                "balanceStatus": "mvp_staged_after_gate",
+                "statusReason": "Enable only if ordinary buys and joker_line are revalidated after the MVP."
             }
         },
         {
             "id": "card_double_line",
             "enabled": false,
             "status": "staged",
-            "assetId": "card_frame_uncommon",
+            "assetId": "double_red_line_h",
             "name": "Double Line",
-            "description": "One card places two same-color line segments as a two-cell macro tile.",
+            "description": "Two-cell red macro line staged after the balance gate.",
             "cost": 6,
             "rarity": "uncommon",
             "family": "double_line",
+            "color": "red",
             "pattern": "double_line",
             "offerWeight": 0,
             "maxPerShop": 0,
             "enabledFromBattle": 99,
+            "specialTile": {
+                "id": "double_red_line_h",
+                "file": "tile_red_line_h.png",
+                "color": "red",
+                "pattern": "double_line_h",
+                "matrix": ["...", "XXX", "..."],
+                "special": "double_macro_tile",
+                "segments": [
+                    { "tileId": "tile_red_line_h", "offset": [0, 0] },
+                    { "tileId": "tile_red_line_h", "offset": [1, 0] }
+                ]
+            },
             "rules": {
                 "kind": "double_macro_tile",
                 "footprint": "two adjacent macro cells",
@@ -542,7 +568,8 @@
                 ],
                 "placement": "Both segment cells must be empty; every outside edge uses normal edge legality; the internal shared edge must match.",
                 "scoring": "Segments score exactly as ordinary red line tiles with no extra damage multiplier.",
-                "statusReason": "Disabled until the shop UI supports a multi-cell placement preview."
+                "balanceStatus": "mvp_staged_after_gate",
+                "statusReason": "Disabled for MVP after fixed-seed balance: battle 3 probe stayed weak and raised minimal-closure/dead-end risk."
             }
         },
         {
@@ -568,7 +595,8 @@
                 ],
                 "placement": "Both segment cells must be empty; every outside edge uses normal edge legality; the internal shared edge must match.",
                 "scoring": "Segments score exactly as ordinary blue corner tiles with no extra damage multiplier.",
-                "statusReason": "Disabled until double cards have an explicit placement UI."
+                "balanceStatus": "mvp_staged_after_gate",
+                "statusReason": "Disabled because the weaker double-line candidate did not pass the MVP balance gate."
             }
         }
     ]

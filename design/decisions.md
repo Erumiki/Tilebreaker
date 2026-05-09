@@ -14,6 +14,24 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - MVP card balance sync stages joker and double line
+
+**Context:** The fixed-seed balance gate showed that the live guaranteed joker shop and `double_red_line_h` did not outperform the no-shop baseline enough to justify final-MVP risk.
+**Decision:** Remove the guaranteed `card_joker_line_v` offer, stage `card_joker_line_v` and `card_double_line`, lower common offer pressure and keep only restrained ordinary line/tee/corner plus plus/cross in the active shop. Active families now carry final `mvp_keep_*` balance statuses from `configs/cards.json`.
+**Rationale:** The jam build needs one clear active card pool. Keeping the implemented special-card definitions staged preserves future work without letting unapproved control tools stay active by inertia.
+
+### 2026-05-09 - Joker line is guaranteed for playtesting
+
+**Context:** `joker_line_v` was technically enabled in the shop, but the weighted offer pool made it appear in only a tiny fraction of manual shops, so the player could easily never see the first wildcard control card.
+**Decision:** Add `shop.guaranteedOffers` to `configs/cards.json` and guarantee `card_joker_line_v` as one offer from the battle 2 shop onward. It remains paid, capped at one per shop and marked balance-unverified.
+**Rationale:** A control card cannot be evaluated if it is invisible. Guaranteeing one slot preserves price pressure while making the next balance pass about the card's actual feel, not whether RNG happened to show it.
+
+### 2026-05-09 - First double card uses macro-tile placement
+
+**Context:** The shop already sells ordinary red/blue helpers, controlled plus/cross cards and `joker_line_v`, but the planned double-card family still needed one concrete behavior before it could enter the playable build.
+**Decision:** Enable `card_double_line` as `double_red_line_h` from battle 3. It is bought and drawn as one card id, then placement expands it into two adjacent ordinary `tile_red_line_h` board segments. Both segment cells must be empty; the internal edge and all outside edges use normal edge legality; scoring treats those board segments like ordinary red line tiles with no bonus multiplier.
+**Rationale:** This gives the player a clear control tool without adding a second placement click, free rotation or special damage. Keeping the first double family red, horizontal, expensive and low-weight lets the next balance pass test whether reach/control helps planning or revives automatic small closures.
+
 ### 2026-05-09 - Between-battle progression becomes a gold card shop
 
 **Context:** Battles now pay closure gold, field resources and monster bounties, and the card catalog is validated data. The old `1 of 3` free upgrade screen no longer fits the deck-building loop.
@@ -26,7 +44,7 @@ Important decisions are recorded with date and rationale so any team member or C
 
 **Context:** Gold and monster bounty now exist, but between-battle spending still needs a stable data source before replacing the old upgrade screen.
 
-**Decision:** Add `configs/cards.json` as the source of truth for shop offers. The catalog defines offer count, rarity weights, active red/blue shop colors, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special-card definition and explicitly staged joker/double candidates. `src/entities/cards.js` validates the catalog during config load, checks enabled tile/special/asset references and exposes enabled-offer filtering plus special tile extraction for the shop.
+**Decision:** Add `configs/cards.json` as the source of truth for shop offers. The catalog defines offer count, rarity weights, active red/blue shop colors, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, initially one enabled `joker_line_v` special-card definition and explicitly staged joker/double candidates. `src/entities/cards.js` validates the catalog during config load, checks enabled tile/special/asset references and exposes enabled-offer filtering plus special tile extraction for the shop. Later passes added `shop.guaranteedOffers` for visible control-card playtesting and enabled the first double-card family as `double_red_line_h`.
 
 **Rationale:** This lets the shop consume data instead of hardcoding prices or offer families in a scene. Keeping stronger joker/double cards staged protects the closure puzzle while making the planned control-card direction concrete and testable.
 
@@ -75,6 +93,8 @@ Important decisions are recorded with date and rationale so any team member or C
 **Decision:** Active `legacy` replaces the old end-round/new-pick action with `Сдать руку`. The button previews and immediately charges `submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, then redeals. Separate monster attack damage is removed from active Core 1; the player loses hearts only through hand submit in this MVP pass. Closed zones score immediately after the placement that closes them, before any later action. Each closed zone gives `+1 gold`; closures on consecutive valid placements award strike bonus gold equal to the current strike count. Gold is saved for a later between-round card/shop pass, not spent in this implementation pass.
 
 **Rationale:** This keeps the rescued Core 1 focused on one readable pressure: "Can I close something with this hand, or do I surrender the hand and pay hearts?" Immediate closure makes the cause/effect legible, while gold and strike reward fast tactical closures without reintroducing old monster attack bookkeeping.
+
+**Superseded 2026-05-09:** Gold is no longer only saved. The later between-battle progression decision implemented the card shop, so gold is now spent on catalog cards after non-final victories.
 
 ### 2026-05-09 - Core 1 Rescue uses hearts and new-pick cost
 
@@ -265,6 +285,8 @@ Important decisions are recorded with date and rationale so any team member or C
 **Decision:** Add `tileBattle.drawMode` with values `hand` and `queue`, enable `queue` as active MVP mode, keep full-hand available through `?drawMode=hand`, add queue UI and simulator support for queue through `DRAW_MODE=queue`. Use beam AI for queue simulation: with current tile and preview, the decision space is smaller, so it can be tested more strongly than a random full-hand order.
 
 **Rationale:** Manual checking needs queue visible in the normal build, not only through debug URL. Queue makes choice more sequential and is genuinely easier for the test AI. After replacing greedy evaluation with beam, queue metrics became noticeably fairer: early conversion is better in some runs. The main design problem remains: closures are still most often small `area <= 12`, so the next task must still compare queue and hand before choosing the final active `drawMode`.
+
+**Superseded 2026-05-09:** Core 1 Rescue switched the active MVP default back to `drawMode: "hand"` after manual playtest. Queue remains available through debug/URL comparison, but it is no longer the current MVP posture.
 
 ### 2026-05-09 - Off-color leap is available beyond full blocking
 
