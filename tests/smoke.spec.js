@@ -48,6 +48,13 @@ async function getMainMenuDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getMainMenuDebug());
 }
 
+function expectRectInsideViewport(rect, viewport, label) {
+  expect(rect.x, `${label}.x`).toBeGreaterThanOrEqual(0);
+  expect(rect.y, `${label}.y`).toBeGreaterThanOrEqual(0);
+  expect(rect.x + rect.width, `${label}.right`).toBeLessThanOrEqual(viewport.width);
+  expect(rect.y + rect.height, `${label}.bottom`).toBeLessThanOrEqual(viewport.height);
+}
+
 async function placeHandIndex(page, handIndex, cellX, cellY) {
   let debug = await getBattleDebug(page);
   const placedBefore = debug.placedCount;
@@ -487,6 +494,61 @@ test('player can hold and swap one hand card', async ({ page }) => {
     + (battleDebug.heldTile ? 1 : 0),
   ).toBe(run.deck.length);
 });
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 360, height: 740 },
+  { width: 430, height: 932 },
+]) {
+  test(`portrait battle layout fits ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
+
+    await expect(page.locator('#game')).toBeVisible();
+    await expectScene(page, 'mainmenu');
+
+    const menuDebug = await getMainMenuDebug(page);
+    await clickRect(page, menuDebug.layout.startButton);
+    await expectScene(page, 'battle');
+
+    let battleDebug = await getBattleDebug(page);
+
+    expect(battleDebug.layout.mode).toBe('portrait');
+    expect(battleDebug.layout.viewport.overflows).toBe(false);
+    expect(battleDebug.layout.minTouchTarget).toBeGreaterThanOrEqual(44);
+    expect(battleDebug.layout.hand).toHaveLength(7);
+    expect(battleDebug.layout.hold).not.toBeNull();
+    expect(battleDebug.uiState.primary).toEqual(expect.any(String));
+    expect(battleDebug.uiState.hold).toBe('holdEmpty');
+
+    [
+      ['hud', battleDebug.layout.hud],
+      ['monsterBanner', battleDebug.layout.monsterBanner],
+      ['board', battleDebug.layout.board],
+      ['feedback', battleDebug.layout.feedback],
+      ['log', battleDebug.layout.log],
+      ['hold', battleDebug.layout.hold],
+      ['primaryButton', battleDebug.layout.primaryButton],
+      ...battleDebug.layout.hand.map((rect, index) => [`hand.${index}`, rect]),
+    ].forEach(([label, rect]) => expectRectInsideViewport(rect, viewport, label));
+
+    await clickRect(page, battleDebug.layout.hold);
+    await page.waitForTimeout(50);
+
+    battleDebug = await getBattleDebug(page);
+    expect(battleDebug.heldTile).not.toBeNull();
+    expect(battleDebug.uiState.hold).toBe('holdFilled');
+
+    await clickRect(page, battleDebug.layout.primaryButton);
+    await expect.poll(() => page.evaluate(() => (
+      window.__tilebreakerDebug.getBattleDebug()?.handSubmitsThisBattle
+    ))).toBe(1);
+
+    battleDebug = await getBattleDebug(page);
+    expect(battleDebug.layout.mode).toBe('portrait');
+    expect(battleDebug.layout.viewport.overflows).toBe(false);
+  });
+}
 
 test('player can choose a kept experiment from the temporary variant picker', async ({ page }) => {
   await page.goto('/?seed=20260508&drawMode=queue');

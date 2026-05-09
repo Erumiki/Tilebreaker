@@ -15,6 +15,24 @@ This brief covers presentation assets for the active Core 1 MVP:
 - full-hand draw, one hold slot, `Сдать руку`, hearts, gold and strikes;
 - later shop, monster intro and field resource tasks.
 
+## Accepted Art Direction
+
+The active setting is **Astral Archive Defense**. Tilebreaker is a roguelite about a defender of a star archive who builds magical contours on a battle grid to seal invading monsters while their heart holds out.
+
+The player is not simply attacking a monster with tiles. The player is holding a defensive ritual. A closed contour is a completed seal or ward; the monster loses hearts because part of its intrusion has been cut off by the barrier.
+
+Art language:
+
+- red boundaries are solar seals;
+- blue boundaries are lunar seals;
+- the universal starter is the archive's red-blue meridian;
+- captured areas are stabilized archive space inside a ward;
+- `Сдать руку` is an overload of the archive mechanism paid with living light;
+- gold is star dust or archive tokens;
+- monster portraits show escalating breaches into the archive.
+
+Detailed direction lives in `design/art-direction.md`.
+
 The tile topology itself remains owned by gameplay data. Tile `matrix`, `edges`, `color`, `pattern`, `special` rules and scoring semantics live in `assets/tiles_v2/tile_manifest.json` and `configs/game.json`. Repainting a PNG must not change any of those values.
 
 ## Source Files

@@ -1,5 +1,6 @@
 import { BattleOutcome, getRunDeckStats } from '../entities/run.js';
 import { getGameplayVariant } from '../entities/gameplayVariants.js';
+import { createBattleLayout } from './battleLayout.js';
 import {
     advanceTileQueue,
     canPlaceTile,
@@ -33,6 +34,21 @@ const COLOR_LABELS = {
     red: 'Красный',
     blue: 'Синий',
     green: 'Зеленый',
+};
+
+const BATTLE_UI_STATES = {
+    battleIntro: 'battleIntro',
+    placing: 'placing',
+    cardSelected: 'cardSelected',
+    holdEmpty: 'holdEmpty',
+    holdFilled: 'holdFilled',
+    invalidPlacement: 'invalidPlacement',
+    closureScored: 'closureScored',
+    submitPaid: 'submitPaid',
+    submitBlocked: 'submitBlocked',
+    lastChanceHand: 'lastChanceHand',
+    victory: 'victory',
+    defeat: 'defeat',
 };
 
 function isQueueDrawMode(settings) {
@@ -175,80 +191,6 @@ function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
     ui.drawRect({ x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color, alpha);
     ui.drawRect({ x: rect.x, y: rect.y, width: thickness, height: rect.height }, color, alpha);
     ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-}
-
-function getLayout(screen, settings) {
-    const boardPixels = Math.min(screen.width - 360, screen.height - 290, 438);
-    const boardSize = Math.max(300, boardPixels);
-    const boardX = Math.max(24, Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - 300));
-    const boardY = 144;
-    const isQueue = isQueueDrawMode(settings);
-    const holdEnabled = isHoldEnabled(settings);
-    const holdGap = holdEnabled ? 14 : 0;
-    const handSlot = isQueue
-        ? Math.min(116, (screen.width - 96) / 2.1)
-        : Math.min(82, Math.max(
-            54,
-            (screen.width - 64 - holdGap - (settings.handSize - 1) * 8)
-                / (settings.handSize + (holdEnabled ? 1 : 0)),
-        ));
-    const previewSlot = isQueue ? Math.floor(handSlot * 0.72) : handSlot;
-    const handCount = isQueue ? 2 : settings.handSize;
-    const handWidth = isQueue
-        ? handSlot + 14 + previewSlot
-        : settings.handSize * handSlot + (settings.handSize - 1) * 8;
-    const groupWidth = handWidth + (holdEnabled ? handSlot + holdGap : 0);
-    const groupX = screen.width / 2 - groupWidth / 2;
-    const handX = groupX + (holdEnabled ? handSlot + holdGap : 0);
-    const handY = screen.height - handSlot - 28;
-    const sideX = boardX + boardSize + 24;
-    const sideWidth = Math.max(240, screen.width - sideX - 24);
-
-    return {
-        board: {
-            x: boardX,
-            y: boardY,
-            width: boardSize,
-            height: boardSize,
-        },
-        cellSize: boardSize / settings.boardSize,
-        hold: holdEnabled ? {
-            x: groupX,
-            y: handY,
-            width: handSlot,
-            height: handSlot,
-        } : null,
-        hand: Array.from({ length: handCount }, (_, index) => {
-            if (!isQueue) {
-                return {
-                    x: handX + index * (handSlot + 8),
-                    y: handY,
-                    width: handSlot,
-                    height: handSlot,
-                };
-            }
-
-            const size = index === 0 ? handSlot : previewSlot;
-            return {
-                x: screen.width / 2 - handWidth / 2 + (index === 0 ? 0 : handSlot + 14),
-                y: handY + (handSlot - size),
-                width: size,
-                height: size,
-            };
-        }),
-        endRoundButton: {
-            x: sideX,
-            y: handY - 82,
-            width: sideWidth,
-            height: 56,
-        },
-        sidePanel: {
-            x: sideX,
-            y: boardY,
-            width: sideWidth,
-            height: boardSize,
-        },
-    };
 }
 
 function getBoardCell(layout, settings, point) {
@@ -446,8 +388,12 @@ function drawHand(ui, layout, settings, state, mouse, tileTextures) {
         });
 
         if (label) {
-            ui.drawText(label, rect.x, rect.y - 24, {
-                size: index === 0 ? 16 : 14,
+            const labelX = layout.mode === 'portrait' ? rect.x + rect.width / 2 : rect.x;
+            const labelY = layout.mode === 'portrait' ? rect.y + rect.height - 18 : rect.y - 24;
+
+            ui.drawText(label, labelX, labelY, {
+                align: layout.mode === 'portrait' ? 'center' : 'left',
+                size: layout.mode === 'portrait' ? 12 : index === 0 ? 16 : 14,
                 color: index === 0 ? '#f6f0a8' : '#8fb1cb',
             });
         }
@@ -469,13 +415,25 @@ function drawHold(ui, layout, settings, state, mouse, tileTextures) {
         oneColorLand: isOneColorLandVariant(settings),
         tileTextures,
     });
-    ui.drawText('Запас', rect.x, rect.y - 24, {
-        size: 14,
-        color: tileDef ? '#f3d991' : '#8fb1cb',
-    });
+    if (layout.mode === 'portrait') {
+        ui.drawText('Запас', rect.x + rect.width / 2, rect.y + rect.height - 18, {
+            align: 'center',
+            size: 12,
+            color: tileDef ? '#f3d991' : '#8fb1cb',
+        });
+    } else {
+        ui.drawText('Запас', rect.x, rect.y - 24, {
+            size: 14,
+            color: tileDef ? '#f3d991' : '#8fb1cb',
+        });
+    }
 }
 
 function drawSidePanel(ui, layout, battle, run, settings, state) {
+    if (!layout.sidePanel) {
+        return;
+    }
+
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round, settings);
     const deck = getRunDeckStats(run);
@@ -611,6 +569,159 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             });
         });
     }
+}
+
+function getCompactBattleLine(battle, state, settings) {
+    const variant = getGameplayVariant(settings);
+
+    return `${battle.name} · Раунд ${state.round} · ${variant.shortLabel}`;
+}
+
+function drawBattleHeader(ui, layout, run, battle, settings, state) {
+    if (layout.mode === 'portrait') {
+        const hud = layout.hud;
+        const banner = layout.monsterBanner;
+
+        ui.drawRect(hud, '#0f1d2b', 0.96);
+        drawBorder(ui, hud, '#28445c', 1, 0.85);
+        ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
+            size: 13,
+            color: '#eef8ff',
+        });
+        ui.drawText(`Игрок ${formatHearts(state.playerHp)}`, hud.x + hud.width * 0.24, hud.y + 8, {
+            size: 14,
+            color: '#c8f7dd',
+        });
+        ui.drawText(`Монстр ${formatHearts(state.enemyHp)}`, hud.x + hud.width * 0.53, hud.y + 8, {
+            size: 14,
+            color: '#ffd4d8',
+        });
+        ui.drawText(`${run.gold ?? 0} зол`, hud.x + hud.width - 58, hud.y + 8, {
+            size: 14,
+            color: '#f3d991',
+        });
+
+        ui.drawRect(banner, '#132334', 0.94);
+        drawBorder(ui, banner, '#31566b', 1, 0.85);
+        ui.drawText(getCompactBattleLine(battle, state, settings), banner.x + 10, banner.y + 9, {
+            size: 15,
+            color: '#d8e7f2',
+        });
+        return;
+    }
+
+    ui.drawText(`Битва ${run.currentBattle} / ${run.totalBattles}`, 28, 24, {
+        size: 24,
+        color: '#eef8ff',
+    });
+    ui.drawText(usesHandSubmitEconomy(settings)
+        ? 'Замыкай зоны: закрытие бьет монстра, сдача руки стоит сердца'
+        : isRoadModeVariant(settings)
+            ? 'Проведи дорогу от S к E и перебей атаки'
+            : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
+        size: 17,
+        color: '#98b4c8',
+    });
+}
+
+function getFeedbackType(state, settings) {
+    if (state.outcome === 'victory') {
+        return BATTLE_UI_STATES.victory;
+    }
+
+    if (state.outcome === 'defeat') {
+        return BATTLE_UI_STATES.defeat;
+    }
+
+    if (state.feedback?.startsWith('Нельзя')) {
+        return BATTLE_UI_STATES.invalidPlacement;
+    }
+
+    if ((state.lastPlacementClosedZones ?? 0) > 0) {
+        return BATTLE_UI_STATES.closureScored;
+    }
+
+    if (usesHandSubmitEconomy(settings) && state.lastSubmitResult?.submitted) {
+        return BATTLE_UI_STATES.submitPaid;
+    }
+
+    if (usesHandSubmitEconomy(settings) && !getHandSubmitCostPreview(state, settings).canPay) {
+        return state.handSubmitLocked
+            ? BATTLE_UI_STATES.lastChanceHand
+            : BATTLE_UI_STATES.submitBlocked;
+    }
+
+    if (state.hand[state.selectedHandIndex]) {
+        return BATTLE_UI_STATES.cardSelected;
+    }
+
+    return BATTLE_UI_STATES.placing;
+}
+
+function getBattleUiState(state, settings) {
+    return {
+        primary: getFeedbackType(state, settings),
+        placement: state.phase === 'placing' && !state.outcome
+            ? BATTLE_UI_STATES.placing
+            : state.phase,
+        selected: state.hand[state.selectedHandIndex]
+            ? BATTLE_UI_STATES.cardSelected
+            : null,
+        hold: state.heldTile
+            ? BATTLE_UI_STATES.holdFilled
+            : BATTLE_UI_STATES.holdEmpty,
+        canSubmit: !usesHandSubmitEconomy(settings)
+            || getHandSubmitCostPreview(state, settings).canPay,
+        submitLocked: state.handSubmitLocked ?? false,
+    };
+}
+
+function drawPortraitFeedback(ui, layout, settings, state) {
+    if (layout.mode !== 'portrait') {
+        if (state.feedback) {
+            ui.drawText(state.feedback, layout.board.x, layout.hand[0].y - 34, {
+                size: 16,
+                color: '#f3d991',
+            });
+        }
+        return;
+    }
+
+    const feedback = layout.feedback;
+    const log = layout.log;
+    const submitCost = usesHandSubmitEconomy(settings)
+        ? getHandSubmitCostPreview(state, settings)
+        : null;
+    const fallback = state.outcome === 'victory'
+        ? 'Победа'
+        : state.outcome === 'defeat'
+            ? 'Поражение'
+            : submitCost
+                ? `Сдать руку ${formatHeartDelta(submitCost.totalDamage)} · карт ${submitCost.unplayedHandCards}`
+                : 'Ход';
+
+    ui.drawRect(feedback, '#101c2a', 0.96);
+    drawBorder(ui, feedback, '#28445c', 1, 0.85);
+    ui.drawText(state.feedback ?? fallback, feedback.x + 10, feedback.y + 8, {
+        size: 14,
+        color: state.feedback?.startsWith('Нельзя') ? '#ff8b9c' : '#f3d991',
+    });
+
+    ui.drawRect(log, '#0d1824', 0.92);
+    drawBorder(ui, log, '#21384c', 1, 0.75);
+    const latestLog = (state.battleLog ?? []).slice(-2);
+    const lines = latestLog.length > 0
+        ? latestLog
+        : state.lastResult
+            ? [`Монстру ${formatHeartDelta(state.lastResult.enemyDamage)} · золото +${state.lastResult.goldEarned ?? 0}`]
+            : ['Событий пока нет'];
+
+    lines.slice(0, 2).forEach((entry, index) => {
+        ui.drawText(entry, log.x + 10, log.y + 6 + index * 18, {
+            size: 12,
+            color: index === 0 ? '#bfd2df' : '#8fb1cb',
+        });
+    });
 }
 
 function getButtonLabel(state, settings) {
@@ -1041,7 +1152,7 @@ export function createBattleScene({
         render(app) {
             const screen = app.screen;
             const mouse = input.getMouse();
-            this.layout = getLayout(screen, settings);
+            this.layout = createBattleLayout(screen, settings);
             const renderKey = createRenderKey({
                 ui,
                 layout: this.layout,
@@ -1059,29 +1170,12 @@ export function createBattleScene({
             this.lastRenderKey = renderKey;
             ui.begin();
 
-            ui.drawText(`Битва ${run.currentBattle} / ${run.totalBattles}`, 28, 24, {
-                size: 24,
-                color: '#eef8ff',
-            });
-            ui.drawText(usesHandSubmitEconomy(settings)
-                ? 'Замыкай зоны: закрытие бьет монстра, сдача руки стоит сердца'
-                : isRoadModeVariant(settings)
-                    ? 'Проведи дорогу от S к E и перебей атаки'
-                    : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
-                size: 17,
-                color: '#98b4c8',
-            });
-
+            drawBattleHeader(ui, this.layout, run, battle, settings, state);
             drawBoard(ui, this.layout, settings, state, mouse, tileTextures);
             drawSidePanel(ui, this.layout, battle, run, settings, state);
             drawHold(ui, this.layout, settings, state, mouse, tileTextures);
             drawHand(ui, this.layout, settings, state, mouse, tileTextures);
-            if (state.feedback) {
-                ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
-                    size: 16,
-                    color: '#f3d991',
-                });
-            }
+            drawPortraitFeedback(ui, this.layout, settings, state);
             const submitBlocked = usesHandSubmitEconomy(settings)
                 && state.phase === 'placing'
                 && !state.outcome
@@ -1095,7 +1189,7 @@ export function createBattleScene({
                     ? '#3a434d'
                     : state.phase === 'placing' && !state.outcome ? '#66c7f4' : '#69d29d',
                 edgeColor: submitBlocked ? '#5b6872' : '#9fdfff',
-                textSize: 20,
+                textSize: this.layout.mode === 'portrait' ? 18 : 20,
             });
         },
         getDebugState() {
@@ -1215,6 +1309,7 @@ export function createBattleScene({
                 deck: getRunDeckStats(run),
                 colorMultipliers: { ...run.colorMultipliers },
                 visibleCombatColors: getVisibleCombatColors(settings),
+                uiState: getBattleUiState(state, settings),
                 layout: this.layout,
             };
         },

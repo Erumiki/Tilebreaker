@@ -283,7 +283,17 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP UIX Track 1: coordinate mockup and portrait battle layout
+### ~~[2026-05-09] Art direction pass: Astral Archive defense~~ DONE
+
+**Status:** accepted the active setting as Astral Archive defense and recorded it in `design/art-direction.md`, `design/art-mvp-brief.md`, `design/decisions.md`, `todo/current.md` and README. The core fantasy is now defensive: the player is the defender of a star archive, red/blue contours are solar/lunar wards, closures seal parts of an invading monster breach, `Сдать руку` overloads the archive mechanism with living light, and monster/level art should show an escalating siege.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### ~~[2026-05-09] MVP UIX Track 1: coordinate mockup and portrait battle layout~~ DONE
 
 **Idea:** move battle UI layout from ad hoc scene math into an explicit mockup/layout contract optimized for portrait mobile play.
 
@@ -303,6 +313,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** mobile Playwright checks at `390x844`, `360x740` and `430x932` show the board, hand, hold, HUD and primary button inside the viewport with usable tap targets; the same smoke path still works on desktop.
 
 **Art dependency:** use ids from the art manifest when available, but allow placeholder textures so the UIX task does not wait for final art.
+
+**Status:** added `design/ui-mockup.md` and extracted battle coordinates into pure `src/scenes/battleLayout.js` with named slots for `hud`, `monsterBanner`, `board`, `feedback`, `log`, `hold`, `hand[]`, `primaryButton`/`endRoundButton` and `sidePanel`. Active battle rendering now switches between the old desktop composition and a portrait mobile layout with compact HUD, centered board, two-row hand grid plus hold, feedback/log rows and a full-width `Сдать руку` button. Pointer/touch input is enabled, debug exposes layout mode/rects/overflow/safe-area/min touch target and `uiState`, and Playwright covers `390x844`, `360x740` and `430x932` plus the desktop smoke path.
 
 **Priority:** must
 

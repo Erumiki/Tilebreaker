@@ -14,6 +14,14 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Art direction is Astral Archive defense
+
+**Context:** The MVP art contract now has monster portraits, level backdrops, board overlays, heart/gold/submit effects and shop/card frames. A generic tile art skin would not explain why the monster matters or why the player pays hearts to continue.
+
+**Decision:** Move the active setting toward Astral Archive defense. Tilebreaker is a roguelite about a defender of a star archive who builds magical red and blue contours on a battle grid to seal invading monsters while their heart holds out. A closed contour is a completed seal or ward, not a direct weapon swing. The monster loses hearts because part of its intrusion is cut off by the barrier. `Сдать руку` is an overload of the archive mechanism paid with living light.
+
+**Rationale:** This direction gives every reserved MVP art asset a clear job: monster portraits are escalating breaches, level backdrops are archive rooms under siege, capture overlays are solar/lunar wards, hearts are living light, gold is star dust or archive tokens, and the universal starter is the archive's red-blue meridian. It preserves the strict 3x3 tile readability while adding a stronger defensive fantasy.
+
 ### 2026-05-09 - Core 1 uses one universal red-blue center starter
 
 **Context:** The two temporary center anchors made the opening playable, but they looked like ordinary deck tiles and split the "start either color here" rule across two objects. The card GD pass already narrowed the next control card test to one board-only universal vertical starter.
