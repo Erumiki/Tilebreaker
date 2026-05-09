@@ -39,7 +39,10 @@ async function getBattleDebug(page) {
 async function getMainMenuDebug(page) {
   await expect.poll(() => page.evaluate(() => {
     const debug = window.__tilebreakerDebug?.getMainMenuDebug?.();
-    return Boolean(debug?.layout?.startButton);
+    return Boolean(
+      debug?.layout?.startButton?.width
+      && debug?.layout?.variants?.length,
+    );
   })).toBe(true);
 
   return page.evaluate(() => window.__tilebreakerDebug.getMainMenuDebug());
@@ -84,6 +87,31 @@ async function placeCurrentQueueTile(page) {
   return true;
 }
 
+async function placeFirstValidHandTile(page) {
+  let debug = await getBattleDebug(page);
+
+  if (debug.drawMode === 'queue') {
+    return placeCurrentQueueTile(page);
+  }
+
+  if (debug.phase !== 'placing' || debug.validCells.length === 0) {
+    return false;
+  }
+
+  const placedBefore = debug.placedCount;
+  const target = debug.validCells[0];
+  const { board, cellSize } = debug.layout;
+  await page.mouse.click(
+    board.x + (target.x + 0.5) * cellSize,
+    board.y + (target.y + 0.5) * cellSize,
+  );
+  await page.waitForTimeout(50);
+
+  debug = await getBattleDebug(page);
+  expect(debug.placedCount).toBe(placedBefore + 1);
+  return true;
+}
+
 function findClosureIndices(hand) {
   for (const color of ['red', 'blue', 'green']) {
     const indices = {
@@ -109,11 +137,52 @@ async function playClosureIfAvailable(page) {
     return false;
   }
 
-  await placeHandIndex(page, indices.corner_rd, 2, 2);
-  await placeHandIndex(page, indices.corner_dl, 3, 2);
-  await placeHandIndex(page, indices.corner_ur, 2, 3);
-  await placeHandIndex(page, indices.corner_lu, 3, 3);
+  const origin = findIsolatedEmptyClosureOrigin(debug.board);
+
+  if (!origin) {
+    return false;
+  }
+
+  await placeHandIndex(page, indices.corner_rd, origin.x, origin.y);
+  await placeHandIndex(page, indices.corner_dl, origin.x + 1, origin.y);
+  await placeHandIndex(page, indices.corner_ur, origin.x, origin.y + 1);
+  await placeHandIndex(page, indices.corner_lu, origin.x + 1, origin.y + 1);
   return true;
+}
+
+function findIsolatedEmptyClosureOrigin(board) {
+  for (let y = 0; y < board.length - 1; y += 1) {
+    for (let x = 0; x < board[y].length - 1; x += 1) {
+      if (!isEmptyClosureBlock(board, x, y) || hasOutsideNeighbor(board, x, y)) {
+        continue;
+      }
+
+      return { x, y };
+    }
+  }
+
+  return null;
+}
+
+function isEmptyClosureBlock(board, x, y) {
+  return !board[y][x]
+    && !board[y][x + 1]
+    && !board[y + 1][x]
+    && !board[y + 1][x + 1];
+}
+
+function hasOutsideNeighbor(board, x, y) {
+  for (let yy = Math.max(0, y - 1); yy <= Math.min(board.length - 1, y + 2); yy += 1) {
+    for (let xx = Math.max(0, x - 1); xx <= Math.min(board[yy].length - 1, x + 2); xx += 1) {
+      const insideBlock = xx >= x && xx <= x + 1 && yy >= y && yy <= y + 1;
+
+      if (!insideBlock && board[yy][xx]) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function finishRound(page, expectedDamage = false) {
@@ -149,6 +218,12 @@ async function finishRound(page, expectedDamage = false) {
   }
 
   const enemyDamage = debug.lastResult.enemyDamage;
+  if (!debug.outcome) {
+    expect(debug.lastResult.newPickDamage).toEqual(expect.objectContaining({
+      totalDamage: expect.any(Number),
+      unplayedTiles: expect.any(Number),
+    }));
+  }
   await clickRect(page, debug.layout.endRoundButton);
   await expect.poll(() => page.evaluate(() => {
     const scene = window.__tilebreakerDebug.getSceneName();
@@ -207,12 +282,29 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   expect(run.gameplayVariant).toBe('legacy');
   expect(battleDebug.gameplayVariant).toBe('legacy');
   expect(run.activeCombatColors).toEqual(['red', 'blue']);
+  expect(battleDebug.visibleCombatColors).toEqual(['red', 'blue']);
+  expect(battleDebug.enemyHp).toBe(3);
+  expect(battleDebug.board).toHaveLength(7);
+  expect(battleDebug.board.every((row) => row.length === 7)).toBe(true);
+  expect(battleDebug.layout.cellSize).toBeCloseTo(battleDebug.layout.board.width / 7);
+  expect(battleDebug.placedCount).toBe(2);
+  expect(battleDebug.board[3][3]).toEqual(expect.objectContaining({
+    id: 'tile_red_line_v',
+    color: 'red',
+    pattern: 'line_v',
+  }));
+  expect(battleDebug.board[3][4]).toEqual(expect.objectContaining({
+    id: 'tile_blue_line_v',
+    color: 'blue',
+    pattern: 'line_v',
+  }));
   expect(run.deck.length).toBeGreaterThan(battleDebug.hand.filter(Boolean).length);
   expect(new Set(run.deck).size).toBeLessThan(run.deck.length);
   expect(
     run.drawPile.length
     + run.discardPile.length
     + battleDebug.hand.filter(Boolean).length
+    + (battleDebug.heldTile ? 1 : 0)
     + (battleDebug.queueReserve?.filter(Boolean).length ?? 0),
   ).toBe(run.deck.length);
 
@@ -245,36 +337,87 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   }
 });
 
-test('player can choose the first experiment from the temporary variant picker', async ({ page }) => {
-  await page.goto('/?seed=20260508');
+test('player can hold and swap one hand card', async ({ page }) => {
+  await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  await clickRect(page, menuDebug.layout.startButton);
+  await expectScene(page, 'battle');
+
+  let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+  let battleDebug = await getBattleDebug(page);
+  const firstTile = battleDebug.hand[0];
+
+  expect(battleDebug.layout.hold).not.toBeNull();
+  expect(battleDebug.heldTile).toBeNull();
+
+  await clickRect(page, battleDebug.layout.hold);
+  await page.waitForTimeout(50);
+  battleDebug = await getBattleDebug(page);
+
+  expect(battleDebug.heldTile).toEqual(firstTile);
+  expect(battleDebug.hand[0]).toBeNull();
+  expect(battleDebug.selectedHandIndex).toBe(1);
+  expect(
+    run.drawPile.length
+    + run.discardPile.length
+    + battleDebug.hand.filter(Boolean).length
+    + (battleDebug.heldTile ? 1 : 0),
+  ).toBe(run.deck.length);
+
+  const swapIndex = battleDebug.selectedHandIndex;
+  const swapTile = battleDebug.hand[swapIndex];
+  await clickRect(page, battleDebug.layout.hold);
+  await page.waitForTimeout(50);
+  battleDebug = await getBattleDebug(page);
+  run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+
+  expect(battleDebug.heldTile).toEqual(swapTile);
+  expect(battleDebug.hand[swapIndex]).toEqual(firstTile);
+  expect(battleDebug.selectedHandIndex).toBe(swapIndex);
+  expect(
+    run.drawPile.length
+    + run.discardPile.length
+    + battleDebug.hand.filter(Boolean).length
+    + (battleDebug.heldTile ? 1 : 0),
+  ).toBe(run.deck.length);
+});
+
+test('player can choose a kept experiment from the temporary variant picker', async ({ page }) => {
+  await page.goto('/?seed=20260508&drawMode=queue');
 
   await expect(page.locator('#game')).toBeVisible();
   await expectScene(page, 'mainmenu');
 
   let menuDebug = await getMainMenuDebug(page);
-  const placementButton = menuDebug.layout.variants.find((button) => (
-    button.variant.id === 'placement_payoff'
+  expect(menuDebug.variants.map((variant) => variant.id)).not.toContain('placement_payoff');
+  expect(menuDebug.variants.map((variant) => variant.id)).not.toContain('road_mode');
+  const targetsButton = menuDebug.layout.variants.find((button) => (
+    button.variant.id === 'connect_targets'
   ));
-  await clickRect(page, placementButton.rect);
+  await clickRect(page, targetsButton.rect);
 
   menuDebug = await getMainMenuDebug(page);
-  expect(menuDebug.selectedVariant).toBe('placement_payoff');
+  expect(menuDebug.selectedVariant).toBe('connect_targets');
 
   await clickRect(page, menuDebug.layout.startButton);
   await expectScene(page, 'battle');
 
   const variant = await page.evaluate(() => window.__tilebreakerDebug.getGameplayVariant());
-  expect(variant.id).toBe('placement_payoff');
+  expect(variant.id).toBe('connect_targets');
 
   const battleDebug = await getBattleDebug(page);
-  expect(battleDebug.gameplayVariant).toBe('placement_payoff');
-  expect(battleDebug.gameplayVariantLabel).toBe('A');
+  expect(battleDebug.gameplayVariant).toBe('connect_targets');
+  expect(battleDebug.gameplayVariantLabel).toBe('C');
   expect(battleDebug.drawMode).toBe('queue');
-  await expect(placeCurrentQueueTile(page)).resolves.toBe(true);
+  await expect(placeFirstValidHandTile(page)).resolves.toBe(true);
 });
 
 test('one-color chain variant is playable through the first two battles', async ({ page }) => {
-  await page.goto('/?seed=20260508&variant=b');
+  await page.goto('/?seed=20260508&variant=b&drawMode=queue');
 
   await expect(page.locator('#game')).toBeVisible();
   await expectScene(page, 'mainmenu');
@@ -313,7 +456,7 @@ test('one-color chain variant is playable through the first two battles', async 
 });
 
 test('connect-targets variant is playable through the first two battles', async ({ page }) => {
-  await page.goto('/?seed=20260508&variant=c');
+  await page.goto('/?seed=20260508&variant=c&drawMode=queue');
 
   await expect(page.locator('#game')).toBeVisible();
   await expectScene(page, 'mainmenu');
@@ -354,4 +497,32 @@ test('connect-targets variant is playable through the first two battles', async 
       expect(battleDebug.connectTargets).not.toBeNull();
     }
   }
+});
+
+test('road-mode variant remains URL-playable with visible gates', async ({ page }) => {
+  await page.goto('/?seed=20260508&variant=d&drawMode=queue');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('road_mode');
+  await clickRect(page, menuDebug.layout.startButton);
+  await expectScene(page, 'battle');
+
+  let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+  let battleDebug = await getBattleDebug(page);
+  expect(run.gameplayVariant).toBe('road_mode');
+  expect(run.activeCombatColors).toEqual(['red']);
+  expect(battleDebug.gameplayVariantLabel).toBe('D');
+  expect(battleDebug.roadGates).toEqual(expect.objectContaining({
+    start: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    end: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    distance: expect.any(Number),
+  }));
+
+  await expect(placeFirstValidHandTile(page)).resolves.toBe(true);
+  battleDebug = await getBattleDebug(page);
+  expect(battleDebug.gameplayVariant).toBe('road_mode');
+  expect(battleDebug.roadGates).not.toBeNull();
 });

@@ -1,5 +1,14 @@
 import { GAMEPLAY_VARIANTS, getGameplayVariant } from '../entities/gameplayVariants.js';
 
+const HIDDEN_PLAYTEST_VARIANTS = new Set([
+    'placement_payoff',
+    'road_mode',
+]);
+
+function getMenuVariants() {
+    return GAMEPLAY_VARIANTS.filter((variant) => !HIDDEN_PLAYTEST_VARIANTS.has(variant.id));
+}
+
 function getStartButton(screen) {
     const width = Math.min(340, screen.width - 48);
     return {
@@ -12,13 +21,14 @@ function getStartButton(screen) {
 
 function getVariantButtons(screen) {
     const gap = 10;
+    const variants = getMenuVariants();
     const availableWidth = Math.min(screen.width - 48, 760);
-    const buttonWidth = Math.max(116, (availableWidth - gap * (GAMEPLAY_VARIANTS.length - 1)) / GAMEPLAY_VARIANTS.length);
-    const width = buttonWidth * GAMEPLAY_VARIANTS.length + gap * (GAMEPLAY_VARIANTS.length - 1);
+    const buttonWidth = Math.max(116, (availableWidth - gap * (variants.length - 1)) / variants.length);
+    const width = buttonWidth * variants.length + gap * (variants.length - 1);
     const startX = screen.width / 2 - width / 2;
     const y = screen.height * 0.52;
 
-    return GAMEPLAY_VARIANTS.map((variant, index) => ({
+    return variants.map((variant, index) => ({
         variant,
         rect: {
             x: startX + index * (buttonWidth + gap),
@@ -115,7 +125,7 @@ export function createMainMenuScene({ config, input, ui, onStart }) {
         getDebugState() {
             return {
                 selectedVariant: selectedVariantId,
-                variants: GAMEPLAY_VARIANTS.map((variant) => ({
+                variants: getMenuVariants().map((variant) => ({
                     id: variant.id,
                     shortLabel: variant.shortLabel,
                     title: variant.title,

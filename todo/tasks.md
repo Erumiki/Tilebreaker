@@ -150,21 +150,145 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Day 4: Core 1 improvements after hearts
+### ~~[2026-05-09] Day 4: Core 1 improvements after hearts~~ DONE
 
-**Idea:** if hearts/pick-pressure gives the battle a clear tempo, strengthen `legacy` with the next core levers: starting universal red/blue center tile, hold one tile, limited rotate and double-color tiles.
+**Idea:** if hearts/pick-pressure gives the battle a clear tempo, strengthen `legacy` with the next core levers.
 
-**Why:** full-hand already improved agency, and hearts should provide tempo. The next risk is that the player returns to waiting for the one needed card; these levers give more control without restarting the core.
+**Why:** full-hand already improved agency, and hearts should provide tempo. The next risk is that the player returns to waiting for the one needed card; a center anchor and one hold slot give more control without restarting the core.
 
 **MVP:**
 
-- add a starting universal red/blue center tile as the plan's anchor;
-- add hold for one tile so a bad hand does not turn into full discard;
-- test limited rotate as a rare/limited resource, not a free rotate for everything;
-- test red/blue double-color tiles as a way to connect plans across two colors;
-- introduce levers one at a time and briefly play the first 1-2 battles after each.
+- postpone the universal red/blue card to the next task;
+- add two existing center cards of different colors instead: red vertical line and blue vertical line;
+- increase the arena to 7x7;
+- add one Tetris-like hold slot for the selected hand card;
+- keep the anchors as ordinary board tiles, not special art or a new universal type;
+- keep the held card through a non-lethal new pick, but return it to discard when the battle ends;
+- sync logic tests, smoke and simulator with the 7x7 starter board and hold behavior.
 
-**Acceptance:** after the hearts check, one next lever is chosen, enabled in legacy, and the first 3-5 turns give more meaningful decisions without a noticeable return to small-square dominance.
+**Acceptance:** `legacy` starts on a 7x7 board with two ordinary center anchors, the first hand can immediately continue either color, one selected card can be held/swapped across a new pick, and universal-card work is explicitly queued next.
+
+**Status:** implemented `startingBoardTiles` in config, seeded `legacy` with `tile_red_line_v` at `(3,3)` and `tile_blue_line_v` at `(4,3)`, reset fresh-start recovery to the configured starter board, added `holdEnabled` hand-mode hold/swap that survives non-lethal new picks, updated smoke/unit/simulator coverage and README/current docs.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Design pass: hand-submit economy, gold and feedback
+
+**Idea:** turn the latest playable Core 1 notes into a concrete spec before implementing the next loop change.
+
+**Why:** the battle now plays, but the next move changes the tempo, economy and feedback language at once. It needs one deliberate pass so the implementation does not mix old round-end combat with the new "submit hand" loop.
+
+**MVP:**
+
+- replace the old "Закончить раунд" concept with "Сдать руку";
+- decide the heart-cost curve for each next hand submit, and show that cost before the button is pressed;
+- specify that pressing "Сдать руку" immediately pays the cost and redeals the hand;
+- remove monster damage as a separate player-damage source in the active Core 1 loop: the player pays only through hand-submit costs;
+- specify immediate zone closure/scoring at the moment the zone closes, not only when the hand is submitted;
+- define strike timing: closing a zone on the very next step after a zone closure awards extra gold;
+- introduce gold as the future between-round card-buying currency;
+- use `design/signs-and-feedback.md` as the UIX checklist for all actions, events, messages and animations;
+- decide what belongs in the next implementation pass versus the later card/shop pass.
+
+**Acceptance:** there is a short written spec or updated design note that fixes hand-submit cost rules, immediate closure timing, strike/gold behavior and required feedback before code work starts.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] UIX pass: signs and feedback inventory
+
+**Idea:** create and maintain a concrete feedback map for every battle action and event.
+
+**Why:** the next loop depends on the player understanding hearts paid, damage dealt, gold earned, strike chains, invalid actions and hand redeals without reading external notes.
+
+**MVP:**
+
+- use `design/signs-and-feedback.md` as the source document for this pass;
+- list every player action and game event with trigger, visible feedback, animation/timing, message-log text and test/debug signal;
+- cover tile selection, hold/swap, valid/invalid placement, zone closure, hand submit, redeal, damage, heart cost, gold, strikes and future shop buys;
+- produce a prioritized UI implementation checklist from the inventory;
+- do not implement UI changes during the inventory pass unless it is explicitly promoted into the implementation task.
+
+**Acceptance:** the feedback inventory is complete enough that each active battle action has a planned sign/message/animation and the implementation task can work from it directly.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Core 1 implementation: hand submit, immediate closure and gold
+
+**Idea:** implement the new active battle loop from the design pass.
+
+**Why:** "end round, monster attacks, then continue" is no longer the desired mental model. The player should be choosing when to pay hearts for a new hand, while closures resolve immediately and reward gold/strikes.
+
+**MVP:**
+
+- rename the active combat button to "Сдать руку";
+- show the current heart cost on or next to the button;
+- on click, immediately apply the heart cost and redeal the hand without a separate round-result confirmation;
+- animate the redeal;
+- stop applying monster attack damage to the player in active Core 1;
+- close and score zones at the moment of closure;
+- add a combat/message log with animated text for damage, paid hearts, gold and strike events;
+- add strike rewards when a zone closure follows directly after a previous zone closure;
+- add visible gold as a persistent run currency that can later be spent between rounds/battles;
+- rework the active battle UI around hearts, submit cost, immediate scoring, log, strikes and gold.
+
+**Acceptance:** the active `legacy` battle can be played without the old round-end damage model: closing a zone immediately deals/logs damage, submitting the hand immediately costs hearts and redeals with animation, strikes give bonus gold, and the UI clearly explains the new economy.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] GD pass: universal starter, jokers and purchasable cards
+
+**Idea:** design the next card set before adding new assets or shop content.
+
+**Why:** gold only matters if the between-round purchase pool creates real planning. The universal starter card should be considered together with later purchasable control cards, not as a one-off asset.
+
+**MVP:**
+
+- design the universal starter card that replaces the current two-card center bridge;
+- design purchasable card candidates for the between-round card economy;
+- include joker cards that can match all colors;
+- include two-color closer cards with two colored sides;
+- decide what other control/payoff cards are worth testing;
+- define a simulation/manual-test protocol for the GD pass before committing cards to the active deck.
+
+**Acceptance:** there is a candidate card list with intended roles, rough costs/rarities if relevant, and a test plan for validating the universal starter and buyable cards.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Day 4: Core 1 universal red/blue center card
+
+**Idea:** replace the temporary two-card center anchor with one universal red/blue center card that can support both color plans.
+
+**Why:** the two existing center cards are enough to test the opening feel immediately, but the intended anchor should eventually communicate "start either color here" as one clean rule. Do this after the GD card pass decides the universal starter semantics together with the future purchasable card pool.
+
+**MVP:**
+
+- define the universal card's edge/micro-cell semantics;
+- add or generate its visual asset;
+- seed it at the center instead of the two temporary cards;
+- decide whether it is a special board-only tile or a card that can later enter the deck;
+- update placement/scoring tests and the first-battle smoke check.
+
+**Acceptance:** `legacy` starts with one visible universal red/blue center card, both red and blue plans can continue from it, and the two-card bridge is removed.
 
 **Priority:** must
 

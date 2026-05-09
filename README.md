@@ -2,17 +2,19 @@
 
 Tilebreaker is a fast roguelite tile-placement battler. The player places boundary tiles, closes territories, captures land with the boundary color and counters enemy color attacks.
 
-The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank and with a full hand by default.
+The current MVP after the manual playtest pass is built around the `legacy` rescue iteration: two-color capture-fill without gray blank, with a full hand by default, two colored center anchors and one hold slot.
 
 - active gameplay variant: `gameplayVariant: "legacy"`; this is the current rescue candidate `hand + two-color capture-fill + hearts/pick-pressure`; Variant A (`placement_payoff`) and Variant D (`road_mode`) were removed from favorites after manual testing, Variant B (`one_color_chain`) is postponed until it has a stronger idea, and Variant C (`connect_targets`) remains an option for separate thought;
 - tiles: `assets/tiles_v2/tile_manifest.json`;
 - active starting combat colors: `red` and `blue`; `green` remains in the manifest, but is not part of the starting deck, active attacks or visible legacy combat rows;
-- board: 6x6 macro tiles, each tile is 3x3 micro-cells;
+- board: 7x7 macro tiles, each tile is 3x3 micro-cells;
+- legacy battles start with two regular center anchors from the existing tile set: red vertical line at `(3,3)` and blue vertical line at `(4,3)`; the future universal red/blue card is deliberately postponed;
 - legality: if a cell has direct neighbors, adjacent edges must match by 3-cell edge signature; an empty cell with no direct neighbors is valid as a new island;
 - gray blank tiles remain in the manifest as technical/future material, but are removed from the active starting deck and opening tests;
 - scoring: a closed colored boundary captures the empty or filled interior;
 - legacy damage is shown as hearts: the first monster has 3 hearts, a minimal 2x2 capture deals 1 heart, and larger zones can deal more through `tileBattle.hearts.zoneDamagePerHeart`;
 - a new hand pick in `legacy` has an explicit cost: before confirmation, the UI shows incoming damage from the base cost and unplayed tiles;
+- active hand mode has one hold slot: the selected card can be set aside, swapped with another card later and carried across a new pick; it returns to discard when the battle ends;
 - active MVP draw mode is `drawMode: "hand"`: the player sees the full hand because queue/playtest too often turned planning into waiting for the right card;
 - battle start uses `drawBag`: the early draw window is reordered from the current draw pile to cap `corner` at 2, prevent early `plus`, provide more `line`/`tee` continuation pieces and avoid becoming a hidden loop guarantee;
 - queue mode remains available as debug/comparison through `?drawMode=queue`;
@@ -25,7 +27,7 @@ The current MVP after the manual playtest pass is built around the `legacy` resc
 
 ## Where Things Live
 
-- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player hearts, heart conversion and pick-pressure settings, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
+- `configs/game.json` - global tile-battle settings: board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion and pick-pressure settings, starting deck size/recipe, opening `drawBag`, damage formula, `placementPayoff` for Variant A, `oneColorChain` for Variant B, `connectTargets` for Variant C, `roadMode` for Variant D, active tile manifest path, debug draw smoothing, gray wildcard placement, board cleanup between rounds, dead-end recovery, legacy off-color leap settings and run battle count.
 - `configs/levels.json` - battle list, enemy hearts and red/blue color attacks by round.
 - `assets/tiles_v2/tile_manifest.json` - active MVP tile set.
 - `src/entities/run.js` - run state: deck, draw pile, discard pile, rewards and color multipliers.

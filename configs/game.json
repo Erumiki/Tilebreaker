@@ -5,13 +5,24 @@
     "ballSpeed": 460,
     "startingLives": 3,
     "tileBattle": {
-        "boardSize": 6,
+        "boardSize": 7,
         "handSize": 7,
-        "drawMode": "queue",
+        "drawMode": "hand",
+        "holdEnabled": true,
         "gameplayVariant": "legacy",
         "activeCombatColors": ["red", "blue"],
-        "startingPlayerHp": 160,
-        "startingDeckSize": 36,
+        "startingBoardTiles": [
+            { "id": "tile_red_line_v", "x": 3, "y": 3, "gameplayVariants": ["legacy"] },
+            { "id": "tile_blue_line_v", "x": 4, "y": 3, "gameplayVariants": ["legacy"] }
+        ],
+        "startingPlayerHp": 18,
+        "startingDeckSize": 24,
+        "hearts": {
+            "zoneDamagePerHeart": 24,
+            "minimumZoneHearts": 1,
+            "newPickBaseDamage": 1,
+            "unplayedTilesPerDamage": 4
+        },
         "damageFormula": {
             "type": "areaMultiplier",
             "areaMultiplier": 2,
@@ -39,6 +50,16 @@
             "oneColorLand": true,
             "respawn": "nextRound"
         },
+        "roadMode": {
+            "completeBonus": 4,
+            "damagePerTile": 6,
+            "maxScoredExtraLength": 6,
+            "minLength": 4,
+            "gateMinDistance": 5,
+            "gateMaxDistance": 7,
+            "oneColorLand": true,
+            "respawn": "nextRound"
+        },
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
         "handSelectionDraws": 3,
         "guaranteedLoopHands": false,
@@ -57,7 +78,7 @@
                 "red": 4,
                 "blue": 4
             },
-            "grayMax": 1
+            "grayMax": 0
         },
         "startingDeckRecipe": [
             { "pattern": "line_h", "colors": ["red", "blue"], "count": 2 },
@@ -69,8 +90,7 @@
             { "pattern": "corner_ur", "colors": ["red", "blue"], "count": 1 },
             { "pattern": "corner_rd", "colors": ["red", "blue"], "count": 1 },
             { "pattern": "corner_dl", "colors": ["red", "blue"], "count": 1 },
-            { "pattern": "corner_lu", "colors": ["red", "blue"], "count": 1 },
-            { "id": "tile_gray_blank_01", "count": 1 }
+            { "pattern": "corner_lu", "colors": ["red", "blue"], "count": 1 }
         ],
         "roundBoardCleanup": "clearScoredTiles",
         "deadEndRecovery": "freshStart",

@@ -1,15 +1,15 @@
 # Current Version
 
-## v0.17 Core 1 Rescue Hearts
+## v0.18 Core 1 Rescue Center Anchors
 
-**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, and a visible cost for every new pick/refill.
+**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, visible pick pressure, a larger board, two ready center anchors and one hold slot.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player hearts, heart conversion/pick-pressure settings, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, `roadMode`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
+- `configs/game.json` stores board size, hand size, `drawMode`, `holdEnabled`, `gameplayVariant`, `activeCombatColors`, `startingBoardTiles`, starting player hearts, heart conversion/pick-pressure settings, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, `roadMode`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
 - Active default `gameplayVariant` is `legacy`. It is the preserved two-color capture-fill ruleset and the main rescue candidate.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
 - URL overrides accept `?gameplayVariant=placement_payoff` and short aliases `?variant=a`, `?variant=b`, `?variant=c`, `?variant=d`.
@@ -37,8 +37,11 @@
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.
 - The active tile catalog still has `line_h`, `line_v`, four `corner`, four `tee`, and `plus` per combat color, plus 3 gray blank ids in the manifest.
 - Active MVP `activeCombatColors` are `red` and `blue`. Green remains in the manifest and UI model, but is not in the starting deck, early reward color cycle or the first two battle attack tables.
+- Active MVP board size is 7x7 macro tiles. Legacy battles start with two ordinary pre-placed center anchors from the existing v2 set: `tile_red_line_v` at `(3,3)` and `tile_blue_line_v` at `(4,3)`. They are not a universal card and do not consume cards from the run deck.
+- The future universal red/blue center card is postponed into a later GD/card task. The current anchors are intentionally a quick playable bridge: two colors are already visible in the center, and both can be continued vertically with normal matching edges.
 - A new run starts with a recipe-built 24-tile rescue deck: for red and blue, `line_h x2`, `line_v x2`, each `tee` x1, each `corner` x1, no `plus`, no gray blank. The recipe supports duplicate tile ids without changing art or manifest.
 - Active MVP `drawMode` is `hand`. The player sees the full `handSize` hand because queue made the best mode feel too much like waiting for a card instead of planning.
+- Active MVP `holdEnabled` is true in hand mode. The selected hand card can move into one hold slot; clicking the hold slot again swaps the selected hand card with the held card. The held card survives a non-lethal new pick and avoids the unplayed-hand discard, but returns to discard when the battle ends.
 - Legacy combat now uses hearts in the playable layer: the first monster has 3 hearts, the player starts with 18 hearts, a minimal 2x2 capture is 1 heart, and larger zones can convert into more hearts through `tileBattle.hearts.zoneDamagePerHeart`.
 - Legacy UI shows only active red/blue combat rows. Green remains in the manifest and old/debug structures, but no longer consumes visible combat-result space in the active rescue path.
 - Ending a non-lethal legacy round previews the cost of the next pick before the player confirms it. New pick damage is `newPickBaseDamage + floor(unplayedTiles / unplayedTilesPerDamage)`, currently `1 + floor(unplayed / 4)`.
@@ -47,7 +50,7 @@
 - Queue remains available for comparison through `?drawMode=queue`, but it is no longer the default playtest posture.
 - At the start of each battle, enabled `drawBag` reorders only the next `openingDraws` future draws from the current draw pile. In the rescue deck it caps early `corner` at 2, forbids early `plus`, requires `line`/`tee` continuation pieces, keeps at least four red and four blue tiles when available and limits gray count to 0. It does not add tiles, guarantee a loop or solve placement for the player.
 - Stable debug/smoke runs use URL overrides such as `?seed=20260508&guaranteedLoopHands=true`; normal player runs generate a fresh seed on each start.
-- At round end, played and unplayed hand or queue tiles go to discard; when draw pile is empty, discard is shuffled back into draw pile.
+- At round end, played and unplayed hand or queue tiles go to discard; the one held tile stays in the hold slot across a non-lethal new pick. When draw pile is empty, discard is shuffled back into draw pile.
 - Starting player hearts are 18 in the active rescue build.
 - After each won battle, the player chooses one of three rewards: add a tile to discard/deck, remove a tile from deck, or increase a combat color multiplier. Add/boost rewards respect `activeCombatColors`, so the v3 start does not offer green before the game reintroduces it deliberately.
 - `dot` and base `cap` tiles are not in the MVP deck.
@@ -55,13 +58,15 @@
 - A fully enclosed empty or filled interior becomes captured land for that color.
 - Between rounds, closed/scored tiles are cleared and unclosed tiles stay on the board, so unfinished territory can be completed later.
 - A zero-damage first round is not automatically bad: it can be a valid setup round if the saved board contains useful, buildable contour that converts into captures in later rounds.
-- If the next hand cannot continue the saved board at all, the battle uses fresh-start recovery and clears the unclosed board for that hand.
+- If the next hand cannot continue the saved board at all, the battle uses fresh-start recovery and resets the board to the configured starter board for that hand.
 - Placement is broad by default: a tile can be placed in any empty cell with no direct neighbors; if it has direct neighbors, all touching edges must match. This supersedes the older off-color leap as the main escape from artificial placement narrowing.
 - Gray tiles still have asymmetric wildcard placement support in rules/tests, but active playtests remove gray blank from the starting deck because it currently adds confusion without useful decisions.
 - Color multipliers are stored on the run and multiply the zone's configured base damage after area and gray bonuses.
 - Combat UI shows player hearts, monster hearts, round number, red/blue enemy attacks, deck/discard counts, board, hand, and per-color round results: enemy attack, captured area, heart hit, multiplier, payoff bonus, monster damage or player damage.
 - A minimal 2x2 corner loop scores area 12 with no size bonus; a larger closed zone can beat it through the large-zone bonus, but the gray-fill route is no longer part of active tests.
-- The simulator reads the same `startingDeckRecipe` and `drawBag` as the game and reports small-capture diagnostics: `minimal capture share`, `avg capture area`, `placements before capture`, zero-damage hands/rounds, zero-damage streak, captures in 3 rounds, quick 4-corner loops, and opening draw/hand composition by color and shape. It can be forced into queue simulation with `DRAW_MODE=queue`; queue uses a small beam AI because the decision space is narrower than full-hand play.
+- The simulator reads the same `startingDeckRecipe`, `startingBoardTiles` and `drawBag` as the game and reports small-capture diagnostics: `minimal capture share`, `avg capture area`, `placements before capture`, zero-damage hands/rounds, zero-damage streak, captures in 3 rounds, quick 4-corner loops, and opening draw/hand composition by color and shape. It can be forced into queue simulation with `DRAW_MODE=queue`; queue uses a small beam AI because the decision space is narrower than full-hand play.
 - Interpret `zero damage` over a multi-round window, not as an isolated first-round failure. Watch zero-damage streaks, captures within the next 2-3 rounds, dead-end/freshStart rate, win rate and player damage.
 - Manual playtest result on 2026-05-09: `legacy` is the most playable variant, but still collapses into waiting for the right card. Two colors helped but did not fully fix it. Variant A did not feel meaningfully different and is not a standalone direction; Variant B lacks a strong one-color idea; Variant D/road-style scoring needs rethinking/rotation before more tests; the fifth tested direction is cut. Current favorites are Core 1 rescue and a separate Kingdomino-like combat spike.
-- Updated legacy target after hearts implementation: judge the encounter by "how many picks did it take to kill the monster?" before adding start-center, hold, rotate or double-color control tools.
+- Updated legacy target after center anchors + hold: judge whether the first 3-5 turns feel less like waiting for one card before adding the universal card, rotate or double-color control tools.
+- Latest playtest note for future work, not implemented in v0.18: replace the old round-end model with "Сдать руку", preview/pay hand-submit hearts, animate immediate redeal, remove monster attack damage from active Core 1, score zones at closure time, add animated combat messages, strikes and gold.
+- UIX planning for those future signs and messages starts in `design/signs-and-feedback.md`.

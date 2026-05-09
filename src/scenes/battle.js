@@ -8,6 +8,9 @@ import {
     createTilesFromManifest,
     discardRoundHand,
     getRoundAttack,
+    getConnectedCombatTileKeys,
+    getShortestCombatPathKeys,
+    holdSelectedTile,
     placeTile,
     resolveTileRound,
     scoreTileBoard,
@@ -30,6 +33,10 @@ const COLOR_LABELS = {
 
 function isQueueDrawMode(settings) {
     return settings.drawMode === 'queue';
+}
+
+function isHoldEnabled(settings) {
+    return settings.holdEnabled === true && !isQueueDrawMode(settings);
 }
 
 function getCaptureAreaByColor(result) {
@@ -61,6 +68,7 @@ function getCaptureBonusByColor(result) {
     }
 
     bonusByColor.red += result.connectTargetBonus ?? 0;
+    bonusByColor.red += result.roadDamage ?? 0;
 
     return bonusByColor;
 }
@@ -77,9 +85,14 @@ function isConnectTargetsVariant(settings) {
     return getGameplayVariant(settings).id === 'connect_targets';
 }
 
+function isRoadModeVariant(settings) {
+    return getGameplayVariant(settings).id === 'road_mode';
+}
+
 function isOneColorLandVariant(settings) {
     return isOneColorChainVariant(settings)
-        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false);
+        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false)
+        || (isRoadModeVariant(settings) && settings.roadMode?.oneColorLand !== false);
 }
 
 function getPlacementFocusMax(settings) {
@@ -104,8 +117,36 @@ function getColorLabel(color, settings) {
     return COLOR_LABELS[color];
 }
 
-function formatDamage(value) {
-    return Math.max(0, value || 0);
+function getVisibleCombatColors(settings) {
+    if (isOneColorLandVariant(settings)) {
+        return ['red'];
+    }
+
+    const colors = Array.isArray(settings.activeCombatColors)
+        ? settings.activeCombatColors.filter((color) => COMBAT_COLORS.includes(color))
+        : [];
+
+    return colors.length > 0 ? colors : COMBAT_COLORS;
+}
+
+function formatHearts(value) {
+    const hearts = Math.max(0, Math.ceil(value || 0));
+
+    if (hearts === 0) {
+        return 'нет';
+    }
+
+    if (hearts <= 12) {
+        return '♥'.repeat(hearts);
+    }
+
+    return `♥ x${hearts}`;
+}
+
+function formatHeartDelta(value) {
+    const hearts = Math.max(0, Math.ceil(value || 0));
+
+    return hearts > 0 ? `-${formatHearts(hearts)}` : '0';
 }
 
 function insetRect(rect, amount) {
@@ -130,14 +171,23 @@ function getLayout(screen, settings) {
     const boardX = Math.max(24, Math.min(screen.width * 0.5 - boardSize / 2, screen.width - boardSize - 300));
     const boardY = 144;
     const isQueue = isQueueDrawMode(settings);
+    const holdEnabled = isHoldEnabled(settings);
+    const holdGap = holdEnabled ? 14 : 0;
     const handSlot = isQueue
         ? Math.min(116, (screen.width - 96) / 2.1)
-        : Math.min(82, (screen.width - 64) / settings.handSize - 8);
+        : Math.min(82, Math.max(
+            54,
+            (screen.width - 64 - holdGap - (settings.handSize - 1) * 8)
+                / (settings.handSize + (holdEnabled ? 1 : 0)),
+        ));
     const previewSlot = isQueue ? Math.floor(handSlot * 0.72) : handSlot;
     const handCount = isQueue ? 2 : settings.handSize;
     const handWidth = isQueue
         ? handSlot + 14 + previewSlot
         : settings.handSize * handSlot + (settings.handSize - 1) * 8;
+    const groupWidth = handWidth + (holdEnabled ? handSlot + holdGap : 0);
+    const groupX = screen.width / 2 - groupWidth / 2;
+    const handX = groupX + (holdEnabled ? handSlot + holdGap : 0);
     const handY = screen.height - handSlot - 28;
     const sideX = boardX + boardSize + 24;
     const sideWidth = Math.max(240, screen.width - sideX - 24);
@@ -150,10 +200,16 @@ function getLayout(screen, settings) {
             height: boardSize,
         },
         cellSize: boardSize / settings.boardSize,
+        hold: holdEnabled ? {
+            x: groupX,
+            y: handY,
+            width: handSlot,
+            height: handSlot,
+        } : null,
         hand: Array.from({ length: handCount }, (_, index) => {
             if (!isQueue) {
                 return {
-                    x: screen.width / 2 - handWidth / 2 + index * (handSlot + 8),
+                    x: handX + index * (handSlot + 8),
                     y: handY,
                     width: handSlot,
                     height: handSlot,
@@ -235,7 +291,7 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
         size: 16,
         color: '#ecf6ff',
     });
-    ui.drawText(`Атака ${attack[color] ?? 0}`, rect.x + rect.width - 94, rect.y + 9, {
+    ui.drawText(`Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - 124, rect.y + 9, {
         size: 15,
         color: '#afc4d7',
     });
@@ -252,12 +308,12 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     const areaByColor = getCaptureAreaByColor(result);
     const bonusByColor = getCaptureBonusByColor(result);
     const outcomeLabel = colorResult.enemyDamage > 0
-        ? `Бонус +${bonusByColor[color]}  |  Врагу +${formatDamage(colorResult.enemyDamage)}`
-        : `Бонус +${bonusByColor[color]}  |  Игроку +${formatDamage(colorResult.playerDamage)}`;
+        ? `Бонус ${formatHearts(bonusByColor[color])}  |  Врагу ${formatHeartDelta(colorResult.enemyDamage)}`
+        : `Бонус ${formatHearts(bonusByColor[color])}  |  Игроку ${formatHeartDelta(colorResult.playerDamage)}`;
     const outcomeColor = colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
 
     const multiplier = result.score.zones.find((zone) => zone.color === color)?.multiplier ?? 1;
-    ui.drawText(`Площадь ${areaByColor[color]}  |  Сумма ${formatDamage(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, rect.y + 29, {
+    ui.drawText(`Площадь ${areaByColor[color]}  |  Удар ${formatHearts(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, rect.y + 29, {
         size: 14,
         color: '#d8e7f2',
     });
@@ -300,8 +356,11 @@ function drawBoard(ui, layout, settings, state, mouse) {
 
             if (isTargetA || isTargetB) {
                 const targetColor = targets.connected ? '#c9ffd9' : '#f3d991';
+                const label = isRoadModeVariant(settings)
+                    ? isTargetA ? 'S' : 'E'
+                    : isTargetA ? 'A' : 'B';
                 drawBorder(ui, insetRect(rect, 4), targetColor, 4, 1);
-                ui.drawText(isTargetA ? 'A' : 'B', rect.x + rect.width / 2, rect.y + rect.height / 2 - 13, {
+                ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - 13, {
                     align: 'center',
                     size: 26,
                     color: targetColor,
@@ -353,11 +412,32 @@ function drawHand(ui, layout, settings, state, mouse) {
     });
 }
 
+function drawHold(ui, layout, settings, state, mouse) {
+    if (!layout.hold) {
+        return;
+    }
+
+    const rect = layout.hold;
+    const hovered = ui.contains(rect, mouse);
+    const tileDef = state.heldTile;
+
+    ui.drawRect(rect, hovered ? '#263d4f' : '#182838', tileDef ? 1 : 0.5);
+    drawBorder(ui, rect, tileDef ? '#f3d991' : '#38536a', tileDef ? 3 : 2, tileDef ? 1 : 0.8);
+    drawTile(ui, tileDef, insetRect(rect, 8), {
+        oneColorLand: isOneColorLandVariant(settings),
+    });
+    ui.drawText('Запас', rect.x, rect.y - 24, {
+        size: 14,
+        color: tileDef ? '#f3d991' : '#8fb1cb',
+    });
+}
+
 function drawSidePanel(ui, layout, battle, run, settings, state) {
     const panel = layout.sidePanel;
     const attack = getRoundAttack(battle, state.round, settings);
     const deck = getRunDeckStats(run);
     const variant = getGameplayVariant(settings);
+    const visibleColors = getVisibleCombatColors(settings);
     const totalCaptureArea = state.lastResult
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
@@ -372,11 +452,11 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
         size: 17,
         color: '#9fb8ca',
     });
-    ui.drawText(`Игрок HP ${state.playerHp}`, panel.x + 18, panel.y + 86, {
+    ui.drawText(`Игрок ${formatHearts(state.playerHp)}`, panel.x + 18, panel.y + 86, {
         size: 20,
         color: '#c8f7dd',
     });
-    ui.drawText(`Враг HP ${state.enemyHp}`, panel.x + 18, panel.y + 116, {
+    ui.drawText(`Монстр ${formatHearts(state.enemyHp)}`, panel.x + 18, panel.y + 116, {
         size: 20,
         color: '#ffd4d8',
     });
@@ -411,13 +491,22 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
         });
     }
+    if (isRoadModeVariant(settings) && state.connectTargets) {
+        const roadStatus = state.connectTargets.connected
+            ? `Road +${state.lastResult?.roadDamage ?? 0}`
+            : `Road ${state.connectTargets.distance}`;
+        ui.drawText(roadStatus, panel.x + panel.width - 128, panel.y + 144, {
+            size: 15,
+            color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
+        });
+    }
 
     ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
         color: '#8fb1cb',
     });
 
-    COMBAT_COLORS.forEach((color, index) => {
+    visibleColors.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
             y: panel.y + 190 + index * 68,
@@ -433,15 +522,25 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
                 + (zone.grayBonus ?? 0)
                 + (zone.focusBonus ?? 0)
                 + (zone.chainBonus ?? 0)
-        ), 0) + (state.lastResult.connectTargetBonus ?? 0);
-        ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`, panel.x + 18, panel.y + 400, {
+        ), 0) + (state.lastResult.connectTargetBonus ?? 0) + (state.lastResult.roadDamage ?? 0);
+        const summary = isRoadModeVariant(settings)
+            ? `Дорога ${state.lastResult.roadLength ?? 0}  |  Лишних +${state.lastResult.roadExtraLength ?? 0}  |  Урон +${state.lastResult.roadDamage ?? 0}`
+            : `Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`;
+        ui.drawText(summary, panel.x + 18, panel.y + 400, {
             size: 15,
             color: '#d8e7f2',
         });
-        ui.drawText(`Врагу -${formatDamage(state.lastResult.enemyDamage)}  |  Игроку -${formatDamage(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
+        ui.drawText(`Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, panel.y + 422, {
             size: 15,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
         });
+        if (!state.outcome && (state.lastResult.newPickDamage?.totalDamage ?? 0) > 0) {
+            const pickDamage = state.lastResult.newPickDamage;
+            ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, panel.y + 444, {
+                size: 15,
+                color: pickDamage.totalDamage > 0 ? '#ffd0d7' : '#c9ffd9',
+            });
+        }
     }
 }
 
@@ -452,6 +551,10 @@ function getButtonLabel(state) {
 
     if (state.outcome) {
         return 'К результату битвы';
+    }
+
+    if ((state.lastResult?.newPickDamage?.totalDamage ?? 0) > 0) {
+        return `Новый пик (${formatHeartDelta(state.lastResult.newPickDamage.totalDamage)})`;
     }
 
     return 'Новый раунд';
@@ -488,6 +591,16 @@ function getPlacedFeedback(state, settings) {
         }
     }
 
+    if (isRoadModeVariant(settings)) {
+        if (state.connectTargets?.connected && !state.connectTargets?.scored) {
+            return 'Дорога соединена: заканчивай раунд для удара';
+        }
+
+        if (state.connectTargets) {
+            return 'Тяни дорогу от S к E';
+        }
+    }
+
     if (isQueueDrawMode(settings)) {
         return state.selectedHandIndex >= 0
             ? 'Текущий тайл поставлен, queue сдвинулся'
@@ -502,11 +615,13 @@ function getPlacedFeedback(state, settings) {
 function getHoverKey(ui, layout, settings, mouse) {
     const boardCell = getBoardCell(layout, settings, mouse);
     const handIndex = layout.hand.findIndex((rect) => ui.contains(rect, mouse));
+    const holdHover = layout.hold && ui.contains(layout.hold, mouse);
     const buttonHover = ui.contains(layout.endRoundButton, mouse);
 
     return [
         boardCell ? `${boardCell.x},${boardCell.y}` : '-',
         handIndex,
+        holdHover ? 1 : 0,
         buttonHover ? 1 : 0,
     ].join('|');
 }
@@ -515,7 +630,70 @@ function cloneBoard(board) {
     return board.map((row) => [...row]);
 }
 
-function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewTile = null) {
+function cellDistance(left, right) {
+    return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+}
+
+function getRoadPlacementValue(board, x, y, settings, targets) {
+    if (!isRoadModeVariant(settings) || !targets) {
+        return 0;
+    }
+
+    const aTile = board[targets.a.y]?.[targets.a.x];
+    const bTile = board[targets.b.y]?.[targets.b.x];
+
+    if (aTile && bTile) {
+        const pathKeys = getShortestCombatPathKeys(board, targets.a, targets.b, settings);
+
+        if (pathKeys.length > 0) {
+            const base = settings.roadMode?.completeBonus ?? 12;
+            const perTile = settings.roadMode?.damagePerTile ?? 6;
+            const maxExtra = settings.roadMode?.maxScoredExtraLength ?? 6;
+            const routeEdges = Math.max(0, pathKeys.length - 1);
+            const extraLength = Math.max(0, routeEdges - targets.distance);
+            const scoredExtraLength = Math.min(extraLength, maxExtra);
+            const damagePreview = base + scoredExtraLength * perTile;
+
+            return 1700 + damagePreview * 170 + scoredExtraLength * 520;
+        }
+    }
+
+    if (!aTile && x === targets.a.x && y === targets.a.y) {
+        return 5000;
+    }
+
+    if (!bTile && x === targets.b.x && y === targets.b.y) {
+        return 3600;
+    }
+
+    const anchor = aTile ? targets.a : bTile ? targets.b : null;
+    const goal = aTile ? targets.b : bTile ? targets.a : targets.a;
+
+    if (!anchor) {
+        return Math.max(0, 900 - cellDistance({ x, y }, goal) * 90);
+    }
+
+    const componentKeys = getConnectedCombatTileKeys(board, anchor.x, anchor.y, settings);
+    const componentCells = componentKeys.map((key) => {
+        const [cellX, cellY] = key.split(',').map(Number);
+        return { x: cellX, y: cellY };
+    });
+    const nearestRoadDistance = componentCells.length > 0
+        ? Math.min(...componentCells.map((cell) => cellDistance(cell, { x, y })))
+        : cellDistance(anchor, { x, y });
+    const nearestGoalDistance = componentCells.length > 0
+        ? Math.min(...componentCells.map((cell) => cellDistance(cell, goal)))
+        : cellDistance(anchor, goal);
+    const nextGoalDistance = cellDistance({ x, y }, goal);
+    const extension = Math.max(0, nearestGoalDistance - nextGoalDistance);
+
+    return componentKeys.length * 190
+        + extension * 340
+        - nearestRoadDistance * 120
+        - nextGoalDistance * 35;
+}
+
+function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewTile = null, targets = null) {
     const nextBoard = cloneBoard(board);
     nextBoard[y][x] = tileDef;
     const score = scoreTileBoard(nextBoard, settings, run);
@@ -546,7 +724,10 @@ function getPlacementValue(board, tileDef, x, y, settings, run, attack, previewT
         return sum + Math.min(closedDamage, threat);
     }, 0);
 
-    return immediateValue + previewValue * 0.35 + defensiveValue;
+    return immediateValue
+        + previewValue * 0.35
+        + defensiveValue
+        + getRoadPlacementValue(nextBoard, x, y, settings, targets);
 }
 
 function getValidCells(state, settings, run, battle) {
@@ -568,7 +749,17 @@ function getValidCells(state, settings, run, battle) {
             cells.push({
                 x,
                 y,
-                value: getPlacementValue(state.board, tileDef, x, y, settings, run, attack, previewTile),
+                value: getPlacementValue(
+                    state.board,
+                    tileDef,
+                    x,
+                    y,
+                    settings,
+                    run,
+                    attack,
+                    previewTile,
+                    state.connectTargets,
+                ),
             });
         }
     }
@@ -581,9 +772,10 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         row.map((tileDef) => tileDef?.id ?? '-').join(',')
     )).join(';');
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
+    const heldKey = state.heldTile?.id ?? '-';
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}:${state.lastResult.roadDamage ?? 0}:${state.lastResult.newPickDamage?.totalDamage ?? 0}:${state.lastResult.newPickDamageApplied ?? false}`
         : '-';
     const connectTargetKey = state.connectTargets
         ? `${state.connectTargets.a.x},${state.connectTargets.a.y}:${state.connectTargets.b.x},${state.connectTargets.b.y}:${state.connectTargets.connected}:${state.connectTargets.scored}`
@@ -608,6 +800,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         getGameplayVariant(settings).id,
         boardKey,
         handKey,
+        heldKey,
         `${deck.deck}:${deck.drawPile}:${deck.discardPile}:${deck.reshuffles}`,
         COMBAT_COLORS.map((color) => run.colorMultipliers[color]).join(','),
         resultKey,
@@ -641,6 +834,22 @@ export function createBattleScene({
             const click = input.consumeClick();
 
             if (!click || !this.layout) {
+                return;
+            }
+
+            if (state.phase === 'placing'
+                && this.layout.hold
+                && ui.contains(this.layout.hold, click)) {
+                const hadHeldTile = Boolean(state.heldTile);
+                const hadSelectedTile = Boolean(state.hand[state.selectedHandIndex]);
+                const held = holdSelectedTile(state, settings);
+                state.feedback = held
+                    ? hadHeldTile && hadSelectedTile
+                        ? 'Запас обновлен'
+                        : hadHeldTile
+                            ? 'Карта вернулась из запаса'
+                            : 'Карта ушла в запас'
+                    : 'Сначала выбери карту для запаса';
                 return;
             }
 
@@ -688,6 +897,19 @@ export function createBattleScene({
                 return;
             }
 
+            if ((state.lastResult?.newPickDamage?.totalDamage ?? 0) > 0
+                && !state.lastResult.newPickDamageApplied) {
+                const pickDamage = state.lastResult.newPickDamage.totalDamage;
+                state.playerHp = Math.max(0, state.playerHp - pickDamage);
+                run.playerHp = state.playerHp;
+                state.lastResult.newPickDamageApplied = true;
+
+                if (state.playerHp <= 0) {
+                    onFinish(BattleOutcome.Defeat);
+                    return;
+                }
+            }
+
             startNextTileRound(state, {
                 run,
                 battle,
@@ -721,13 +943,16 @@ export function createBattleScene({
                 size: 24,
                 color: '#eef8ff',
             });
-            ui.drawText('Собери замкнутую цветную границу и перебей атаки', 28, 58, {
+            ui.drawText(isRoadModeVariant(settings)
+                ? 'Проведи дорогу от S к E и перебей атаки'
+                : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
                 size: 17,
                 color: '#98b4c8',
             });
 
             drawBoard(ui, this.layout, settings, state, mouse);
             drawSidePanel(ui, this.layout, battle, run, settings, state);
+            drawHold(ui, this.layout, settings, state, mouse);
             drawHand(ui, this.layout, settings, state, mouse);
             if (state.feedback) {
                 ui.drawText(state.feedback, this.layout.board.x, this.layout.hand[0].y - 34, {
@@ -750,6 +975,7 @@ export function createBattleScene({
                 enemyHp: state.enemyHp,
                 playerHp: state.playerHp,
                 round: state.round,
+                selectedHandIndex: state.selectedHandIndex,
                 placedCount: state.board.reduce((sum, row) => (
                     sum + row.filter(Boolean).length
                 ), 0),
@@ -765,6 +991,11 @@ export function createBattleScene({
                     color: tileDef.color,
                     pattern: tileDef.pattern,
                 } : null),
+                heldTile: state.heldTile ? {
+                    id: state.heldTile.id,
+                    color: state.heldTile.color,
+                    pattern: state.heldTile.pattern,
+                } : null,
                 gameplayVariant: getGameplayVariant(settings).id,
                 gameplayVariantLabel: getGameplayVariant(settings).shortLabel,
                 drawMode: settings.drawMode ?? 'hand',
@@ -794,6 +1025,16 @@ export function createBattleScene({
                     connectTargetBonus: state.lastResult.connectTargetBonus ?? 0,
                     connectTargetConnected: state.lastResult.connectTargetConnected ?? false,
                     connectTargets: state.lastResult.connectTargets,
+                    roadConnected: state.lastResult.roadConnected ?? false,
+                    roadLength: state.lastResult.roadLength ?? 0,
+                    roadShortestLength: state.lastResult.roadShortestLength ?? 0,
+                    roadExtraLength: state.lastResult.roadExtraLength ?? 0,
+                    roadScoredExtraLength: state.lastResult.roadScoredExtraLength ?? 0,
+                    roadBaseDamage: state.lastResult.roadBaseDamage ?? 0,
+                    roadDamage: state.lastResult.roadDamage ?? 0,
+                    roadTileKeys: [...state.lastResult.roadTileKeys ?? []],
+                    newPickDamage: state.lastResult.newPickDamage,
+                    newPickDamageApplied: state.lastResult.newPickDamageApplied ?? false,
                     placementFocusSpent: state.lastResult.placementFocusSpent,
                     placementFocusBonus: state.lastResult.placementFocusBonus,
                     placementFocusRemaining: state.lastResult.placementFocusRemaining,
@@ -812,8 +1053,14 @@ export function createBattleScene({
                     a: { ...state.connectTargets.a },
                     b: { ...state.connectTargets.b },
                 } : null,
+                roadGates: isRoadModeVariant(settings) && state.connectTargets ? {
+                    ...state.connectTargets,
+                    start: { ...state.connectTargets.a },
+                    end: { ...state.connectTargets.b },
+                } : null,
                 deck: getRunDeckStats(run),
                 colorMultipliers: { ...run.colorMultipliers },
+                visibleCombatColors: getVisibleCombatColors(settings),
                 layout: this.layout,
             };
         },

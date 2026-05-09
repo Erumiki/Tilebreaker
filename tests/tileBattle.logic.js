@@ -14,8 +14,12 @@ import {
     createStartingDeckIds,
     createTileBattleState,
     createTilesFromManifest,
+    discardRoundHand,
+    getNewPickDamagePreview,
+    holdSelectedTile,
     placeTile,
     resolveTileRound,
+    scoreTileBoard,
 } from '../src/entities/tileBattle.js';
 
 const settings = {
@@ -82,6 +86,225 @@ test('free cells without direct neighbors stay valid after the first tile', () =
 
     assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 5, 5, settings), true);
     assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 0, 0, settings), true);
+});
+
+test('legacy starts on a 7x7 board with two regular colored center anchors', () => {
+    const startSettings = {
+        ...settings,
+        boardSize: 7,
+        handSize: 7,
+        drawMode: 'hand',
+        gameplayVariant: 'legacy',
+        startingBoardTiles: [
+            { id: 'tile_red_line_v', x: 3, y: 3, gameplayVariants: ['legacy'] },
+            { id: 'tile_blue_line_v', x: 4, y: 3, gameplayVariants: ['legacy'] },
+        ],
+        startingDeckRecipe: [
+            { pattern: 'line_h', colors: ['red', 'blue'], count: 2 },
+            { pattern: 'line_v', colors: ['red', 'blue'], count: 2 },
+            { pattern: 'tee_u', colors: ['red', 'blue'], count: 1 },
+            { pattern: 'tee_r', colors: ['red', 'blue'], count: 1 },
+        ],
+    };
+    const startTiles = createTilesFromManifest(manifest, startSettings);
+    const startTile = (id) => startTiles.find((tileDef) => tileDef.id === id);
+    const deckIds = createStartingDeckIds(startTiles, startSettings);
+    const run = createRunState({
+        totalBattles: 1,
+        playerHp: 18,
+        startingDeck: deckIds,
+        seed: 20260508,
+        settings: startSettings,
+    });
+    const state = createTileBattleState({
+        battle: {
+            enemyHp: 3,
+            attacks: [{ red: 1, blue: 1 }],
+        },
+        run,
+        settings: startSettings,
+        tiles: startTiles,
+    });
+    const placedTiles = state.board.flat().filter(Boolean);
+
+    assert.equal(state.board.length, 7);
+    assert.equal(state.board.every((row) => row.length === 7), true);
+    assert.equal(placedTiles.length, 2);
+    assert.equal(state.board[3][3].id, 'tile_red_line_v');
+    assert.equal(state.board[3][4].id, 'tile_blue_line_v');
+    assert.deepEqual(placedTiles.map((tileDef) => tileDef.color).sort(), ['blue', 'red']);
+    assert.equal(placedTiles.every((tileDef) => tileDef.pattern === 'line_v'), true);
+    assert.equal(canPlaceTile(state.board, startTile('tile_red_line_v'), 3, 3, startSettings), false);
+    assert.equal(canPlaceTile(state.board, startTile('tile_red_line_v'), 3, 2, startSettings), true);
+    assert.equal(canPlaceTile(state.board, startTile('tile_blue_line_v'), 4, 2, startSettings), true);
+});
+
+test('hold slot stores one hand tile, swaps it, and keeps it through a new pick', () => {
+    const holdSettings = {
+        ...settings,
+        holdEnabled: true,
+        handSize: 3,
+        drawMode: 'hand',
+    };
+    const run = {
+        discardPile: [],
+    };
+    const state = {
+        phase: 'placing',
+        hand: [
+            tile('tile_red_line_h'),
+            tile('tile_blue_line_h'),
+            tile('tile_red_line_v'),
+        ],
+        heldTile: null,
+        selectedHandIndex: 0,
+        playedThisRound: [],
+        queueReserve: [],
+        queuePlayedThisRound: 0,
+        outcome: null,
+    };
+
+    assert.equal(holdSelectedTile(state, holdSettings), true);
+    assert.equal(state.heldTile.id, 'tile_red_line_h');
+    assert.equal(state.hand[0], null);
+    assert.equal(state.selectedHandIndex, 1);
+
+    assert.equal(holdSelectedTile(state, holdSettings), true);
+    assert.equal(state.heldTile.id, 'tile_blue_line_h');
+    assert.equal(state.hand[1].id, 'tile_red_line_h');
+    assert.equal(state.selectedHandIndex, 1);
+
+    discardRoundHand(run, state);
+
+    assert.deepEqual(run.discardPile.sort(), ['tile_red_line_h', 'tile_red_line_v']);
+    assert.equal(state.heldTile.id, 'tile_blue_line_h');
+    assert.equal(state.hand.every((tileDef) => tileDef === null), true);
+
+    state.phase = 'placing';
+    assert.equal(holdSelectedTile(state, holdSettings), true);
+    assert.equal(state.heldTile, null);
+    assert.equal(state.hand[0].id, 'tile_blue_line_h');
+    assert.equal(state.selectedHandIndex, 0);
+});
+
+test('held tile returns to discard when the battle ends', () => {
+    const run = {
+        discardPile: [],
+    };
+    const state = {
+        hand: [],
+        heldTile: tile('tile_red_line_h'),
+        playedThisRound: [],
+        queueReserve: [],
+        queuePlayedThisRound: 0,
+        selectedHandIndex: -1,
+        outcome: 'victory',
+    };
+
+    discardRoundHand(run, state);
+
+    assert.deepEqual(run.discardPile, ['tile_red_line_h']);
+    assert.equal(state.heldTile, null);
+});
+
+test('heart scoring makes a minimal corner loop deal one heart', () => {
+    const board = emptyBoard();
+    const heartSettings = {
+        ...settings,
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+            largeZoneBonus: {
+                minArea: 12,
+                bonusPerArea: 2,
+            },
+        },
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+    };
+
+    board[2][2] = tile('tile_red_corner_rd');
+    board[2][3] = tile('tile_red_corner_dl');
+    board[3][2] = tile('tile_red_corner_ur');
+    board[3][3] = tile('tile_red_corner_lu');
+
+    const score = scoreTileBoard(board, heartSettings);
+
+    assert.equal(score.zones.length, 1);
+    assert.equal(score.zones[0].area, 12);
+    assert.equal(score.zones[0].rawDamage, 24);
+    assert.equal(score.zones[0].damage, 1);
+    assert.equal(score.damageByColor.red, 1);
+});
+
+test('new pick damage previews base cost plus unplayed hand penalty', () => {
+    const state = {
+        hand: [
+            tile('tile_red_line_h'),
+            null,
+            tile('tile_blue_line_v'),
+            tile('tile_red_tee_u'),
+            null,
+            tile('tile_blue_corner_lu'),
+        ],
+    };
+    const preview = getNewPickDamagePreview(state, {
+        hearts: {
+            newPickBaseDamage: 1,
+            unplayedTilesPerDamage: 3,
+        },
+    });
+
+    assert.deepEqual(preview, {
+        baseDamage: 1,
+        unplayedTiles: 4,
+        unplayedDamage: 1,
+        totalDamage: 2,
+    });
+});
+
+test('heart combat lets a minimal matching capture damage the monster', () => {
+    const heartSettings = {
+        ...settings,
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+        hearts: {
+            zoneDamagePerHeart: 24,
+            minimumZoneHearts: 1,
+        },
+    };
+    const state = {
+        round: 1,
+        playerHp: 12,
+        enemyHp: 3,
+        board: emptyBoard(),
+        hand: [],
+        selectedHandIndex: -1,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+    };
+
+    state.board[2][2] = tile('tile_red_corner_rd');
+    state.board[2][3] = tile('tile_red_corner_dl');
+    state.board[3][2] = tile('tile_red_corner_ur');
+    state.board[3][3] = tile('tile_red_corner_lu');
+
+    resolveTileRound(state, {
+        enemyHp: 3,
+        attacks: [{ red: 1, blue: 0 }],
+    }, heartSettings);
+
+    assert.equal(state.lastResult.enemyDamage, 1);
+    assert.equal(state.lastResult.playerDamage, 0);
+    assert.equal(state.enemyHp, 2);
 });
 
 test('placement payoff focus charges setup and boosts the next capture', () => {
@@ -272,6 +495,151 @@ test('connect targets use one-color land and pay bonus once', () => {
     assert.equal(state.lastResult.connectTargetBonus, 0);
 });
 
+test('road mode scores connected start/end road by route length without area capture', () => {
+    const roadSettings = {
+        ...settings,
+        gameplayVariant: 'road_mode',
+        activeCombatColors: ['red', 'blue'],
+        roadMode: {
+            completeBonus: 4,
+            damagePerTile: 6,
+            maxScoredExtraLength: 6,
+            minLength: 3,
+            gateMinDistance: 2,
+            gateMaxDistance: 6,
+            oneColorLand: true,
+            respawn: 'nextRound',
+        },
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+    };
+    const roadTiles = createTilesFromManifest(manifest, roadSettings);
+    const roadTile = (id) => roadTiles.find((tileDef) => tileDef.id === id);
+    const state = {
+        round: 1,
+        playerHp: 30,
+        enemyHp: 80,
+        board: emptyBoard(),
+        hand: [],
+        selectedHandIndex: -1,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+        placementFocus: 0,
+        chainMeter: null,
+        chainRegionKeys: [],
+        connectTargets: {
+            a: { x: 1, y: 1 },
+            b: { x: 3, y: 1 },
+            distance: 2,
+            connected: false,
+            scored: false,
+        },
+    };
+
+    state.board[1][1] = roadTile('tile_red_line_h');
+    state.board[1][2] = roadTile('tile_blue_line_h');
+    state.board[1][3] = roadTile('tile_red_line_h');
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 0, blue: 5, green: 5 }],
+    }, roadSettings);
+
+    assert.equal(state.lastResult.attack.red, 5);
+    assert.equal(state.lastResult.attack.blue, 0);
+    assert.equal(state.lastResult.score.zones.length, 0);
+    assert.equal(state.lastResult.roadConnected, true);
+    assert.equal(state.lastResult.roadLength, 3);
+    assert.equal(state.lastResult.roadShortestLength, 3);
+    assert.equal(state.lastResult.roadExtraLength, 0);
+    assert.equal(state.lastResult.roadDamage, 4);
+    assert.equal(state.lastResult.score.damageByColor.red, 4);
+    assert.equal(state.lastResult.enemyDamage, 0);
+    assert.equal(state.lastResult.byColor.blue.playerDamage, 0);
+    assert.deepEqual(new Set(state.lastResult.scoredTileKeys), new Set(['1,1', '2,1', '3,1']));
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 0, blue: 0, green: 0 }],
+    }, roadSettings);
+
+    assert.equal(state.lastResult.roadConnected, false);
+    assert.equal(state.lastResult.roadDamage, 0);
+});
+
+test('road mode rewards detours over shortest start/end bridge', () => {
+    const roadSettings = {
+        ...settings,
+        gameplayVariant: 'road_mode',
+        activeCombatColors: ['red', 'blue'],
+        roadMode: {
+            completeBonus: 4,
+            damagePerTile: 6,
+            maxScoredExtraLength: 6,
+            minLength: 3,
+            gateMinDistance: 2,
+            gateMaxDistance: 8,
+            oneColorLand: true,
+            respawn: 'nextRound',
+        },
+    };
+    const roadTiles = createTilesFromManifest(manifest, roadSettings);
+    const roadTile = (id) => roadTiles.find((tileDef) => tileDef.id === id);
+    const state = {
+        round: 1,
+        playerHp: 30,
+        enemyHp: 80,
+        board: emptyBoard(),
+        hand: [],
+        selectedHandIndex: -1,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+        placementFocus: 0,
+        chainMeter: null,
+        chainRegionKeys: [],
+        connectTargets: {
+            a: { x: 1, y: 1 },
+            b: { x: 3, y: 1 },
+            distance: 2,
+            connected: false,
+            scored: false,
+        },
+    };
+
+    state.board[1][1] = roadTile('tile_red_plus');
+    state.board[2][1] = roadTile('tile_blue_plus');
+    state.board[3][1] = roadTile('tile_red_plus');
+    state.board[3][2] = roadTile('tile_blue_plus');
+    state.board[3][3] = roadTile('tile_red_plus');
+    state.board[2][3] = roadTile('tile_blue_plus');
+    state.board[1][3] = roadTile('tile_red_plus');
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 0, blue: 0, green: 0 }],
+    }, roadSettings);
+
+    assert.equal(state.lastResult.roadConnected, true);
+    assert.equal(state.lastResult.roadLength, 7);
+    assert.equal(state.lastResult.roadShortestLength, 3);
+    assert.equal(state.lastResult.roadExtraLength, 4);
+    assert.equal(state.lastResult.roadDamage, 28);
+    assert.deepEqual(
+        new Set(state.lastResult.scoredTileKeys),
+        new Set(['1,1', '1,2', '1,3', '2,3', '3,3', '3,2', '3,1']),
+    );
+});
+
 test('opening draw bag caps early closers and keeps continuations', () => {
     const deckIds = createStartingDeckIds(tiles, {
         startingDeckRecipe: [
@@ -376,7 +744,6 @@ test('active combat colors constrain early reward colors', () => {
             { pattern: 'corner_rd', colors: ['red', 'blue'], count: 1 },
             { pattern: 'corner_dl', colors: ['red', 'blue'], count: 1 },
             { pattern: 'corner_lu', colors: ['red', 'blue'], count: 1 },
-            { id: 'tile_gray_blank_01', count: 1 },
         ],
     });
     const run = createRunState({

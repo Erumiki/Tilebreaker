@@ -5,11 +5,11 @@
             "name": "Первый раунд",
             "ante": 1,
             "reward": 3,
-            "enemyHp": 35,
+            "enemyHp": 3,
             "attacks": [
                 { "red": 1, "blue": 1 },
-                { "red": 2, "blue": 1 },
-                { "red": 1, "blue": 2 }
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 }
             ]
         },
         {
@@ -17,11 +17,11 @@
             "name": "Ставка повыше",
             "ante": 1,
             "reward": 4,
-            "enemyHp": 45,
+            "enemyHp": 3,
             "attacks": [
-                { "red": 2, "blue": 2 },
-                { "red": 3, "blue": 2 },
-                { "red": 2, "blue": 3 }
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 }
             ]
         },
         {
@@ -29,11 +29,11 @@
             "name": "Сложная доска",
             "ante": 2,
             "reward": 5,
-            "enemyHp": 55,
+            "enemyHp": 4,
             "attacks": [
-                { "red": 3, "blue": 3, "green": 3 },
-                { "red": 4, "blue": 3, "green": 4 },
-                { "red": 3, "blue": 5, "green": 3 }
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 }
             ]
         },
         {
@@ -41,11 +41,11 @@
             "name": "Проверка билда",
             "ante": 2,
             "reward": 6,
-            "enemyHp": 65,
+            "enemyHp": 4,
             "attacks": [
-                { "red": 4, "blue": 4, "green": 4 },
-                { "red": 4, "blue": 5, "green": 4 },
-                { "red": 5, "blue": 4, "green": 5 }
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 }
             ]
         },
         {
@@ -53,11 +53,11 @@
             "name": "Финальная ставка",
             "ante": 3,
             "reward": 8,
-            "enemyHp": 75,
+            "enemyHp": 5,
             "attacks": [
-                { "red": 5, "blue": 5, "green": 5 },
-                { "red": 5, "blue": 6, "green": 5 },
-                { "red": 6, "blue": 5, "green": 6 }
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 },
+                { "red": 1, "blue": 1 }
             ]
         }
     ]

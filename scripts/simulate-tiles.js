@@ -181,6 +181,7 @@ function createStartingDeck() {
 
         return {
             label: manifest.tileSetVersion ?? TILE_MANIFEST_PATH,
+            scenarioTiles: tiles,
             tiles: deckIds.map((tileId) => {
                 const tileDef = tileMap.get(tileId);
 
@@ -210,6 +211,7 @@ function createStartingDeck() {
 
     return {
         label: 'legacy_center_exit',
+        scenarioTiles: deck,
         tiles: deck,
     };
 }
@@ -348,6 +350,44 @@ function canPlace(placements, tileDef, x, y, strictEdges) {
     }
 
     return canPlaceOffColorLeap(placements, tileDef, x, y);
+}
+
+function shouldUseStartingBoardTile(entry) {
+    if (!Array.isArray(entry.gameplayVariants) || entry.gameplayVariants.length === 0) {
+        return true;
+    }
+
+    return entry.gameplayVariants.includes(GAMEPLAY_VARIANT.id);
+}
+
+function createStartingPlacements(deck, strictEdges = true) {
+    const placements = new Map();
+    const tileMap = new Map(deck.map((tileDef) => [tileDef.id, tileDef]));
+    const entries = Array.isArray(TILE_SETTINGS.startingBoardTiles)
+        ? TILE_SETTINGS.startingBoardTiles
+        : [];
+
+    for (const entry of entries) {
+        if (!shouldUseStartingBoardTile(entry)) {
+            continue;
+        }
+
+        const x = Math.floor(entry.x);
+        const y = Math.floor(entry.y);
+        const tileDef = tileMap.get(entry.id);
+
+        if (!tileDef) {
+            throw new Error(`Unknown startingBoardTiles tile id: ${entry.id}`);
+        }
+
+        if (!canPlace(placements, tileDef, x, y, strictEdges)) {
+            throw new Error(`startingBoardTiles entry cannot be placed: ${entry.id} at ${x},${y}`);
+        }
+
+        placements.set(key(x, y), tileDef);
+    }
+
+    return placements;
 }
 
 function findCandidatePlacements(placements, tileDef, strictEdges) {
@@ -973,6 +1013,7 @@ function analyzeHands(rng, deck, strictEdges, useOpeningBag) {
 
     for (let run = 0; run < HAND_RUNS; run += 1) {
         const drawState = createDrawState(rng, deck, useOpeningBag);
+        const startingPlacements = createStartingPlacements(deck, strictEdges);
         const candidate = DRAW_MODE === 'queue'
             ? null
             : drawBestCandidateHandFromState(
@@ -981,17 +1022,17 @@ function analyzeHands(rng, deck, strictEdges, useOpeningBag) {
                 HAND_SIZE,
                 strictEdges,
                 null,
-                new Map(),
+                startingPlacements,
                 'payoff',
             );
         const hand = DRAW_MODE === 'queue'
             ? drawFromState(rng, drawState, HAND_SIZE)
             : candidate.hand;
         const best = DRAW_MODE === 'queue'
-            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'payoff')
+            ? findBestQueuePlacement(hand, null, strictEdges, startingPlacements, 'payoff')
             : candidate.best;
         reports.push({
-            placed: best.placements.size,
+            placed: best.placedThisRound,
             totalDamage: best.score.totalDamage,
             zones: best.score.zones.length,
             zoneAreas: best.score.zones.map((zone) => zone.size),
@@ -1016,12 +1057,13 @@ function analyzeStrategyComparison(rng, deck, strictEdges, useOpeningBag) {
     for (let run = 0; run < HAND_RUNS; run += 1) {
         const drawState = createDrawState(rng, deck, useOpeningBag);
         const hand = drawFromState(rng, drawState, HAND_SIZE);
+        const startingPlacements = createStartingPlacements(deck, strictEdges);
         const closeASAP = DRAW_MODE === 'queue'
-            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'closeASAP')
-            : findBestPlacement(rng, hand, null, strictEdges, new Map(), 'closeASAP');
+            ? findBestQueuePlacement(hand, null, strictEdges, startingPlacements, 'closeASAP')
+            : findBestPlacement(rng, hand, null, strictEdges, startingPlacements, 'closeASAP');
         const payoff = DRAW_MODE === 'queue'
-            ? findBestQueuePlacement(hand, null, strictEdges, new Map(), 'payoff')
-            : findBestPlacement(rng, hand, null, strictEdges, new Map(), 'payoff');
+            ? findBestQueuePlacement(hand, null, strictEdges, startingPlacements, 'payoff')
+            : findBestPlacement(rng, hand, null, strictEdges, startingPlacements, 'payoff');
 
         reports.push({
             hand,
@@ -1035,7 +1077,7 @@ function analyzeStrategyComparison(rng, deck, strictEdges, useOpeningBag) {
 
 function simulateFight(rng, deck, battle, strictEdges, useOpeningBag) {
     const drawState = createDrawState(rng, deck, useOpeningBag);
-    let placements = new Map();
+    let placements = createStartingPlacements(deck, strictEdges);
     let enemyHp = battle.enemyHp;
     let playerHp = STARTING_PLAYER_HP;
     let rounds = 0;
@@ -1067,9 +1109,10 @@ function simulateFight(rng, deck, battle, strictEdges, useOpeningBag) {
             deadEndRounds += 1;
 
             if (DEAD_END_RECOVERY === 'freshStart') {
+                const startingPlacements = createStartingPlacements(deck, strictEdges);
                 best = DRAW_MODE === 'queue'
-                    ? findBestQueuePlacement(hand, attack, strictEdges, new Map(), 'payoff')
-                    : findBestPlacement(rng, hand, attack, strictEdges, new Map(), 'payoff');
+                    ? findBestQueuePlacement(hand, attack, strictEdges, startingPlacements, 'payoff')
+                    : findBestPlacement(rng, hand, attack, strictEdges, startingPlacements, 'payoff');
                 recoveredDeadEnds += 1;
             }
         }
@@ -1397,6 +1440,7 @@ function run() {
     const seed = Number(process.argv[2] || 20260508);
     const deckDefinition = createStartingDeck();
     const deck = deckDefinition.tiles;
+    const scenarioTiles = deckDefinition.scenarioTiles ?? deck;
 
     console.log(`Tilebreaker tile feasibility simulation`);
     console.log(`Seed: ${seed}`);
@@ -1417,7 +1461,7 @@ function run() {
     console.log(`Off-color leap: ${OFF_COLOR_LEAP_PLACEMENT}, distance: ${OFF_COLOR_LEAP_DISTANCE}, only blocked: ${OFF_COLOR_LEAP_ONLY_WHEN_BLOCKED}`);
     console.log(`Opening draw bag: ${DRAW_BAG.enabled ? 'on' : 'off'}, window: ${OPENING_DRAW_COUNT}`);
     printDeck(deck);
-    printPayoffScenarioComparison(deck);
+    printPayoffScenarioComparison(scenarioTiles);
 
     const modes = process.argv.includes('--with-loose') ? [true, false] : [true];
     const presets = ['current', 'fewer corners', 'fewer plus', 'fewer both'];

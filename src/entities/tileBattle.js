@@ -1,4 +1,5 @@
 import { discardTileIds, drawTileIds } from './run.js';
+import { getGameplayVariant } from './gameplayVariants.js';
 
 export const COMBAT_COLORS = ['red', 'blue', 'green'];
 export const TILE_COLORS = ['red', 'blue', 'green', 'gray'];
@@ -39,9 +40,18 @@ function isConnectTargetsVariant(settings = {}) {
     return settings.gameplayVariant === 'connect_targets';
 }
 
+function isRoadModeVariant(settings = {}) {
+    return settings.gameplayVariant === 'road_mode';
+}
+
+function isRouteGateVariant(settings = {}) {
+    return isConnectTargetsVariant(settings) || isRoadModeVariant(settings);
+}
+
 function isOneColorLandVariant(settings = {}) {
     return isOneColorChainVariant(settings)
-        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false);
+        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false)
+        || (isRoadModeVariant(settings) && settings.roadMode?.oneColorLand !== false);
 }
 
 function normalizeRuleSymbol(symbol, settings = {}) {
@@ -96,6 +106,51 @@ function isInsideBoard(size, x, y) {
 
 function createEmptyBoard(size) {
     return Array.from({ length: size }, () => Array(size).fill(null));
+}
+
+function shouldUseStartingBoardTile(entry, settings) {
+    if (!Array.isArray(entry.gameplayVariants) || entry.gameplayVariants.length === 0) {
+        return true;
+    }
+
+    return entry.gameplayVariants.includes(getGameplayVariant(settings).id);
+}
+
+function findTileById(tiles, tileId) {
+    return tiles.find((tileDef) => tileDef.id === tileId);
+}
+
+function createStartingBoard(settings, tiles) {
+    const board = createEmptyBoard(settings.boardSize);
+    const entries = Array.isArray(settings.startingBoardTiles)
+        ? settings.startingBoardTiles
+        : [];
+
+    for (const entry of entries) {
+        if (!shouldUseStartingBoardTile(entry, settings)) {
+            continue;
+        }
+
+        const x = Math.floor(entry.x);
+        const y = Math.floor(entry.y);
+        const tileDef = findTileById(tiles, entry.id);
+
+        if (!tileDef) {
+            throw new Error(`Unknown startingBoardTiles tile id: ${entry.id}`);
+        }
+
+        if (!isInsideBoard(settings.boardSize, x, y)) {
+            throw new Error(`startingBoardTiles entry is outside the board: ${entry.id} at ${x},${y}`);
+        }
+
+        if (!canPlaceTile(board, tileDef, x, y, settings)) {
+            throw new Error(`startingBoardTiles entry cannot be placed: ${entry.id} at ${x},${y}`);
+        }
+
+        board[y][x] = tileDef;
+    }
+
+    return board;
 }
 
 function countPlacedTiles(board) {
@@ -208,16 +263,64 @@ function getGrayInteriorBonus(settings, grayInteriorCells) {
     return grayInteriorCells * (grayBonus.bonusPerCell ?? 0);
 }
 
+function convertRawZoneDamageToHearts(settings, rawDamage) {
+    const damagePerHeart = settings.hearts?.zoneDamagePerHeart ?? 0;
+
+    if (getGameplayVariant(settings).id !== 'legacy'
+        || damagePerHeart <= 0
+        || rawDamage <= 0) {
+        return rawDamage;
+    }
+
+    const minimumHearts = settings.hearts?.minimumZoneHearts ?? 1;
+
+    return Math.max(minimumHearts, Math.floor(rawDamage / damagePerHeart));
+}
+
 function getZoneDamageBreakdown(settings, area, grayInteriorCells) {
     const areaDamage = area * getDamagePerArea(settings);
     const areaBonus = getLargeZoneBonus(settings, area);
     const grayBonus = getGrayInteriorBonus(settings, grayInteriorCells);
+    const rawDamage = areaDamage + areaBonus + grayBonus;
 
     return {
         areaDamage,
         areaBonus,
         grayBonus,
-        baseDamage: areaDamage + areaBonus + grayBonus,
+        rawDamage,
+        baseDamage: convertRawZoneDamageToHearts(settings, rawDamage),
+    };
+}
+
+function countUnplayedHandTiles(state) {
+    return state.hand
+        ?.filter(Boolean)
+        .length ?? 0;
+}
+
+export function getNewPickDamagePreview(state, settings) {
+    if (getGameplayVariant(settings).id !== 'legacy') {
+        return {
+            baseDamage: 0,
+            unplayedTiles: countUnplayedHandTiles(state),
+            unplayedDamage: 0,
+            totalDamage: 0,
+        };
+    }
+
+    const heartRules = settings.hearts ?? {};
+    const baseDamage = heartRules.newPickBaseDamage ?? 0;
+    const tilesPerDamage = heartRules.unplayedTilesPerDamage ?? 0;
+    const unplayedTiles = countUnplayedHandTiles(state);
+    const unplayedDamage = tilesPerDamage > 0
+        ? Math.floor(unplayedTiles / tilesPerDamage)
+        : 0;
+
+    return {
+        baseDamage,
+        unplayedTiles,
+        unplayedDamage,
+        totalDamage: Math.max(0, baseDamage + unplayedDamage),
     };
 }
 
@@ -518,10 +621,13 @@ export function applyOpeningDrawBag(run, tiles, settings = {}) {
     return run.lastOpeningBag;
 }
 
-function hasAnyValidPlacement(board, hand, settings) {
+function hasAnyValidPlacement(board, hand, settings, heldTile = null) {
     const playableTiles = isQueueDrawMode(settings) ? [hand[0]] : hand;
+    const tilesToCheck = isHoldEnabled(settings) && heldTile
+        ? [...playableTiles, heldTile]
+        : playableTiles;
 
-    return playableTiles.some((tileDef) => {
+    return tilesToCheck.some((tileDef) => {
         if (!tileDef) {
             return false;
         }
@@ -540,6 +646,10 @@ function hasAnyValidPlacement(board, hand, settings) {
 
 function isQueueDrawMode(settings) {
     return settings.drawMode === 'queue';
+}
+
+function isHoldEnabled(settings) {
+    return settings.holdEnabled === true && !isQueueDrawMode(settings);
 }
 
 function drawTileDefs(run, tiles, count) {
@@ -796,6 +906,7 @@ function findCapturedAreas(board, settings) {
                     areaBonus: damage.areaBonus,
                     grayInteriorCells,
                     grayBonus: damage.grayBonus,
+                    rawDamage: damage.rawDamage,
                     baseDamage: damage.baseDamage,
                     damage: damage.baseDamage,
                     interiorCells: region.interiorCells,
@@ -817,6 +928,10 @@ function getScoredTileKeys(result) {
 
     if (!result) {
         return scoredTileKeys;
+    }
+
+    for (const tileKey of result.score?.roadTileKeys ?? []) {
+        scoredTileKeys.add(tileKey);
     }
 
     for (const zone of result.score.zones) {
@@ -877,6 +992,29 @@ function getConnectTargetRules(settings) {
     };
 }
 
+function getRoadModeRules(settings) {
+    return {
+        completeBonus: settings.roadMode?.completeBonus ?? 12,
+        damagePerTile: settings.roadMode?.damagePerTile ?? 6,
+        maxScoredExtraLength: settings.roadMode?.maxScoredExtraLength ?? 6,
+        minLength: settings.roadMode?.minLength ?? 4,
+        gateMinDistance: settings.roadMode?.gateMinDistance ?? 5,
+        gateMaxDistance: settings.roadMode?.gateMaxDistance ?? 7,
+    };
+}
+
+function getRouteGateRules(settings) {
+    if (isRoadModeVariant(settings)) {
+        const roadRules = getRoadModeRules(settings);
+        return {
+            minDistance: roadRules.gateMinDistance,
+            maxDistance: roadRules.gateMaxDistance,
+        };
+    }
+
+    return getConnectTargetRules(settings);
+}
+
 function getPlacementPayoffRules(settings) {
     return {
         focusPerUsefulPlacement: settings.placementPayoff?.focusPerUsefulPlacement ?? 1,
@@ -885,7 +1023,7 @@ function getPlacementPayoffRules(settings) {
     };
 }
 
-function getConnectedCombatTileKeys(board, startX, startY, settings) {
+export function getConnectedCombatTileKeys(board, startX, startY, settings) {
     const startTile = board[startY]?.[startX];
 
     if (!isCombatTile(startTile)) {
@@ -926,6 +1064,77 @@ function getConnectedCombatTileKeys(board, startX, startY, settings) {
     }
 
     return [...visited];
+}
+
+export function getShortestCombatPathKeys(board, start, end, settings) {
+    const startTile = board[start.y]?.[start.x];
+    const endTile = board[end.y]?.[end.x];
+
+    if (!isCombatTile(startTile) || !isCombatTile(endTile)) {
+        return [];
+    }
+
+    const startKey = boardKey(start.x, start.y);
+    const endKey = boardKey(end.x, end.y);
+    const queue = [{ x: start.x, y: start.y }];
+    const visited = new Set([startKey]);
+    const parent = new Map();
+    let cursor = 0;
+
+    while (cursor < queue.length) {
+        const cell = queue[cursor];
+        cursor += 1;
+        const key = boardKey(cell.x, cell.y);
+
+        if (key === endKey) {
+            break;
+        }
+
+        const tileDef = board[cell.y][cell.x];
+
+        for (const direction of DIRECTIONS) {
+            const nextX = cell.x + direction.dx;
+            const nextY = cell.y + direction.dy;
+
+            if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+                continue;
+            }
+
+            const neighbor = board[nextY][nextX];
+            const nextKey = boardKey(nextX, nextY);
+
+            if (!isCombatTile(neighbor) || visited.has(nextKey)) {
+                continue;
+            }
+
+            if (!edgesMatch(tileDef, neighbor, direction, settings)) {
+                continue;
+            }
+
+            visited.add(nextKey);
+            parent.set(nextKey, key);
+            queue.push({ x: nextX, y: nextY });
+        }
+    }
+
+    if (!visited.has(endKey)) {
+        return [];
+    }
+
+    const path = [];
+    let currentKey = endKey;
+
+    while (currentKey) {
+        path.push(currentKey);
+
+        if (currentKey === startKey) {
+            break;
+        }
+
+        currentKey = parent.get(currentKey);
+    }
+
+    return path.reverse();
 }
 
 function updateOneColorChainForPlacement(state, settings, x, y) {
@@ -1036,11 +1245,11 @@ function cellDistance(left, right) {
 }
 
 function createConnectTargetPair(board, settings, salt = 0) {
-    if (!isConnectTargetsVariant(settings)) {
+    if (!isRouteGateVariant(settings)) {
         return null;
     }
 
-    const rules = getConnectTargetRules(settings);
+    const rules = getRouteGateRules(settings);
     const cells = [];
 
     for (let y = 0; y < settings.boardSize; y += 1) {
@@ -1078,7 +1287,7 @@ function createConnectTargetPair(board, settings, salt = 0) {
 }
 
 function ensureConnectTargets(state, settings) {
-    if (!isConnectTargetsVariant(settings)) {
+    if (!isRouteGateVariant(settings)) {
         state.connectTargets = null;
         return null;
     }
@@ -1111,6 +1320,13 @@ function areConnectTargetsLinked(board, targets, settings) {
 }
 
 function applyConnectTargetsToScore(state, score, settings) {
+    if (!isConnectTargetsVariant(settings)) {
+        return {
+            connected: false,
+            bonusDamage: 0,
+        };
+    }
+
     const targets = ensureConnectTargets(state, settings);
 
     if (!targets || targets.scored || !areConnectTargetsLinked(state.board, targets, settings)) {
@@ -1130,6 +1346,92 @@ function applyConnectTargetsToScore(state, score, settings) {
     return {
         connected: true,
         bonusDamage: rules.bonusDamage,
+    };
+}
+
+function applyRoadModeToScore(state, score, settings, run = null) {
+    if (!isRoadModeVariant(settings)) {
+        return {
+            connected: false,
+            length: 0,
+            shortestLength: 0,
+            extraLength: 0,
+            scoredExtraLength: 0,
+            baseDamage: 0,
+            damage: 0,
+            tileKeys: [],
+            pathKeys: [],
+        };
+    }
+
+    const gates = ensureConnectTargets(state, settings);
+
+    if (!gates || gates.scored || !areConnectTargetsLinked(state.board, gates, settings)) {
+        return {
+            connected: false,
+            length: 0,
+            shortestLength: 0,
+            extraLength: 0,
+            scoredExtraLength: 0,
+            baseDamage: 0,
+            damage: 0,
+            tileKeys: [],
+            pathKeys: [],
+        };
+    }
+
+    const rules = getRoadModeRules(settings);
+    const pathKeys = getShortestCombatPathKeys(state.board, gates.a, gates.b, settings);
+    const length = pathKeys.length;
+    const shortestLength = gates.distance + 1;
+    const routeEdges = Math.max(0, length - 1);
+    const extraLength = Math.max(0, routeEdges - gates.distance);
+    const scoredExtraLength = Math.min(extraLength, rules.maxScoredExtraLength);
+
+    if (length < rules.minLength) {
+        gates.connected = true;
+        return {
+            connected: true,
+            length,
+            shortestLength,
+            extraLength,
+            scoredExtraLength,
+            baseDamage: 0,
+            damage: 0,
+            tileKeys: pathKeys,
+            pathKeys,
+        };
+    }
+
+    const multiplier = run?.colorMultipliers?.red ?? 1;
+    const baseDamage = rules.completeBonus + scoredExtraLength * rules.damagePerTile;
+    const damage = baseDamage * multiplier;
+    gates.connected = true;
+    gates.scored = true;
+    score.road = {
+        connected: true,
+        length,
+        shortestLength,
+        extraLength,
+        scoredExtraLength,
+        baseDamage,
+        multiplier,
+        damage,
+    };
+    score.roadTileKeys = pathKeys;
+    score.damageByColor.red += damage;
+    score.totalDamage += damage;
+
+    return {
+        connected: true,
+        length,
+        shortestLength,
+        extraLength,
+        scoredExtraLength,
+        baseDamage,
+        damage,
+        tileKeys: pathKeys,
+        pathKeys,
     };
 }
 
@@ -1225,6 +1527,7 @@ export function createStartingDeckIds(tiles, settings = {}) {
 
 export function createTileBattleState({ battle, run, settings, tiles }) {
     const round = 1;
+    const startingBoard = createStartingBoard(settings, tiles);
     applyOpeningDrawBag(run, tiles, settings);
     const roundTiles = drawRoundTiles({
         run,
@@ -1232,7 +1535,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         battle,
         settings,
         round,
-        board: createEmptyBoard(settings.boardSize),
+        board: startingBoard,
     });
     const hand = isQueueDrawMode(settings) ? roundTiles.slice(0, 2) : roundTiles;
 
@@ -1240,8 +1543,9 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         round,
         playerHp: run.playerHp,
         enemyHp: battle.enemyHp,
-        board: createEmptyBoard(settings.boardSize),
+        board: startingBoard,
         hand,
+        heldTile: null,
         selectedHandIndex: hand.findIndex(Boolean),
         queueReserve: isQueueDrawMode(settings) ? roundTiles.slice(2) : [],
         playedThisRound: [],
@@ -1255,7 +1559,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         chainMeter: isOneColorChainVariant(settings) ? 0 : null,
         lastChainDelta: 0,
         chainRegionKeys: [],
-        connectTargets: createConnectTargetPair(createEmptyBoard(settings.boardSize), settings, round),
+        connectTargets: createConnectTargetPair(startingBoard, settings, round),
     };
 }
 
@@ -1339,8 +1643,47 @@ export function placeTile(state, settings, x, y) {
     return true;
 }
 
+export function holdSelectedTile(state, settings) {
+    if (!isHoldEnabled(settings) || state.phase !== 'placing') {
+        return false;
+    }
+
+    const selectedIndex = state.selectedHandIndex;
+    const selectedTile = state.hand[selectedIndex] ?? null;
+    const heldTile = state.heldTile ?? null;
+
+    if (!selectedTile && !heldTile) {
+        return false;
+    }
+
+    if (!selectedTile && heldTile) {
+        const emptyIndex = state.hand.findIndex((tileDef) => !tileDef);
+
+        if (emptyIndex < 0) {
+            return false;
+        }
+
+        state.hand[emptyIndex] = heldTile;
+        state.heldTile = null;
+        state.selectedHandIndex = emptyIndex;
+        return true;
+    }
+
+    state.heldTile = selectedTile;
+    state.hand[selectedIndex] = heldTile;
+
+    if (state.hand[selectedIndex]) {
+        state.selectedHandIndex = selectedIndex;
+        return true;
+    }
+
+    const nextIndex = state.hand.findIndex(Boolean);
+    state.selectedHandIndex = nextIndex >= 0 ? nextIndex : -1;
+    return true;
+}
+
 export function scoreTileBoard(board, settings, run = null) {
-    const zones = findCapturedAreas(board, settings);
+    const zones = isRoadModeVariant(settings) ? [] : findCapturedAreas(board, settings);
     const damageByColor = Object.fromEntries(TILE_COLORS.map((color) => [color, 0]));
 
     for (const zone of zones) {
@@ -1366,6 +1709,8 @@ export function resolveTileRound(state, battle, settings, run = null) {
     const placementPayoff = applyPlacementFocusToScore(state, score, settings);
     const oneColorChain = applyOneColorChainToScore(state, score, settings);
     const connectTargets = applyConnectTargetsToScore(state, score, settings);
+    const roadMode = applyRoadModeToScore(state, score, settings, run);
+    const newPickDamage = getNewPickDamagePreview(state, settings);
     let enemyDamage = 0;
     let playerDamage = 0;
     const byColor = {};
@@ -1374,7 +1719,7 @@ export function resolveTileRound(state, battle, settings, run = null) {
         const closedDamage = score.damageByColor[color] || 0;
         const threat = attack[color] || 0;
 
-        if (closedDamage > threat) {
+        if (closedDamage > 0 && closedDamage >= threat) {
             enemyDamage += closedDamage;
             byColor[color] = {
                 threat,
@@ -1416,7 +1761,17 @@ export function resolveTileRound(state, battle, settings, run = null) {
         } : null,
         connectTargetBonus: connectTargets.bonusDamage,
         connectTargetConnected: connectTargets.connected,
+        roadConnected: roadMode.connected,
+        roadLength: roadMode.length,
+        roadShortestLength: roadMode.shortestLength,
+        roadExtraLength: roadMode.extraLength,
+        roadScoredExtraLength: roadMode.scoredExtraLength,
+        roadBaseDamage: roadMode.baseDamage,
+        roadDamage: roadMode.damage,
+        roadTileKeys: roadMode.tileKeys,
         scoredTileKeys: [...getScoredTileKeys({ score })],
+        newPickDamage,
+        newPickDamageApplied: false,
     };
 
     if (state.enemyHp <= 0) {
@@ -1435,17 +1790,25 @@ export function discardRoundHand(run, state) {
     const reserveTileIds = state.queueReserve
         ?.filter(Boolean)
         .map((tileDef) => tileDef.id) ?? [];
+    const heldTileIds = state.outcome && state.heldTile
+        ? [state.heldTile.id]
+        : [];
 
     discardTileIds(run, [
         ...state.playedThisRound,
         ...unplayedTileIds,
         ...reserveTileIds,
+        ...heldTileIds,
     ]);
     state.hand = state.hand.map(() => null);
     state.queueReserve = [];
     state.playedThisRound = [];
     state.queuePlayedThisRound = 0;
     state.selectedHandIndex = -1;
+
+    if (state.outcome) {
+        state.heldTile = null;
+    }
 }
 
 export function advanceTileQueue(run, state, settings, tiles) {
@@ -1494,11 +1857,11 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
 
     if (settings.deadEndRecovery === 'freshStart'
         && countPlacedTiles(state.board) > 0
-        && !hasAnyValidPlacement(state.board, state.hand, settings)) {
-        state.board = createEmptyBoard(settings.boardSize);
+        && !hasAnyValidPlacement(state.board, state.hand, settings, state.heldTile)) {
+        state.board = createStartingBoard(settings, tiles);
     }
 
-    if (isConnectTargetsVariant(settings)) {
+    if (isRouteGateVariant(settings)) {
         state.connectTargets = state.connectTargets?.scored
             ? null
             : state.connectTargets;
