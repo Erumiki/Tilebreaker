@@ -14,6 +14,14 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Core 1 Rescue replaces round end with hand submit and immediate closure
+
+**Context:** The latest playable Core 1 Rescue build already plays better with full hand, center anchors, hold and hearts, but the old round-end model still mixes delayed scoring, monster attack damage and unclear new-pick language. The next implementation needs one clear tempo rule instead of old combat leftovers.
+
+**Decision:** Active `legacy` replaces the old end-round/new-pick action with `Сдать руку`. The button previews and immediately charges `submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, then redeals. Separate monster attack damage is removed from active Core 1; the player loses hearts only through hand submit in this MVP pass. Closed zones score immediately after the placement that closes them, before any later action. Each closed zone gives `+1 gold`; closures on consecutive valid placements award strike bonus gold equal to the current strike count. Gold is saved for a later between-round card/shop pass, not spent in this implementation pass.
+
+**Rationale:** This keeps the rescued Core 1 focused on one readable pressure: "Can I close something with this hand, or do I surrender the hand and pay hearts?" Immediate closure makes the cause/effect legible, while gold and strike reward fast tactical closures without reintroducing old monster attack bookkeeping.
+
 ### 2026-05-09 - Core 1 Rescue uses hearts and new-pick cost
 
 **Context:** Manual playtest showed that `legacy + hand` remains the most playable core, but large numbers and extra green UI noise make battle tempo hard to read. The player needs a simple goal: kill the monster in fewer hand picks.
@@ -283,3 +291,5 @@ Important decisions are recorded with date and rationale so any team member or C
 **Decision:** For the next legacy iteration, remove the third/green color from active legacy interfaces, replace large damage numbers with a hearts scale, start the first monster with 3 hearts, count minimal 2x2 capture as 1 heart, and make every new pick/refill a source of incoming damage. Unplayed tiles should increase this damage, but only with explicit preview before the action.
 
 **Rationale:** This turns battle from abstract damage accounting into a clear tempo race: kill the monster in fewer picks. New-pick cost ties hand, tempo and health together, but preview is mandatory so the player feels responsible for the decision instead of secretly punished.
+
+**Superseded wording 2026-05-09:** the implemented pressure remains useful, but the next active Core 1 pass renames the action to `Сдать руку`, removes separate monster attack damage and uses the newer hand-submit formula recorded above.

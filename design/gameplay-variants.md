@@ -42,23 +42,77 @@ New playtest signal: with a full hand, `legacy` immediately became more playable
 
 Status 2026-05-09: hearts/pick-pressure MVP is implemented in active `legacy`.
 
-Next design turn for `legacy`:
+### Next Loop Decision: Сдать Руку, Immediate Closure, Gold
+
+Latest playable feedback confirms that Core 1 Rescue should keep the active `legacy` foundation and replace the old round-end model rather than start a new core.
+
+Implementation-now decisions:
+
+- rename the old new-pick / end-round action to `Сдать руку`;
+- preview the exact heart cost on the button;
+- pay the cost immediately when the button is pressed, then redeal the hand;
+- remove separate monster attack damage from active Core 1;
+- score closed zones immediately after the placement that closes them;
+- add gold as visible battle income, but only as saved future shop currency;
+- add strike as a reward for two or more closures on consecutive valid placements;
+- fill the battle log and debug state from the concrete UIX checklist in `design/signs-and-feedback.md`.
+
+Hand-submit cost for the first implementation pass:
+
+```text
+submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)
+```
+
+This preserves the old readable unplayed-card pressure but makes repeated hand surrender get heavier over the battle. With a 7-card hand, submitting without playing costs 2 hearts; playing down to 3 cards makes the first submit cost 1 heart. The held card is intentionally excluded from `unplayedHandCards`, because hold is the player's explicit way to protect one future plan.
+
+Immediate closure timing:
+
+- placement legality resolves first;
+- the tile is placed;
+- all newly closed zones are detected and scored at once;
+- monster hearts, gold and strike update before the next player action;
+- scored tiles follow the existing cleanup rule after the closure feedback beat;
+- hand submit no longer triggers delayed scoring.
+
+Strike definition:
+
+- a closure opens a strike window;
+- if the next valid tile placement also closes a zone, award `Strike x1`;
+- each further consecutive closing placement increments the strike count;
+- a valid non-closing placement breaks the window and resets strike count;
+- submitting the hand breaks the window and resets strike count;
+- selection, hold/swap and invalid clicks do not break the window because they are not valid placements.
+
+Gold rules for the first implementation pass:
+
+- run starts at 0 gold;
+- each closed zone gives `+1 gold`;
+- each strike gives extra `+strikeCount gold`;
+- battle win rewards and card buying are not part of this implementation pass.
+
+Later card/shop pass:
+
+- spend gold between battles on card buys;
+- define shop prices, reroll/remove costs and reward pacing after gold income is visible;
+- revisit card pool, universal red/blue card, rotate tools or double-color cards only after the new closure/submit loop is tested.
+
+Previous implemented hearts slice, now superseded by the `Сдать руку` wording for the next implementation pass:
 
 - green removed from visible legacy combat rows: active combat shows red/blue;
 - legacy HP/damage are shown as hearts;
 - first monster: `3 hearts`;
 - small 2x2 square = `1 heart` damage;
 - larger closed zones give more hearts through `tileBattle.hearts.zoneDamagePerHeart`;
-- every new pick/refill of the hand deals monster damage;
-- unplayed tiles increase incoming damage from a new pick through `floor(unplayed / unplayedTilesPerDamage)`;
-- battle goal reads as: kill the monster in fewer picks.
+- the old implemented new-pick pressure charged hearts on a confirmed new hand;
+- the new accepted wording is `Сдать руку`, with repeated-submit pressure added through `floor(handSubmitsThisBattle / 2)`;
+- battle goal reads as: kill the monster in fewer hand submits.
 
-Desired new player question: "Should I draw a new hand and take the hit, or can I squeeze one more useful move out of this hand?"
+Desired new player question: "Should I submit this hand and pay hearts, or can I squeeze one more useful move out of it?"
 
-Accepted MVP slice:
+Accepted hearts MVP slice before this design pass:
 
 1. Heart conversion and pick-pressure apply only to `legacy` so hidden variants do not inherit the new tempo rule.
-2. A new pick costs `1 + floor(unplayed / 4)` hearts, with preview shown before confirmation.
+2. A new pick costs `1 + floor(unplayed / 4)` hearts, with preview shown before confirmation. The next pass replaces this with the full `Сдать руку` formula above.
 3. Minimal matching capture now really hits the monster for 1 heart: equal defense by color counts as enough, instead of requiring strictly beating the threat.
 4. Road-mode remains URL-playable, but its smoke is reduced to launch/gates/first placement because the mode was removed from active rescue comparison.
 5. The next manual playtest should decide whether hearts/pick-pressure creates clear battle tempo without starting center/hold/rotate.
@@ -101,7 +155,7 @@ Scores are given after the first 1-2 battles. Scale: `1` bad, `3` tolerable, `5`
 
 | Variant | Want to grow 5+ cells | Turn goal is clear | Zero turns rare/tolerable | Damage readable | Analysis not sticky | One more run? | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `legacy` | 4 | 3 | 3 | 2 | 3 | 4 | Full-hand immediately improved the game. Next focus: remove green UI noise, switch to hearts, make every new pick a decision with cost. |
+| `legacy` | 4 | 3 | 3 | 2 | 3 | 4 | Full-hand immediately improved the game. Next focus: remove green UI noise, switch to hearts, make `Сдать руку` a decision with visible cost. |
 | `placement_payoff` | 2 | 2 | 2 | 3 | 3 | 1 | Does not feel like a separate mode. Focus can remain as possible Core 1 support, but remove the direction from active choice. |
 | `one_color_chain` |  |  |  |  |  |  | One color does not yet have a clear interesting stake. Archive until there is a new idea. |
 | `connect_targets` |  |  |  |  |  |  | Needs separate mode 4 analysis: scoring/goal should require real connection, maybe rotate is needed. |

@@ -1,8 +1,8 @@
 # Current Version
 
-## v0.18 Core 1 Rescue Center Anchors
+## v0.18 Core 1 Rescue + Hand Submit Spec
 
-**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, visible pick pressure, a larger board, two ready center anchors and one hold slot.
+**Goal:** Rescue the most playable core: `legacy` two-color capture-fill, without gray blank, with full-hand draw by default, heart-scale combat, a larger board, two ready center anchors, one hold slot, and the next hand-submit/immediate-closure loop ready for implementation.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
@@ -44,13 +44,19 @@
 - Active MVP `holdEnabled` is true in hand mode. The selected hand card can move into one hold slot; clicking the hold slot again swaps the selected hand card with the held card. The held card survives a non-lethal new pick and avoids the unplayed-hand discard, but returns to discard when the battle ends.
 - Legacy combat now uses hearts in the playable layer: the first monster has 3 hearts, the player starts with 18 hearts, a minimal 2x2 capture is 1 heart, and larger zones can convert into more hearts through `tileBattle.hearts.zoneDamagePerHeart`.
 - Legacy UI shows only active red/blue combat rows. Green remains in the manifest and old/debug structures, but no longer consumes visible combat-result space in the active rescue path.
-- Ending a non-lethal legacy round previews the cost of the next pick before the player confirms it. New pick damage is `newPickBaseDamage + floor(unplayedTiles / unplayedTilesPerDamage)`, currently `1 + floor(unplayed / 4)`.
+- Current implemented build still uses the older non-lethal new-pick action, but the accepted next Core 1 Rescue spec replaces it with `Сдать руку`.
+- `Сдать руку` previews and immediately charges `submitCost = 1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, then redeals the hand.
+- The held card is excluded from `unplayedHandCards`; hold is the explicit way to save one future plan through a submit.
+- In the accepted next loop, the player loses hearts only through `Сдать руку`. Separate monster attack damage is removed from active Core 1.
 - Pick-pressure is intentionally scoped to `legacy`; hidden/archived variants stay URL-playable without inheriting this new tempo rule.
-- Manual playtest after switching to full-hand: `legacy` immediately feels better. The next legacy goal is not more variants, but a cleaner battle loop: hide irrelevant green UI, show monster/player hearts, make a new pick/refill deal incoming damage, and let unplayed tiles increase that incoming damage.
+- Manual playtest after switching to full-hand: `legacy` immediately feels better. The next legacy goal is not more variants, but a cleaner battle loop: hide irrelevant green UI, show monster/player hearts, replace new-pick language with `Сдать руку`, charge the previewed submit cost immediately, and let unplayed hand cards plus repeated submits increase that cost.
 - Queue remains available for comparison through `?drawMode=queue`, but it is no longer the default playtest posture.
 - At the start of each battle, enabled `drawBag` reorders only the next `openingDraws` future draws from the current draw pile. In the rescue deck it caps early `corner` at 2, forbids early `plus`, requires `line`/`tee` continuation pieces, keeps at least four red and four blue tiles when available and limits gray count to 0. It does not add tiles, guarantee a loop or solve placement for the player.
 - Stable debug/smoke runs use URL overrides such as `?seed=20260508&guaranteedLoopHands=true`; normal player runs generate a fresh seed on each start.
-- At round end, played and unplayed hand or queue tiles go to discard; the one held tile stays in the hold slot across a non-lethal new pick. When draw pile is empty, discard is shuffled back into draw pile.
+- At hand submit, played and unplayed hand tiles go to discard; the one held tile stays in the hold slot. When draw pile is empty, discard is shuffled back into draw pile.
+- In the accepted next loop, zone closure is scored immediately after the placement that closes the zone. Monster hearts, gold and strike feedback update before any later placement, hold or hand submit.
+- Gold is accepted as future between-round card-buying currency. A run starts at 0 gold; each closed zone gives `+1 gold`; strike bonus adds `+strikeCount gold`.
+- A strike happens when the next valid placement after a closure also closes a zone. Valid non-closing placement or `Сдать руку` resets it; selection, hold/swap and invalid clicks do not.
 - Starting player hearts are 18 in the active rescue build.
 - After each won battle, the player chooses one of three rewards: add a tile to discard/deck, remove a tile from deck, or increase a combat color multiplier. Add/boost rewards respect `activeCombatColors`, so the v3 start does not offer green before the game reintroduces it deliberately.
 - `dot` and base `cap` tiles are not in the MVP deck.
@@ -68,5 +74,4 @@
 - Interpret `zero damage` over a multi-round window, not as an isolated first-round failure. Watch zero-damage streaks, captures within the next 2-3 rounds, dead-end/freshStart rate, win rate and player damage.
 - Manual playtest result on 2026-05-09: `legacy` is the most playable variant, but still collapses into waiting for the right card. Two colors helped but did not fully fix it. Variant A did not feel meaningfully different and is not a standalone direction; Variant B lacks a strong one-color idea; Variant D/road-style scoring needs rethinking/rotation before more tests; the fifth tested direction is cut. Current favorites are Core 1 rescue and a separate Kingdomino-like combat spike.
 - Updated legacy target after center anchors + hold: judge whether the first 3-5 turns feel less like waiting for one card before adding the universal card, rotate or double-color control tools.
-- Latest playtest note for future work, not implemented in v0.18: replace the old round-end model with "Сдать руку", preview/pay hand-submit hearts, animate immediate redeal, remove monster attack damage from active Core 1, score zones at closure time, add animated combat messages, strikes and gold.
-- UIX planning for those future signs and messages starts in `design/signs-and-feedback.md`.
+- Latest playtest design pass is recorded in `design/gameplay-variants.md`, `design/signs-and-feedback.md` and `design/decisions.md`: implement `Сдать руку`, immediate closure scoring, strike/gold feedback and battle-log language next; postpone actual card shop/buy prices to a later card/shop pass.

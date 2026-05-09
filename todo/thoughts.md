@@ -13,7 +13,7 @@ Unsynced ideas, observations and improvements that appeared during work but have
 
 - [2026-05-09] Legacy playtest: full-hand immediately became more playable. This confirms that the next iteration should strengthen agency in legacy instead of returning to queue. New goal wording: kill the monster with fewer hand picks.
 
-- [2026-05-09] Legacy hearts/pick-pressure: remove the third/green color from interfaces; replace large numbers with hearts; first monster has 3 hearts; small square = 1 heart; every new pick/refill damages the player; unplayed tiles increase incoming damage. It is important to show the damage preview before the pick, otherwise the system will feel secretly punitive.
+- [2026-05-09] Legacy hearts/pick-pressure: synced into the Core 1 Rescue design pass. The next active wording is `Сдать руку`: preview and immediately pay `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, remove separate monster attack damage, and keep the player cost explicit.
 
 - [2026-05-09] Day 2 playtest: remove gray blank from all active tests. In the current state, the blank tile does not create an interesting decision, makes the hand harder to read and can mask the real draw problem. Synced in `configs/game.json`: rescue deck without gray blank, `drawBag.grayMax = 0`.
 

@@ -176,51 +176,15 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Design pass: hand-submit economy, gold and feedback
+### ~~[2026-05-09] Design pass: hand-submit economy, gold and feedback~~ DONE
 
-**Idea:** turn the latest playable Core 1 notes into a concrete spec before implementing the next loop change.
-
-**Why:** the battle now plays, but the next move changes the tempo, economy and feedback language at once. It needs one deliberate pass so the implementation does not mix old round-end combat with the new "submit hand" loop.
-
-**MVP:**
-
-- replace the old "Закончить раунд" concept with "Сдать руку";
-- decide the heart-cost curve for each next hand submit, and show that cost before the button is pressed;
-- specify that pressing "Сдать руку" immediately pays the cost and redeals the hand;
-- remove monster damage as a separate player-damage source in the active Core 1 loop: the player pays only through hand-submit costs;
-- specify immediate zone closure/scoring at the moment the zone closes, not only when the hand is submitted;
-- define strike timing: closing a zone on the very next step after a zone closure awards extra gold;
-- introduce gold as the future between-round card-buying currency;
-- use `design/signs-and-feedback.md` as the UIX checklist for all actions, events, messages and animations;
-- decide what belongs in the next implementation pass versus the later card/shop pass.
-
-**Acceptance:** there is a short written spec or updated design note that fixes hand-submit cost rules, immediate closure timing, strike/gold behavior and required feedback before code work starts.
-
-**Priority:** must
-
-**Layer:** MVP
+**Status:** done as a design pass. Decisions are recorded in `design/gameplay-variants.md`, `design/signs-and-feedback.md`, `design/decisions.md` and synced to `todo/current.md`: `Сдать руку` uses `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, pays immediately, immediate closure scores at placement time, monster attack damage is removed from active Core 1, gold/strike rewards are specified, and card/shop buying is postponed to a later pass.
 
 ---
 
-### [2026-05-09] UIX pass: signs and feedback inventory
+### ~~[2026-05-09] UIX pass: signs and feedback inventory~~ DONE
 
-**Idea:** create and maintain a concrete feedback map for every battle action and event.
-
-**Why:** the next loop depends on the player understanding hearts paid, damage dealt, gold earned, strike chains, invalid actions and hand redeals without reading external notes.
-
-**MVP:**
-
-- use `design/signs-and-feedback.md` as the source document for this pass;
-- list every player action and game event with trigger, visible feedback, animation/timing, message-log text and test/debug signal;
-- cover tile selection, hold/swap, valid/invalid placement, zone closure, hand submit, redeal, damage, heart cost, gold, strikes and future shop buys;
-- produce a prioritized UI implementation checklist from the inventory;
-- do not implement UI changes during the inventory pass unless it is explicitly promoted into the implementation task.
-
-**Acceptance:** the feedback inventory is complete enough that each active battle action has a planned sign/message/animation and the implementation task can work from it directly.
-
-**Priority:** must
-
-**Layer:** MVP
+**Status:** inventory filled for the next implementation pass in `design/signs-and-feedback.md`, including button labels, battle-log strings, animation timing priorities, gold/strike feedback and debug/test signals. Future shop/buy feedback remains explicitly later.
 
 ---
 
@@ -230,18 +194,21 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Why:** "end round, monster attacks, then continue" is no longer the desired mental model. The player should be choosing when to pay hearts for a new hand, while closures resolve immediately and reward gold/strikes.
 
-**MVP:**
+**Implementation order:**
 
-- rename the active combat button to "Сдать руку";
-- show the current heart cost on or next to the button;
-- on click, immediately apply the heart cost and redeal the hand without a separate round-result confirmation;
-- animate the redeal;
-- stop applying monster attack damage to the player in active Core 1;
-- close and score zones at the moment of closure;
-- add a combat/message log with animated text for damage, paid hearts, gold and strike events;
-- add strike rewards when a zone closure follows directly after a previous zone closure;
-- add visible gold as a persistent run currency that can later be spent between rounds/battles;
-- rework the active battle UI around hearts, submit cost, immediate scoring, log, strikes and gold.
+1. Add config/run state for the new economy: persistent `run.gold = 0`, per-battle `handSubmitsThisBattle`, live submit-cost preview `1 + floor(unplayedHandCards / 4) + floor(handSubmitsThisBattle / 2)`, closure gold `+1`, strike bonus `+strikeCount`, and debug fields for all of them.
+2. Split active `legacy` scoring from the old round resolver: after `placeTile`, detect only newly closed/scored zones, apply monster heart damage immediately, award closure gold/strike gold, clear/fade scored tiles through the existing `clearScoredTiles` cleanup, and keep unclosed board state.
+3. Replace the old end-round/new-pick flow in active `legacy` with `Сдать руку`: click pays the previewed hearts immediately, increments `handSubmitsThisBattle`, discards played/unplayed hand cards while preserving the held card, redeals, and never applies separate monster attack damage.
+4. Rework battle UI feedback around the new loop: button label/cost, player heart loss on submit, monster heart loss on closure, visible gold, strike count, and battle-log rows from `design/signs-and-feedback.md`.
+5. Keep archived variants URL-playable by either preserving their old `resolveTileRound` path or gating the new economy to active `legacy`; do not spend this task on balancing Variant A-D.
+6. Add focused unit tests first, then smoke coverage: submit-cost math, submit payment/redeal, immediate closure damage, no active monster attack damage, gold/strike rewards, held card surviving submit, and a 5-battle smoke path through the new button.
+
+**MVP boundaries:**
+
+- implement battle earning of gold, but not card shop prices or actual card buying;
+- keep the current two center anchors; universal starter and purchasable control cards stay in the later GD/card pass;
+- keep hold behavior: held card survives hand submit and returns to discard when the battle ends;
+- keep existing heart scale: first monster 3 hearts, player starts with 18 hearts, minimal 2x2 closure is 1 heart.
 
 **Acceptance:** the active `legacy` battle can be played without the old round-end damage model: closing a zone immediately deals/logs damage, submitting the hand immediately costs hearts and redeals with animation, strikes give bonus gold, and the UI clearly explains the new economy.
 
