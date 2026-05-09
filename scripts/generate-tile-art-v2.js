@@ -425,11 +425,24 @@ function drawThinLine(bitmap, x1, y1, x2, y2, thickness, color) {
 
 function drawNeonLine(bitmap, x1, y1, x2, y2, colorKey) {
     const colors = palette[colorKey] ?? palette.universal;
-    drawThinLine(bitmap, x1, y1, x2, y2, 31, withAlpha(colors.neon, 32));
-    drawThinLine(bitmap, x1, y1, x2, y2, 22, withAlpha(colors.neon, 62));
-    drawThinLine(bitmap, x1, y1, x2, y2, 14, withAlpha(colors.neon, 150));
-    drawThinLine(bitmap, x1, y1, x2, y2, 8, withAlpha(colors.neon, 255));
-    drawThinLine(bitmap, x1, y1, x2, y2, 3, withAlpha(colors.core, 240));
+    drawThinLine(bitmap, x1, y1, x2, y2, 42, withAlpha(colors.ink, 118));
+    drawThinLine(bitmap, x1, y1, x2, y2, 62, withAlpha(colors.neon, 28));
+    drawThinLine(bitmap, x1, y1, x2, y2, 46, withAlpha(colors.neon, 48));
+    drawThinLine(bitmap, x1, y1, x2, y2, 32, withAlpha(colors.neon, 92));
+    drawThinLine(bitmap, x1, y1, x2, y2, 22, withAlpha(colors.neon, 165));
+    drawThinLine(bitmap, x1, y1, x2, y2, 15, withAlpha(colors.neon, 255));
+    drawThinLine(bitmap, x1, y1, x2, y2, 8, withAlpha(colors.core, 245));
+    drawThinLine(bitmap, x1, y1, x2, y2, 3, withAlpha(colors.core, 255));
+}
+
+function drawWardNode(bitmap, cx, cy, colorKey) {
+    const colors = palette[colorKey] ?? palette.universal;
+    bitmap.fillCircle(cx, cy, 25, withAlpha(colors.neon, 36));
+    bitmap.fillCircle(cx, cy, 17, withAlpha(colors.neon, 92));
+    bitmap.fillCircle(cx, cy, 10, withAlpha(colors.neon, 210));
+    bitmap.fillCircle(cx, cy, 4, withAlpha(colors.core, 250));
+    drawThinLine(bitmap, cx - 13, cy, cx + 13, cy, 2, withAlpha(colors.core, 150));
+    drawThinLine(bitmap, cx, cy - 13, cx, cy + 13, 2, withAlpha(colors.core, 150));
 }
 
 function drawStoneGrid(bitmap, seed) {
@@ -531,6 +544,8 @@ function drawPathForMatrix(bitmap, matrix, colorKey, offsetX = 0) {
             if (row === 2) {
                 drawNeonLine(bitmap, cx, cy, cx, TILE_SIZE - 8, colorKey);
             }
+
+            drawWardNode(bitmap, cx, cy, colorKey);
         }
     }
 }

@@ -1,0 +1,575 @@
+{
+    "version": "mvp_card_catalog_v1",
+    "source": "design/card-pool.md",
+    "shop": {
+        "offerCount": 5,
+        "activeColors": ["red", "blue"],
+        "boughtCardDestination": "discard",
+        "rarityWeights": {
+            "common": 100,
+            "uncommon": 35,
+            "rare": 10
+        },
+        "rareEnabledFromBattle": 3,
+        "priceBands": [
+            {
+                "label": "common_plan_helper",
+                "min": 2,
+                "max": 4,
+                "intent": "Affordable after a normal win."
+            },
+            {
+                "label": "control_tool",
+                "min": 5,
+                "max": 6,
+                "intent": "Requires saving, a bounty or strong gold play."
+            },
+            {
+                "label": "rare_rescue_power",
+                "min": 7,
+                "max": 8,
+                "intent": "Late or rare card that must not solve every hand."
+            }
+        ]
+    },
+    "cards": [
+        {
+            "id": "card_red_line_h",
+            "tileId": "tile_red_line_h",
+            "assetId": "tile_red_line_h",
+            "name": "Red Line H",
+            "description": "Safe red horizontal ward extension.",
+            "cost": 2,
+            "rarity": "common",
+            "family": "line",
+            "color": "red",
+            "pattern": "line_h",
+            "offerWeight": 12,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_line_v",
+            "tileId": "tile_red_line_v",
+            "assetId": "tile_red_line_v",
+            "name": "Red Line V",
+            "description": "Safe red vertical ward extension.",
+            "cost": 2,
+            "rarity": "common",
+            "family": "line",
+            "color": "red",
+            "pattern": "line_v",
+            "offerWeight": 12,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_line_h",
+            "tileId": "tile_blue_line_h",
+            "assetId": "tile_blue_line_h",
+            "name": "Blue Line H",
+            "description": "Safe blue horizontal ward extension.",
+            "cost": 2,
+            "rarity": "common",
+            "family": "line",
+            "color": "blue",
+            "pattern": "line_h",
+            "offerWeight": 12,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_line_v",
+            "tileId": "tile_blue_line_v",
+            "assetId": "tile_blue_line_v",
+            "name": "Blue Line V",
+            "description": "Safe blue vertical ward extension.",
+            "cost": 2,
+            "rarity": "common",
+            "family": "line",
+            "color": "blue",
+            "pattern": "line_v",
+            "offerWeight": 12,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_tee_u",
+            "tileId": "tile_red_tee_u",
+            "assetId": "tile_red_tee_u",
+            "name": "Red Tee U",
+            "description": "Red branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "red",
+            "pattern": "tee_u",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_tee_r",
+            "tileId": "tile_red_tee_r",
+            "assetId": "tile_red_tee_r",
+            "name": "Red Tee R",
+            "description": "Red branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "red",
+            "pattern": "tee_r",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_tee_d",
+            "tileId": "tile_red_tee_d",
+            "assetId": "tile_red_tee_d",
+            "name": "Red Tee D",
+            "description": "Red branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "red",
+            "pattern": "tee_d",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_tee_l",
+            "tileId": "tile_red_tee_l",
+            "assetId": "tile_red_tee_l",
+            "name": "Red Tee L",
+            "description": "Red branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "red",
+            "pattern": "tee_l",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_tee_u",
+            "tileId": "tile_blue_tee_u",
+            "assetId": "tile_blue_tee_u",
+            "name": "Blue Tee U",
+            "description": "Blue branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "blue",
+            "pattern": "tee_u",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_tee_r",
+            "tileId": "tile_blue_tee_r",
+            "assetId": "tile_blue_tee_r",
+            "name": "Blue Tee R",
+            "description": "Blue branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "blue",
+            "pattern": "tee_r",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_tee_d",
+            "tileId": "tile_blue_tee_d",
+            "assetId": "tile_blue_tee_d",
+            "name": "Blue Tee D",
+            "description": "Blue branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "blue",
+            "pattern": "tee_d",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_tee_l",
+            "tileId": "tile_blue_tee_l",
+            "assetId": "tile_blue_tee_l",
+            "name": "Blue Tee L",
+            "description": "Blue branch for growing a larger contour.",
+            "cost": 3,
+            "rarity": "common",
+            "family": "tee",
+            "color": "blue",
+            "pattern": "tee_l",
+            "offerWeight": 8,
+            "maxPerShop": 2,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_corner_ur",
+            "tileId": "tile_red_corner_ur",
+            "assetId": "tile_red_corner_ur",
+            "name": "Red Corner UR",
+            "description": "Red corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "red",
+            "pattern": "corner_ur",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_corner_rd",
+            "tileId": "tile_red_corner_rd",
+            "assetId": "tile_red_corner_rd",
+            "name": "Red Corner RD",
+            "description": "Red corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "red",
+            "pattern": "corner_rd",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_corner_dl",
+            "tileId": "tile_red_corner_dl",
+            "assetId": "tile_red_corner_dl",
+            "name": "Red Corner DL",
+            "description": "Red corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "red",
+            "pattern": "corner_dl",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_corner_lu",
+            "tileId": "tile_red_corner_lu",
+            "assetId": "tile_red_corner_lu",
+            "name": "Red Corner LU",
+            "description": "Red corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "red",
+            "pattern": "corner_lu",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_corner_ur",
+            "tileId": "tile_blue_corner_ur",
+            "assetId": "tile_blue_corner_ur",
+            "name": "Blue Corner UR",
+            "description": "Blue corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "blue",
+            "pattern": "corner_ur",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_corner_rd",
+            "tileId": "tile_blue_corner_rd",
+            "assetId": "tile_blue_corner_rd",
+            "name": "Blue Corner RD",
+            "description": "Blue corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "blue",
+            "pattern": "corner_rd",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_corner_dl",
+            "tileId": "tile_blue_corner_dl",
+            "assetId": "tile_blue_corner_dl",
+            "name": "Blue Corner DL",
+            "description": "Blue corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "blue",
+            "pattern": "corner_dl",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_blue_corner_lu",
+            "tileId": "tile_blue_corner_lu",
+            "assetId": "tile_blue_corner_lu",
+            "name": "Blue Corner LU",
+            "description": "Blue corner closer for a nearly ready seal.",
+            "cost": 4,
+            "rarity": "common",
+            "family": "corner",
+            "color": "blue",
+            "pattern": "corner_lu",
+            "offerWeight": 5,
+            "maxPerShop": 1,
+            "enabledFromBattle": 1,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard"
+            }
+        },
+        {
+            "id": "card_red_plus",
+            "tileId": "tile_red_plus",
+            "assetId": "tile_red_plus",
+            "name": "Red Cross",
+            "description": "High-control red cross, priced to watch small-loop risk.",
+            "cost": 6,
+            "rarity": "uncommon",
+            "family": "plus",
+            "color": "red",
+            "pattern": "plus",
+            "offerWeight": 2,
+            "maxPerShop": 1,
+            "enabledFromBattle": 2,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard",
+                "risk": "small_loop_dominance"
+            }
+        },
+        {
+            "id": "card_blue_plus",
+            "tileId": "tile_blue_plus",
+            "assetId": "tile_blue_plus",
+            "name": "Blue Cross",
+            "description": "High-control blue cross, priced to watch small-loop risk.",
+            "cost": 6,
+            "rarity": "uncommon",
+            "family": "plus",
+            "color": "blue",
+            "pattern": "plus",
+            "offerWeight": 2,
+            "maxPerShop": 1,
+            "enabledFromBattle": 2,
+            "rules": {
+                "kind": "ordinary_tile",
+                "onBuy": "add_to_discard",
+                "risk": "small_loop_dominance"
+            }
+        },
+        {
+            "id": "card_joker_line_v",
+            "assetId": "joker_line_v",
+            "name": "Joker Line V",
+            "description": "Vertical universal boundary that can continue either active color.",
+            "cost": 5,
+            "rarity": "uncommon",
+            "family": "joker_line",
+            "pattern": "line_v",
+            "offerWeight": 2,
+            "maxPerShop": 1,
+            "enabledFromBattle": 2,
+            "specialTile": {
+                "id": "joker_line_v",
+                "file": "starter_universal_line_v.png",
+                "color": "universal",
+                "pattern": "joker_line_v",
+                "matrix": [".*.", ".*.", ".*."],
+                "special": "universal_boundary"
+            },
+            "rules": {
+                "kind": "universal_boundary",
+                "onBuy": "add_to_discard",
+                "edgeMatch": "matches active combat colors only",
+                "capture": "blocks flood-fill for the evaluated color but does not add wildcard cells to score area",
+                "colorMerge": "red and blue do not match directly through the card"
+            }
+        },
+        {
+            "id": "card_joker_corner",
+            "enabled": false,
+            "status": "staged",
+            "assetId": "card_frame_rare",
+            "name": "Joker Corner",
+            "description": "Universal corner closer. Staged until joker-line balance is known.",
+            "cost": 6,
+            "rarity": "rare",
+            "family": "joker_corner",
+            "pattern": "corner",
+            "offerWeight": 0,
+            "maxPerShop": 0,
+            "enabledFromBattle": 99,
+            "rules": {
+                "kind": "universal_boundary",
+                "statusReason": "Postpone until joker_line does not revive automatic small closures."
+            }
+        },
+        {
+            "id": "card_joker_tee",
+            "enabled": false,
+            "status": "staged",
+            "assetId": "card_frame_rare",
+            "name": "Joker Tee",
+            "description": "Universal branch/rescue card. Staged as late control power.",
+            "cost": 7,
+            "rarity": "rare",
+            "family": "joker_tee",
+            "pattern": "tee",
+            "offerWeight": 0,
+            "maxPerShop": 0,
+            "enabledFromBattle": 99,
+            "rules": {
+                "kind": "universal_boundary",
+                "statusReason": "Enable only if ordinary buys and joker_line still leave the deck too dry."
+            }
+        },
+        {
+            "id": "card_double_line",
+            "enabled": false,
+            "status": "staged",
+            "assetId": "card_frame_uncommon",
+            "name": "Double Line",
+            "description": "One card places two same-color line segments as a two-cell macro tile.",
+            "cost": 6,
+            "rarity": "uncommon",
+            "family": "double_line",
+            "pattern": "double_line",
+            "offerWeight": 0,
+            "maxPerShop": 0,
+            "enabledFromBattle": 99,
+            "rules": {
+                "kind": "double_macro_tile",
+                "footprint": "two adjacent macro cells",
+                "segments": [
+                    { "tileId": "tile_red_line_h", "offset": [0, 0] },
+                    { "tileId": "tile_red_line_h", "offset": [1, 0] }
+                ],
+                "placement": "Both segment cells must be empty; every outside edge uses normal edge legality; the internal shared edge must match.",
+                "scoring": "Segments score exactly as ordinary red line tiles with no extra damage multiplier.",
+                "statusReason": "Disabled until the shop UI supports a multi-cell placement preview."
+            }
+        },
+        {
+            "id": "card_double_curve",
+            "enabled": false,
+            "status": "staged",
+            "assetId": "card_frame_uncommon",
+            "name": "Double Curve",
+            "description": "One card places two linked corner segments as a two-cell macro tile.",
+            "cost": 6,
+            "rarity": "uncommon",
+            "family": "double_curve",
+            "pattern": "double_curve",
+            "offerWeight": 0,
+            "maxPerShop": 0,
+            "enabledFromBattle": 99,
+            "rules": {
+                "kind": "double_macro_tile",
+                "footprint": "two adjacent macro cells",
+                "segments": [
+                    { "tileId": "tile_blue_corner_rd", "offset": [0, 0] },
+                    { "tileId": "tile_blue_corner_lu", "offset": [1, 0] }
+                ],
+                "placement": "Both segment cells must be empty; every outside edge uses normal edge legality; the internal shared edge must match.",
+                "scoring": "Segments score exactly as ordinary blue corner tiles with no extra damage multiplier.",
+                "statusReason": "Disabled until double cards have an explicit placement UI."
+            }
+        }
+    ]
+}

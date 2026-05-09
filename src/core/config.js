@@ -1,6 +1,9 @@
+import { validateCardCatalog } from '../entities/cards.js';
+
 const CONFIG_FILES = {
     game: 'configs/game.json',
     levels: 'configs/levels.json',
+    cards: 'configs/cards.json',
 };
 
 let configs = null;
@@ -25,6 +28,16 @@ export async function loadConfig() {
             throw new Error(`Failed to load tile manifest: ${manifestPath}`);
         }
         configs.tileManifest = await response.json();
+    }
+
+    if (configs.cards) {
+        validateCardCatalog(configs.cards, {
+            tiles: [
+                ...(configs.tileManifest?.tiles ?? []),
+                ...(configs.game.tileBattle?.specialTiles ?? []),
+            ],
+            settings: configs.game.tileBattle,
+        });
     }
 
     return configs;

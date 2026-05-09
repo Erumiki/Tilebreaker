@@ -387,7 +387,85 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Card Catalog: prices, offer pool and special-card definitions in JSON
+### [2026-05-09] Art Director Task: hand-painted tile atlas pass against the fake shot
+
+**Idea:** replace the remaining procedural-looking `assets/tiles_v2` atlas with a deliberate fake-shot-quality tile paintover while preserving all gameplay topology.
+
+**Why:** the quick generator rescue can make the ward paths thicker and more readable, but it still cannot fully match the accepted fake shot's confident curved neon tubes, carved brass/stone depth, hand-placed glow falloff and per-pattern composition. The tiles are the main repeated object on screen, so they need a dedicated art pass before the MVP first impression is judged final.
+
+**MVP:**
+
+- keep every filename, PNG size, manifest id, `matrix`, edge signature, color, pattern and special starter rule unchanged;
+- first paint/test a small proof set: red/blue `line_h`, `line_v`, one corner, one tee and `starter_universal_line_v`;
+- compare that proof set in the live portrait battle at `390x844` and desktop, not only on the contact sheet;
+- match the fake shot's heavier ward language: thick luminous red/blue channels, elegant rounded turns, bright but controlled hot cores and soft outer glow;
+- make tile plates feel richer: darker bevels, warmer brass trim, readable stone grid, less flat empty brown surface;
+- avoid fake exits, decorative paths or interior marks that imply changed topology;
+- after approval, finish the full red/blue/green/gray atlas and regenerate `tile_contact_sheet.png` / `tile_sprite_sheet_6x6.png`;
+- record a before/after screenshot pair in the art notes or task status.
+
+**Acceptance:** at board scale and hand scale, red/blue paths read as strong magical ward channels close to the accepted fake shot, all tile topology remains unchanged, and the live portrait screenshot no longer looks like thin procedural line art on empty slabs.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Art Director Task: board-cell states and placement-hint readability pass
+
+**Idea:** design the board cell states, valid/invalid placement hints and closure overlays as one visual system instead of relying on procedural corner markers.
+
+**Why:** the quick rescue muted the old cyan valid-cell noise, but the board still needs a proper state language. Empty cells, valid targets, hover, invalid, scored, resources and closure overlays must support the tile art instead of competing with it.
+
+**MVP:**
+
+- repaint `board_cell_empty`, `board_cell_hover`, `board_cell_valid`, `board_cell_invalid` and `board_cell_scored` as a coherent brass/stone family;
+- decide whether unhovered valid placement is a subtle brass glint, a soft inner wash, or a sparse corner marker, then apply consistently;
+- keep invalid placement visibly red and urgent without making normal valid cells louder than red/blue tile paths;
+- review `drawPlacementHint` and replace remaining hardcoded markers with manifest-backed overlay assets if the art needs finer control;
+- verify field gold/heart icons still read on empty cells and on top of placed tiles;
+- check closure overlays against real closed zones so they read as sealed/captured territory, not extra tile exits;
+- produce portrait and desktop screenshots with a selected hand tile and at least one hover/invalid example.
+
+**Acceptance:** valid hints are visible enough to play but visually quieter than placed ward paths, invalid/hover/scored states are distinct, and board-cell chrome no longer fights the tile art in the live battle screen.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] Art Director Task: buyable card and special-tile art pack
+
+**Idea:** give the artist a focused asset task for the new shop/card catalog tiles before the shop is implemented.
+
+**Why:** `configs/cards.json` now defines ordinary buys, plus/cross, `joker_line_v` and staged joker/double candidates, but the live assets still mostly reuse the base atlas or generator output. The shop will need readable card previews and distinct special tiles that feel worth buying without changing gameplay topology.
+
+**MVP:**
+
+- use `configs/cards.json`, `design/card-pool.md` and `assets/art_refs/astral_archive_style_portrait.png` as the source references;
+- ordinary buyable cards can reuse the repainted atlas from the hand-painted tile task, but shop previews must still read clearly at card scale;
+- paint a distinct `joker_line_v` asset/proof that uses the same universal-boundary topology as the catalog entry: matrix `.*. / .*. / .*.`, active-color wildcard semantics, no direct red-blue merge and no free score area;
+- prepare visual concepts for staged joker corner and joker tee cards, but keep them disabled until gameplay and balance explicitly approve them;
+- prepare visual concepts for `double_line` and `double_curve`/`double_corner` cards as clearly special two-cell tools, without implying free rotation, extra score or unimplemented placement behavior;
+- if new filenames or manifest ids are needed, propose them in the task/status before code consumes them; do not silently rename existing tile ids or PNG files;
+- keep all topology locked: art may change pixels, but not `matrix`, edge signatures, card rules, costs, rarity, offer weights or enabled status;
+- provide a small contact sheet or screenshot set showing ordinary card, plus/cross, joker line and double-card concepts together in the future shop frame scale.
+
+**Acceptance:** the artist can hand back a tile/card art pack where every active catalog card has a readable preview path, `joker_line_v` has a distinct special-tile visual, staged joker/double concepts are clearly marked as not-yet-enabled, and no gameplay semantics are changed by the art.
+
+**Balance note:** art approval does not enable a card. Every card or card family still needs the card-balance validation task before it stays in the active shop pool.
+
+**Parallelization:** safe to run in a separate art chat. That chat should avoid price, rarity, offer-weight and enabled-status tuning except to flag visual/readability concerns for the balance chat.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### ~~[2026-05-09] MVP Card Catalog: prices, offer pool and special-card definitions in JSON~~ DONE
 
 **Idea:** define all buyable cards and prices in data before building the shop UI.
 
@@ -405,6 +483,8 @@ The single list of planned features, improvements, work order and statuses for T
 - add validation so every enabled card references an existing tile/special definition and asset id.
 
 **Acceptance:** the project has a checked-in card catalog with prices for ordinary cards, cross/plus, jokers and double straight/curve candidates; disabled/staged cards are explicit; code/tests can load and validate the catalog before any shop scene uses it.
+
+**Status:** added `configs/cards.json` as the future shop catalog: offer count, active red/blue shop colors, rarity weights, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special definition and staged joker/double candidates with explicit semantics. Added `src/entities/cards.js` for catalog validation, enabled-offer filtering and special tile extraction; `loadConfig()` now validates the catalog against tile/special references. Unit/check/e2e pass.
 
 **Priority:** must
 
@@ -428,6 +508,7 @@ The single list of planned features, improvements, work order and statuses for T
 - unaffordable cards remain visible but cannot be bought;
 - add a clear continue button to proceed to the next monster intro;
 - remove or hide the old active `add tile/remove tile/boost color` choice flow from the normal MVP path, while keeping any debug-only helpers explicit if needed;
+- mark all newly sold cards as balance-unverified in debug/status until their card or family has a recorded balance result;
 - expose shop debug state: offers, prices, bought cards, gold before/after, deck/draw/discard counts and next-battle route.
 
 **Acceptance:** a full smoke run can win a battle, enter the shop, buy multiple affordable cards or skip, see gold/deck counts update correctly, then continue to the next monster intro and battle. The old `1 of 3` upgrade screen is no longer the normal between-battle progression.
@@ -452,9 +533,37 @@ The single list of planned features, improvements, work order and statuses for T
 - cross/plus returns as a shop card with offer caps and price high enough to watch for small-loop dominance;
 - double straight and double curve must have a single clear MVP behavior before implementation, for example a special tile/card with a defined matrix and asset, not an ambiguous two-placement action unless the UI explicitly supports that;
 - add unit tests for placement legality, capture scoring and deck accounting for each enabled family;
-- add simulation/manual metrics comparing no-shop versus shop: win rate, submit count, gold spent, bought-card use rate, minimal capture share and average captured area.
+- add simulation/manual metrics comparing no-shop versus shop: win rate, submit count, gold spent, bought-card use rate, minimal capture share and average captured area;
+- do not leave a card enabled only because art/code exists; every active card or card family needs a recorded balance check and a keep/nerf/disable decision.
 
 **Acceptance:** at least one joker, cross/plus and one double straight/curve candidate can be bought, enter discard, appear through normal draw/reshuffle and obey tested placement/scoring rules without direct red-blue merging or runaway small-square closures.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-09] MVP Balance Pass: validate every shop card before final pool
+
+**Idea:** test every buyable card and special-card family from `configs/cards.json` before it remains enabled in the active shop.
+
+**Why:** new cards are the biggest balance risk in Core 1 Rescue. Ordinary helpers, plus/cross, jokers and doubles can all reduce hand pressure or revive minimal-square dominance if they are too cheap, too common or too generally useful.
+
+**MVP:**
+
+- establish a no-shop baseline on the same seeds: win rate by battle, submits per battle, gold earned, closure count, minimal capture share, average captured area, dead-end/fresh-start rate and player hearts remaining;
+- test ordinary red/blue line cards, tee cards and corner cards separately before judging the combined common pool;
+- test plus/cross separately with its current cost, unlock battle, max-per-shop and offer weight, watching specifically for minimal 2x2 loop dominance;
+- test `joker_line_v` separately, watching blocked-hand recovery, wildcard-assisted closures and whether it makes red/blue plans merge mentally even if rules forbid it;
+- when double cards are implemented, test each double family separately before testing them together;
+- for every enabled card or family, record one decision: keep, change cost, change offer weight, delay unlock, cap per shop, nerf rules, or disable;
+- write results to `design/tile-feasibility.md` or `design/card-pool.md` and sync any accepted tuning back to `configs/cards.json`;
+- if a card cannot be tested yet, keep it staged/disabled and say why.
+
+**Acceptance:** no buyable card stays in the active shop pool without a recorded balance result, and the final MVP pool has documented costs/weights/unlock timing plus a short reason each risky card was kept, nerfed or disabled.
+
+**Parallelization:** safe to run in a separate balance chat after the card catalog exists. That chat should avoid repainting assets and should treat new art as presentation-only unless a card's rules/costs are explicitly changed in `configs/cards.json` with recorded balance rationale.
 
 **Priority:** must
 

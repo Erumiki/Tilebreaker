@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import cardCatalog from '../configs/cards.json' with { type: 'json' };
+import gameConfig from '../configs/game.json' with { type: 'json' };
 import manifest from '../assets/tiles_v2/tile_manifest.json' with { type: 'json' };
+import {
+    getCatalogSpecialTiles,
+    getEnabledShopCards,
+    validateCardCatalog,
+} from '../src/entities/cards.js';
 import {
     GAMEPLAY_VARIANT_ORDER,
     getGameplayVariant,
@@ -37,6 +44,49 @@ const settings = {
 };
 
 const tiles = createTilesFromManifest(manifest, settings);
+const cardValidationTiles = [
+    ...manifest.tiles,
+    ...gameConfig.tileBattle.specialTiles,
+];
+
+test('card catalog validates buyable tiles, prices, and staged special families', () => {
+    const result = validateCardCatalog(cardCatalog, {
+        tiles: cardValidationTiles,
+    });
+
+    assert.equal(result.enabledCards.some((card) => card.id === 'card_red_line_h'), true);
+    assert.equal(result.enabledCards.some((card) => card.id === 'card_blue_plus'), true);
+    assert.equal(result.enabledCards.some((card) => card.id === 'card_joker_line_v'), true);
+    assert.equal(result.stagedCards.some((card) => card.family === 'double_line'), true);
+    assert.equal(result.stagedCards.some((card) => card.family === 'double_curve'), true);
+    assert.equal(result.enabledCards.every((card) => card.cost > 0), true);
+});
+
+test('shop card filtering respects battle unlocks and active early colors', () => {
+    const battleOneCards = getEnabledShopCards(cardCatalog, {
+        battleNumber: 1,
+        activeColors: ['red', 'blue'],
+    });
+    const battleTwoCards = getEnabledShopCards(cardCatalog, {
+        battleNumber: 2,
+        activeColors: ['red', 'blue'],
+    });
+
+    assert.equal(battleOneCards.some((card) => card.family === 'plus'), false);
+    assert.equal(battleOneCards.some((card) => card.family === 'joker_line'), false);
+    assert.equal(battleOneCards.some((card) => card.color === 'green'), false);
+    assert.equal(battleTwoCards.some((card) => card.id === 'card_red_plus'), true);
+    assert.equal(battleTwoCards.some((card) => card.id === 'card_joker_line_v'), true);
+});
+
+test('card catalog exposes enabled special tile definitions for future shop use', () => {
+    const specialTiles = getCatalogSpecialTiles(cardCatalog);
+
+    assert.deepEqual(specialTiles.map((tileDef) => tileDef.id), ['joker_line_v']);
+    assert.equal(specialTiles[0].matrix.join('/'), '.*./.*./.*.');
+    assert.equal(specialTiles[0].special, 'universal_boundary');
+    assert.equal(specialTiles[0].sourceCardId, 'card_joker_line_v');
+});
 
 test('gameplay variants keep one comparison order and URL aliases', () => {
     assert.deepEqual(GAMEPLAY_VARIANT_ORDER, [

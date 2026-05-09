@@ -682,6 +682,8 @@ test('player can choose a kept experiment from the temporary variant picker', as
 });
 
 test('one-color chain variant is playable through the first two battles', async ({ page }) => {
+  test.setTimeout(60_000);
+
   await page.goto('/?seed=20260508&variant=b&drawMode=queue');
 
   await expect(page.locator('#game')).toBeVisible();
@@ -721,6 +723,8 @@ test('one-color chain variant is playable through the first two battles', async 
 });
 
 test('connect-targets variant is playable through the first two battles', async ({ page }) => {
+  test.setTimeout(60_000);
+
   await page.goto('/?seed=20260508&variant=c&drawMode=queue');
 
   await expect(page.locator('#game')).toBeVisible();

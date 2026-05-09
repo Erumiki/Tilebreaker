@@ -1,6 +1,6 @@
 # Card Pool GD Pass
 
-Status 2026-05-09: universal starter implemented; buyable shop cards remain design-only.
+Status 2026-05-09: universal starter implemented; buyable shop cards now have validated data in `configs/cards.json`; shop UI and buying remain unimplemented.
 
 This pass defines the next card vocabulary before the game spends gold on real card buys. The goal is to give Core 1 Rescue more planning control without turning the closure puzzle into an always-wildcard deck.
 
@@ -187,12 +187,13 @@ Success bar:
 
 ### Step 2: Minimal Shop Pool
 
-Initial shop pool:
+Initial shop pool now represented in `configs/cards.json`:
 
 - Colored line.
 - Colored tee.
 - Colored corner.
 - Joker line.
+- Controlled plus/cross cards from battle 2 onward.
 
 Automated checks:
 
@@ -221,4 +222,4 @@ Each candidate needs one clear answer: does it create a better plan, or only mak
 
 ## Current Lead Decision
 
-The active build now takes only `starter_universal_line_v`. The buyable pool is designed but should remain out of the active deck until the universal starter is manually checked. The first shop build should then start with ordinary red-blue cards plus `joker_line`, not with every wildcard and split card at once.
+The active battle deck still starts only with ordinary red/blue rescue cards and the board-only `starter_universal_line_v`; no shop buying is live yet. The future shop should consume `configs/cards.json`: ordinary red/blue lines, tees and corners are active from battle 1; red/blue plus and `joker_line_v` unlock from battle 2; stronger joker corner/tee and double line/curve candidates stay staged until their placement/scoring UX is implemented.

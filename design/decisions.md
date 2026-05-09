@@ -14,6 +14,14 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-09 - Card catalog becomes validated data before shop UI
+
+**Context:** Gold and monster bounty now exist, but between-battle spending still needs a stable data source before replacing the old upgrade screen.
+
+**Decision:** Add `configs/cards.json` as the source of truth for future shop offers. The catalog defines offer count, rarity weights, active red/blue shop colors, price bands, ordinary red/blue line/tee/corner buys, controlled red/blue plus buys, one enabled `joker_line_v` special-card definition and explicitly staged joker/double candidates. `src/entities/cards.js` validates the catalog during config load, checks enabled tile/special/asset references and exposes enabled-offer filtering plus special tile extraction for later shop work.
+
+**Rationale:** This lets the next shop task consume data instead of hardcoding prices or offer families in a scene. Keeping stronger joker/double cards staged protects the closure puzzle while making the planned control-card direction concrete and testable.
+
 ### 2026-05-09 - Field resources and kill bounty extend battle economy
 
 **Context:** Closure and strike gold made battle income visible, but gold still had no map-level decision and monsters did not pay their configured victory reward.

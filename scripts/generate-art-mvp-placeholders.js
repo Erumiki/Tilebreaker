@@ -504,11 +504,11 @@ function drawBoardSurface(bitmap, asset) {
         bitmap.fillRect(13, line + 1, bitmap.width - 26, 1, [159, 129, 88, 24]);
     }
     if (asset.state === 'valid') {
-        bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [79, 148, 190, 50]);
-        bitmap.fillRect(12, 12, bitmap.width - 24, 3, [91, 187, 255, 125]);
-        bitmap.fillRect(12, bitmap.height - 15, bitmap.width - 24, 3, [91, 187, 255, 80]);
-        bitmap.fillRect(12, 12, 3, bitmap.height - 24, [91, 187, 255, 80]);
-        bitmap.fillRect(bitmap.width - 15, 12, 3, bitmap.height - 24, [91, 187, 255, 80]);
+        bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [158, 111, 60, 42]);
+        bitmap.fillRect(12, 12, bitmap.width - 24, 3, [235, 184, 105, 105]);
+        bitmap.fillRect(12, bitmap.height - 15, bitmap.width - 24, 3, [235, 184, 105, 68]);
+        bitmap.fillRect(12, 12, 3, bitmap.height - 24, [235, 184, 105, 68]);
+        bitmap.fillRect(bitmap.width - 15, 12, 3, bitmap.height - 24, [235, 184, 105, 68]);
     }
     if (asset.state === 'invalid') {
         bitmap.fillRect(12, 12, bitmap.width - 24, bitmap.height - 24, [178, 46, 52, 58]);

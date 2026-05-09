@@ -214,21 +214,29 @@ function drawCornerMarkers(ui, rect, color, options = {}) {
 }
 
 function drawPlacementHint(ui, rect, { valid, hovered }) {
-    const color = valid ? '#8fe8ff' : '#ff7b83';
-    const fill = valid ? '#4fc3ff' : '#ff4f5f';
-    const alpha = hovered ? 0.95 : 0.58;
+    const color = valid ? '#d6a05c' : '#ff7b83';
+    const fill = valid ? '#d6a05c' : '#ff4f5f';
+    const alpha = valid
+        ? hovered ? 0.72 : 0.24
+        : hovered ? 0.95 : 0.58;
     const inset = Math.max(3, Math.floor(rect.width * 0.065));
 
-    ui.drawRect(insetRect(rect, inset), fill, hovered ? 0.14 : 0.07);
+    ui.drawRect(insetRect(rect, inset), fill, valid
+        ? hovered ? 0.1 : 0.025
+        : hovered ? 0.14 : 0.07);
     drawCornerMarkers(ui, rect, color, {
         alpha,
-        thickness: hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
-        length: hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
+        thickness: valid
+            ? hovered ? Math.max(2, Math.floor(rect.width * 0.04)) : Math.max(1, Math.floor(rect.width * 0.025))
+            : hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
+        length: valid
+            ? hovered ? Math.max(10, Math.floor(rect.width * 0.24)) : Math.max(7, Math.floor(rect.width * 0.16))
+            : hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
         inset,
     });
 
     if (hovered) {
-        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.035))), color, 2, 0.72);
+        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.035))), color, 2, valid ? 0.45 : 0.72);
     }
 }
 
