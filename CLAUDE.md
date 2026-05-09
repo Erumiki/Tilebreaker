@@ -59,6 +59,36 @@ After changes that affect the playable build, scenes, UI or frontend behavior, C
 - `fix/<name>` - bug fixes.
 - PRs should be small and focused.
 
+## Parallel Work Contract
+
+Parallel chats are allowed only when their ownership is explicit. If two chats start from the same checkpoint, each chat must read this section before editing and must stay inside its lane.
+
+### Art Chat
+
+The art chat owns presentation only:
+
+- Allowed files: `assets/**`, art generators in `scripts/generate-*-art*.js`, art/design notes such as `design/art-*.md`, `design/monster-roster.md`, screenshot/contact-sheet notes and task statuses in `todo/tasks.md`.
+- Allowed work: repaint tiles, card previews, board-cell states, monster art, shop/card frames, icon/readability passes and visual screenshots.
+- Forbidden without explicit lead approval: changing gameplay topology or balance data, including tile `matrix`, edge signatures, `color`, `pattern`, `special` rules, `configs/cards.json` costs, rarity, offer weights, unlock battle, enabled/staged status, deck recipes, scoring, hand rules or shop rules.
+- If new asset ids or filenames are needed, propose them in Markdown first. Do not silently rename existing ids or files that runtime/configs already reference.
+- Art approval does not make a card active-final. New card art is presentation-only until the balance chat records a keep/nerf/disable decision.
+
+### Balance Chat
+
+The balance chat owns testing and tuning:
+
+- Allowed files: `configs/cards.json`, simulation/test scripts when needed, balance notes in `design/tile-feasibility.md` or `design/card-pool.md`, and task statuses in `todo/tasks.md`.
+- Allowed work: run no-shop versus shop baselines, test card families, record metrics, tune cost/offer weight/unlock/max-per-shop/enabled status with rationale, and mark cards keep/nerf/disable.
+- Forbidden without explicit lead approval: repainting assets, changing visual style files, renaming asset ids, modifying tile topology, or changing card visuals as a shortcut for balance.
+- Every active shop card or card family must have a recorded balance result before it is considered final: keep, change cost, change offer weight, delay unlock, cap per shop, nerf rules or disable.
+
+### Integration Rule
+
+- Do not merge art and balance changes into the same commit unless the user explicitly asks for an integration commit.
+- If both chats touch `todo/tasks.md`, merge task-status text carefully and preserve both outcomes.
+- If both chats need `configs/cards.json`, the balance chat owns the final value. The art chat may only request asset-id changes in Markdown until the lead accepts them.
+- Before finishing either lane, run the relevant checks and report exactly which files were touched and which lane owned them.
+
 ## Game Jam Workflow
 
 During the game jam, every new idea and decision passes through three roles:
