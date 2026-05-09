@@ -85,7 +85,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Monster Art Completion: portraits 2-5 and optional backdrops
+### ~~[2026-05-09] Monster Art Completion: portraits 2-5 and optional backdrops~~
 
 **Idea:** finish the remaining monster presentation assets now that the intro, HUD icon path and first portrait proof exist.
 
@@ -103,6 +103,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** all five battle intros show distinct monster portraits that match the roster and remain readable in portrait and desktop layouts; the files replace placeholders in `assets/art_mvp` without code or manifest changes.
 
 **Progress:** all five monster icons and `monster_portrait_battle_01.png` are already generated and wired into runtime. Remaining art work is portraits for battles 2-5 and optional backdrop refinement.
+
+**Completed 2026-05-10:** replaced `monster_portrait_battle_02.png` through `monster_portrait_battle_05.png` with distinct Astral Archive breach portraits for Comet Maw, Rift Hound, Broken Constellation Giant and Black Sun Monarch. Kept existing filenames, 512x512 RGBA dimensions, transparent corners and manifest ids unchanged; optional backdrop refinement remains deferred to Art Track 3/final audit. Verified with local PNG alpha/dimension checks, `./scripts/npm.sh run check` and `./scripts/npm.sh run test:e2e -- --grep "player can complete the 5-battle prototype loop"`.
 
 **Parallelization:** safe as an art-lane task. The art lane owns assets and art generators only; it must not change topology, rules, prices or enabled card status.
 
