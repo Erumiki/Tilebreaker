@@ -43,7 +43,7 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 | `legacy` |  |  |  |  |  |  |  |
 | `placement_payoff` | 4 | 4 | 3 | 4 | 4 | 4 | Seed `20260508`: Focus набрался до cap за setup-раунды и дал +12 к первому closure; это заметно, но не ломает closure. |
 | `one_color_chain` |  |  |  |  |  |  | Реализован MVP: один land-color, `Chain xN`, single-lane threat; smoke seed `20260508` проходит первые 2 боя. Нужен ручной scorecard. |
-| `connect_targets` |  |  |  |  |  |  |  |
+| `connect_targets` |  |  |  |  |  |  | Реализован MVP: цели A/B, one-land-color, single-lane threat, разовый target bonus; smoke seed `20260508` проходит первые 2 боя. Нужен ручной scorecard. |
 | `road_mode` |  |  |  |  |  |  |  |
 
 ## Variant A: Placement Payoff
@@ -82,6 +82,24 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 - smoke-тест проходит первые две битвы через `?variant=b`;
 - вывод: MVP технически playable, но ручной scorecard еще нужен, потому что smoke подтверждает проходимость, а не ощущение "хочется растить 5+ клеток".
 
+## Variant C: Connect Targets
+
+`connect_targets` проверяет гипотезу: большая земля становится понятнее, если на поле есть внешняя цель маршрута, а не только абстрактная площадь закрытия.
+
+- на поле активна пара клеток A/B;
+- все combat-тайлы в этом варианте считаются одной землей для edge-match, capture-fill и connected land;
+- атаки активных цветов складываются в `red` threat, а `blue/green` threat становятся 0;
+- если на обеих target-клетках стоят combat-тайлы и они входят в один connected region, раунд получает `connectTargets.bonusDamage`;
+- target bonus срабатывает один раз на пару, включается в round result/debug и добавляется к land damage;
+- после успешного scoring новая пара появляется в следующем раунде;
+- UI подсвечивает A/B на доске, показывает дистанцию или bonus в side panel и дает feedback при соединении.
+
+Авто-проверка `2026-05-09`, seed `20260508`, real playable/debug:
+
+- unit-тест проверяет смешанную красно-синюю connected land между A/B, single-lane threat и разовый bonus;
+- smoke-тест проходит первые две битвы через `?variant=c`;
+- вывод: MVP технически playable, но ручной scorecard еще нужен, потому что smoke подтверждает проходимость, а не читаемость цели руками.
+
 ## Симуляционные Метрики
 
 Для каждого варианта записывать рядом с ручными наблюдениями:
@@ -97,4 +115,4 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=queue ./scripts/node.sh scripts/simu
 
 ## Текущий Статус
 
-Каркас переключения и протокол сравнения готовы. `placement_payoff` реализован как Focus-эксперимент без прямого урона за placement. `one_color_chain` реализован как one-land-color + Chain MVP. `connect_targets` и `road_mode` пока используют legacy-правила, пока их отдельные задачи не добавят механику.
+Каркас переключения и протокол сравнения готовы. `placement_payoff` реализован как Focus-эксперимент без прямого урона за placement. `one_color_chain` реализован как one-land-color + Chain MVP. `connect_targets` реализован как one-land-color + A/B target bonus MVP. `road_mode` пока использует legacy-правила, пока его отдельная задача не добавит механику.

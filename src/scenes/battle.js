@@ -60,6 +60,8 @@ function getCaptureBonusByColor(result) {
             + (zone.chainBonus ?? 0);
     }
 
+    bonusByColor.red += result.connectTargetBonus ?? 0;
+
     return bonusByColor;
 }
 
@@ -71,6 +73,15 @@ function isOneColorChainVariant(settings) {
     return getGameplayVariant(settings).id === 'one_color_chain';
 }
 
+function isConnectTargetsVariant(settings) {
+    return getGameplayVariant(settings).id === 'connect_targets';
+}
+
+function isOneColorLandVariant(settings) {
+    return isOneColorChainVariant(settings)
+        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false);
+}
+
 function getPlacementFocusMax(settings) {
     return settings.placementPayoff?.maxFocus ?? 4;
 }
@@ -80,13 +91,13 @@ function getOneColorChainMax(settings) {
 }
 
 function getColorHex(color, settings) {
-    return isOneColorChainVariant(settings) && color !== 'gray'
+    return isOneColorLandVariant(settings) && color !== 'gray'
         ? COLOR_HEX.land
         : COLOR_HEX[color];
 }
 
 function getColorLabel(color, settings) {
-    if (isOneColorChainVariant(settings) && color === 'red') {
+    if (isOneColorLandVariant(settings) && color === 'red') {
         return 'Земля';
     }
 
@@ -280,8 +291,22 @@ function drawBoard(ui, layout, settings, state, mouse) {
             ui.drawRect(rect, fill, 1);
             drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
             drawTile(ui, state.board[y][x], insetRect(rect, 5), {
-                oneColorLand: isOneColorChainVariant(settings),
+                oneColorLand: isOneColorLandVariant(settings),
             });
+
+            const targets = state.connectTargets;
+            const isTargetA = targets?.a.x === x && targets?.a.y === y;
+            const isTargetB = targets?.b.x === x && targets?.b.y === y;
+
+            if (isTargetA || isTargetB) {
+                const targetColor = targets.connected ? '#c9ffd9' : '#f3d991';
+                drawBorder(ui, insetRect(rect, 4), targetColor, 4, 1);
+                ui.drawText(isTargetA ? 'A' : 'B', rect.x + rect.width / 2, rect.y + rect.height / 2 - 13, {
+                    align: 'center',
+                    size: 26,
+                    color: targetColor,
+                });
+            }
         }
     }
 
@@ -316,7 +341,7 @@ function drawHand(ui, layout, settings, state, mouse) {
         ui.drawRect(rect, hovered && (!isQueue || index === 0) ? '#263d4f' : '#182838', tileDef ? 1 : 0.45);
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
         drawTile(ui, tileDef, insetRect(rect, 8), {
-            oneColorLand: isOneColorChainVariant(settings),
+            oneColorLand: isOneColorLandVariant(settings),
         });
 
         if (label) {
@@ -377,6 +402,15 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
             color: '#f3d991',
         });
     }
+    if (isConnectTargetsVariant(settings) && state.connectTargets) {
+        const targetStatus = state.connectTargets.connected
+            ? `Targets +${settings.connectTargets?.bonusDamage ?? 30}`
+            : `Targets ${state.connectTargets.distance}`;
+        ui.drawText(targetStatus, panel.x + panel.width - 128, panel.y + 144, {
+            size: 15,
+            color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
+        });
+    }
 
     ui.drawText(state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 168, {
         size: 16,
@@ -399,7 +433,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state) {
                 + (zone.grayBonus ?? 0)
                 + (zone.focusBonus ?? 0)
                 + (zone.chainBonus ?? 0)
-        ), 0);
+        ), 0) + (state.lastResult.connectTargetBonus ?? 0);
         ui.drawText(`Зон ${zones}  |  Площадь ${totalCaptureArea}  |  Бонус +${totalBonus}`, panel.x + 18, panel.y + 400, {
             size: 15,
             color: '#d8e7f2',
@@ -441,6 +475,16 @@ function getPlacedFeedback(state, settings) {
 
         if ((state.lastPlacementClosedZones ?? 0) > 0 && (state.chainMeter ?? 0) > 1) {
             return `Захват готов: Chain x${state.chainMeter} усилит удар`;
+        }
+    }
+
+    if (isConnectTargetsVariant(settings)) {
+        if (state.connectTargets?.connected && !state.connectTargets?.scored) {
+            return `Цели соединены: +${settings.connectTargets?.bonusDamage ?? 30} к итогу раунда`;
+        }
+
+        if (state.connectTargets) {
+            return 'Тяни землю между A и B';
         }
     }
 
@@ -539,7 +583,10 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
     const handKey = state.hand.map((tileDef) => tileDef?.id ?? '-').join(',');
     const deck = getRunDeckStats(run);
     const resultKey = state.lastResult
-        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}`
+        ? `${state.lastResult.enemyDamage}:${state.lastResult.playerDamage}:${state.lastResult.score.zones.length}:${state.lastResult.placementFocusBonus ?? 0}:${state.lastResult.chainBonus ?? 0}:${state.lastResult.connectTargetBonus ?? 0}`
+        : '-';
+    const connectTargetKey = state.connectTargets
+        ? `${state.connectTargets.a.x},${state.connectTargets.a.y}:${state.connectTargets.b.x},${state.connectTargets.b.y}:${state.connectTargets.connected}:${state.connectTargets.scored}`
         : '-';
 
     return [
@@ -557,6 +604,7 @@ function createRenderKey({ ui, layout, settings, run, state, mouse, screen }) {
         state.lastPlacementFocusDelta ?? 0,
         state.chainMeter ?? 0,
         state.lastChainDelta ?? 0,
+        connectTargetKey,
         getGameplayVariant(settings).id,
         boardKey,
         handKey,
@@ -743,6 +791,9 @@ export function createBattleScene({
                         focusBonus: zone.focusBonus ?? 0,
                         chainBonus: zone.chainBonus ?? 0,
                     })),
+                    connectTargetBonus: state.lastResult.connectTargetBonus ?? 0,
+                    connectTargetConnected: state.lastResult.connectTargetConnected ?? false,
+                    connectTargets: state.lastResult.connectTargets,
                     placementFocusSpent: state.lastResult.placementFocusSpent,
                     placementFocusBonus: state.lastResult.placementFocusBonus,
                     placementFocusRemaining: state.lastResult.placementFocusRemaining,
@@ -756,6 +807,11 @@ export function createBattleScene({
                 chainMeter: state.chainMeter ?? 0,
                 lastChainDelta: state.lastChainDelta ?? 0,
                 chainRegionKeys: [...state.chainRegionKeys ?? []],
+                connectTargets: state.connectTargets ? {
+                    ...state.connectTargets,
+                    a: { ...state.connectTargets.a },
+                    b: { ...state.connectTargets.b },
+                } : null,
                 deck: getRunDeckStats(run),
                 colorMultipliers: { ...run.colorMultipliers },
                 layout: this.layout,

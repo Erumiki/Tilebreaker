@@ -1,15 +1,15 @@
 # Current Version
 
-## v0.13 Variant B One-Color Chain
+## v0.14 Variant C Connect Targets
 
-**Goal:** Keep `legacy` and Variant A available while testing Variant B: one land-color removes color self-punishment, and Chain rewards continuous growth of the same connected region before the next capture.
+**Goal:** Keep `legacy`, Variant A and Variant B available while testing Variant C: visible A/B targets give the player an external reason to grow connected land across the board.
 
 **Task source of truth:** `todo/tasks.md` is the only backlog, task order, next-step, acceptance, and status list. Do not choose work from this file.
 
 **Current design truth:**
 
 - Tile-battle tuning lives in JSON configs, not in code.
-- `configs/game.json` stores board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player HP, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
+- `configs/game.json` stores board size, hand size, `drawMode`, `gameplayVariant`, `activeCombatColors`, starting player HP, starting deck size, `startingDeckRecipe`, `drawBag`, damage formula, `placementPayoff`, `oneColorChain`, `connectTargets`, active tile manifest path, debug hand selection draw count, default loop guarantee toggle, round board cleanup, dead-end recovery, legacy off-color leap placement settings and run battle count.
 - Active default `gameplayVariant` is `legacy`. It is the preserved current `queue + two-color capture-fill` ruleset.
 - Variant ids are centralized in `src/entities/gameplayVariants.js`: `legacy`, `placement_payoff`, `one_color_chain`, `connect_targets`, `road_mode`. Old `baseline` URLs are accepted as an alias for `legacy`.
 - URL overrides accept `?gameplayVariant=placement_payoff` and short aliases `?variant=a`, `?variant=b`, `?variant=c`, `?variant=d`.
@@ -24,7 +24,10 @@
 - In Variant B a new run uses one active combat lane (`red`) for rewards/multipliers, and round attacks combine the active configured threats into one land threat so blue/green lanes do not cause unavoidable HP drain.
 - Variant B adds Chain: placing combat tiles into the same connected region increases `Chain xN` up to `oneColorChain.maxChain`; the next captured zone receives `(chain - 1) * oneColorChain.bonusPerChain` as flat bonus damage, then Chain returns to base.
 - Variant B UI shows `Chain current/max`, immediate `Chain xN` feedback and includes chain bonus in round result/debug. Smoke covers the first two battles through `?variant=b`.
-- Variants C-D currently launch as scaffolds using legacy mechanics until their dedicated tasks implement the actual rule changes.
+- Variant C (`connect_targets`) places an active A/B target pair on board cells. If connected combat land links both targets, the round gains one-time `connectTargets.bonusDamage`.
+- Variant C uses one-color land for edge matching/scoring like Variant B, but does not use Chain. A new run uses one active combat lane (`red`) for rewards/multipliers, and round attacks combine active configured threats into one land threat.
+- Variant C UI highlights target cells, shows distance/bonus in the side panel, gives immediate connected feedback, includes target bonus in round result/debug, and respawns a new pair on the next round after scoring. Smoke covers the first two battles through `?variant=c`.
+- Variant D currently launches as a scaffold using legacy mechanics until its dedicated task implements the actual rule change.
 - Scoring uses configured `damageFormula.type = areaMultiplier`: base area damage is `area * areaMultiplier`, zones larger than `largeZoneBonus.minArea` gain `largeZoneBonus.bonusPerArea` per extra micro-cell, and gray tile micro-cells inside a closed zone add `grayInteriorBonus.bonusPerCell`.
 - `configs/levels.json` stores only the battle list, enemy HP and enemy color attacks.
 - The active tile manifest path is `assets/tiles_v2/tile_manifest.json`.

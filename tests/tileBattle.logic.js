@@ -202,6 +202,76 @@ test('one color chain treats combat colors as one land and pays chain bonus', ()
     assert.equal(state.chainMeter, 1);
 });
 
+test('connect targets use one-color land and pay bonus once', () => {
+    const targetSettings = {
+        ...settings,
+        gameplayVariant: 'connect_targets',
+        activeCombatColors: ['red', 'blue'],
+        connectTargets: {
+            bonusDamage: 30,
+            minDistance: 2,
+            maxDistance: 6,
+            oneColorLand: true,
+            respawn: 'nextRound',
+        },
+        damageFormula: {
+            type: 'areaMultiplier',
+            areaMultiplier: 2,
+        },
+    };
+    const targetTiles = createTilesFromManifest(manifest, targetSettings);
+    const targetTile = (id) => targetTiles.find((tileDef) => tileDef.id === id);
+    const state = {
+        round: 1,
+        playerHp: 30,
+        enemyHp: 80,
+        board: emptyBoard(),
+        hand: [],
+        selectedHandIndex: -1,
+        queueReserve: [],
+        playedThisRound: [],
+        queuePlayedThisRound: 0,
+        phase: 'placing',
+        lastResult: null,
+        outcome: null,
+        placementFocus: 0,
+        chainMeter: null,
+        chainRegionKeys: [],
+        connectTargets: {
+            a: { x: 1, y: 1 },
+            b: { x: 3, y: 1 },
+            distance: 2,
+            connected: false,
+            scored: false,
+        },
+    };
+
+    state.board[1][1] = targetTile('tile_red_line_h');
+    state.board[1][2] = targetTile('tile_blue_line_h');
+    state.board[1][3] = targetTile('tile_red_line_h');
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 0, blue: 5, green: 5 }],
+    }, targetSettings);
+
+    assert.equal(state.lastResult.attack.red, 5);
+    assert.equal(state.lastResult.attack.blue, 0);
+    assert.equal(state.lastResult.connectTargetConnected, true);
+    assert.equal(state.lastResult.connectTargetBonus, 30);
+    assert.equal(state.lastResult.score.damageByColor.red, 30);
+    assert.equal(state.lastResult.enemyDamage, 30);
+    assert.equal(state.lastResult.byColor.blue.playerDamage, 0);
+
+    resolveTileRound(state, {
+        enemyHp: 80,
+        attacks: [{ red: 0, blue: 0, green: 0 }],
+    }, targetSettings);
+
+    assert.equal(state.lastResult.connectTargetConnected, false);
+    assert.equal(state.lastResult.connectTargetBonus, 0);
+});
+
 test('opening draw bag caps early closers and keeps continuations', () => {
     const deckIds = createStartingDeckIds(tiles, {
         startingDeckRecipe: [

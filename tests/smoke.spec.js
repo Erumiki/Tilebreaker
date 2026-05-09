@@ -311,3 +311,47 @@ test('one-color chain variant is playable through the first two battles', async 
     }
   }
 });
+
+test('connect-targets variant is playable through the first two battles', async ({ page }) => {
+  await page.goto('/?seed=20260508&variant=c');
+
+  await expect(page.locator('#game')).toBeVisible();
+  await expectScene(page, 'mainmenu');
+
+  const menuDebug = await getMainMenuDebug(page);
+  expect(menuDebug.selectedVariant).toBe('connect_targets');
+  await clickRect(page, menuDebug.layout.startButton);
+  await expectScene(page, 'battle');
+
+  let run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+  let battleDebug = await getBattleDebug(page);
+  expect(run.gameplayVariant).toBe('connect_targets');
+  expect(run.activeCombatColors).toEqual(['red']);
+  expect(battleDebug.gameplayVariantLabel).toBe('C');
+  expect(battleDebug.connectTargets).toEqual(expect.objectContaining({
+    a: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    b: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    distance: expect.any(Number),
+  }));
+
+  for (let battle = 1; battle <= 2; battle += 1) {
+    await playUntilBattleResult(page);
+    await expectScene(page, 'result');
+
+    run = await page.evaluate(() => window.__tilebreakerDebug.getRun());
+    expect(run.completedBattles).toBe(battle);
+
+    await clickCanvas(page, 0.5, 0.73);
+
+    if (battle < 2) {
+      await expectScene(page, 'upgrades');
+      const upgradeDebug = await page.evaluate(() => window.__tilebreakerDebug.getUpgradeDebug());
+      await clickRect(page, upgradeDebug.layout.choices[2]);
+      await expectScene(page, 'battle');
+
+      battleDebug = await getBattleDebug(page);
+      expect(battleDebug.gameplayVariant).toBe('connect_targets');
+      expect(battleDebug.connectTargets).not.toBeNull();
+    }
+  }
+});

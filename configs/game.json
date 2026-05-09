@@ -32,6 +32,13 @@
             "maxChain": 5,
             "bonusPerChain": 4
         },
+        "connectTargets": {
+            "bonusDamage": 30,
+            "minDistance": 5,
+            "maxDistance": 7,
+            "oneColorLand": true,
+            "respawn": "nextRound"
+        },
         "manifestPath": "assets/tiles_v2/tile_manifest.json",
         "handSelectionDraws": 3,
         "guaranteedLoopHands": false,

@@ -35,8 +35,17 @@ function isOneColorChainVariant(settings = {}) {
     return settings.gameplayVariant === 'one_color_chain';
 }
 
+function isConnectTargetsVariant(settings = {}) {
+    return settings.gameplayVariant === 'connect_targets';
+}
+
+function isOneColorLandVariant(settings = {}) {
+    return isOneColorChainVariant(settings)
+        || (isConnectTargetsVariant(settings) && settings.connectTargets?.oneColorLand !== false);
+}
+
 function normalizeRuleSymbol(symbol, settings = {}) {
-    if (isOneColorChainVariant(settings) && isCombatSymbol(symbol)) {
+    if (isOneColorLandVariant(settings) && isCombatSymbol(symbol)) {
         return COLOR_SYMBOLS.red;
     }
 
@@ -741,7 +750,7 @@ function collectEnclosedRegion(grid, colorSymbolValue, reachable, start, visited
 function findCapturedAreas(board, settings) {
     const grid = buildMicroGrid(board, settings);
     const zones = [];
-    const scoringColors = isOneColorChainVariant(settings) ? ['red'] : COMBAT_COLORS;
+    const scoringColors = isOneColorLandVariant(settings) ? ['red'] : COMBAT_COLORS;
 
     for (const color of scoringColors) {
         const colorSymbolValue = colorSymbol(color);
@@ -857,6 +866,14 @@ function getOneColorChainRules(settings) {
     return {
         maxChain: settings.oneColorChain?.maxChain ?? 5,
         bonusPerChain: settings.oneColorChain?.bonusPerChain ?? 4,
+    };
+}
+
+function getConnectTargetRules(settings) {
+    return {
+        bonusDamage: settings.connectTargets?.bonusDamage ?? 30,
+        minDistance: settings.connectTargets?.minDistance ?? 5,
+        maxDistance: settings.connectTargets?.maxDistance ?? 7,
     };
 }
 
@@ -1014,9 +1031,111 @@ function applyOneColorChainToScore(state, score, settings) {
     };
 }
 
+function cellDistance(left, right) {
+    return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+}
+
+function createConnectTargetPair(board, settings, salt = 0) {
+    if (!isConnectTargetsVariant(settings)) {
+        return null;
+    }
+
+    const rules = getConnectTargetRules(settings);
+    const cells = [];
+
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            if (!board[y][x]) {
+                cells.push({ x, y });
+            }
+        }
+    }
+
+    const pairs = [];
+
+    for (let left = 0; left < cells.length; left += 1) {
+        for (let right = left + 1; right < cells.length; right += 1) {
+            const distance = cellDistance(cells[left], cells[right]);
+
+            if (distance >= rules.minDistance && distance <= rules.maxDistance) {
+                pairs.push({
+                    a: cells[left],
+                    b: cells[right],
+                    distance,
+                    connected: false,
+                    scored: false,
+                });
+            }
+        }
+    }
+
+    if (pairs.length === 0) {
+        return null;
+    }
+
+    const index = Math.abs(Math.floor(salt)) % pairs.length;
+    return pairs[index];
+}
+
+function ensureConnectTargets(state, settings) {
+    if (!isConnectTargetsVariant(settings)) {
+        state.connectTargets = null;
+        return null;
+    }
+
+    if (!state.connectTargets || state.connectTargets.scored) {
+        state.connectTargets = createConnectTargetPair(
+            state.board,
+            settings,
+            state.round + countPlacedTiles(state.board) * 17,
+        );
+    }
+
+    return state.connectTargets;
+}
+
+function areConnectTargetsLinked(board, targets, settings) {
+    if (!targets) {
+        return false;
+    }
+
+    const startTile = board[targets.a.y]?.[targets.a.x];
+    const endTile = board[targets.b.y]?.[targets.b.x];
+
+    if (!isCombatTile(startTile) || !isCombatTile(endTile)) {
+        return false;
+    }
+
+    return getConnectedCombatTileKeys(board, targets.a.x, targets.a.y, settings)
+        .includes(boardKey(targets.b.x, targets.b.y));
+}
+
+function applyConnectTargetsToScore(state, score, settings) {
+    const targets = ensureConnectTargets(state, settings);
+
+    if (!targets || targets.scored || !areConnectTargetsLinked(state.board, targets, settings)) {
+        return {
+            connected: false,
+            bonusDamage: 0,
+        };
+    }
+
+    const rules = getConnectTargetRules(settings);
+    targets.connected = true;
+    targets.scored = true;
+    score.targetBonus = (score.targetBonus ?? 0) + rules.bonusDamage;
+    score.damageByColor.red += rules.bonusDamage;
+    score.totalDamage += rules.bonusDamage;
+
+    return {
+        connected: true,
+        bonusDamage: rules.bonusDamage,
+    };
+}
+
 export function createTilesFromManifest(manifest, settings = {}) {
     const deckSize = settings.startingDeckSize ?? manifest.tiles.length;
-    const oneColorLand = isOneColorChainVariant(settings);
+    const oneColorLand = isOneColorLandVariant(settings);
 
     return manifest.tiles.slice(0, deckSize).map((entry) => {
         const symbol = oneColorLand && COMBAT_COLORS.includes(entry.color)
@@ -1136,6 +1255,7 @@ export function createTileBattleState({ battle, run, settings, tiles }) {
         chainMeter: isOneColorChainVariant(settings) ? 0 : null,
         lastChainDelta: 0,
         chainRegionKeys: [],
+        connectTargets: createConnectTargetPair(createEmptyBoard(settings.boardSize), settings, round),
     };
 }
 
@@ -1143,7 +1263,7 @@ export function getRoundAttack(battle, round, settings = {}) {
     const attacks = battle.attacks ?? [{ red: 1, blue: 1, green: 1 }];
     const attack = attacks[(round - 1) % attacks.length];
 
-    if (!isOneColorChainVariant(settings)) {
+    if (!isOneColorLandVariant(settings)) {
         return attack;
     }
 
@@ -1206,6 +1326,10 @@ export function placeTile(state, settings, x, y) {
     }
 
     updateOneColorChainForPlacement(state, settings, x, y);
+    ensureConnectTargets(state, settings);
+    if (state.connectTargets) {
+        state.connectTargets.connected = areConnectTargetsLinked(state.board, state.connectTargets, settings);
+    }
 
     state.playedThisRound.push(tileDef.id);
     state.queuePlayedThisRound += isQueueDrawMode(settings) ? 1 : 0;
@@ -1241,6 +1365,7 @@ export function resolveTileRound(state, battle, settings, run = null) {
     const score = scoreTileBoard(state.board, settings, run);
     const placementPayoff = applyPlacementFocusToScore(state, score, settings);
     const oneColorChain = applyOneColorChainToScore(state, score, settings);
+    const connectTargets = applyConnectTargetsToScore(state, score, settings);
     let enemyDamage = 0;
     let playerDamage = 0;
     const byColor = {};
@@ -1284,6 +1409,13 @@ export function resolveTileRound(state, battle, settings, run = null) {
         chainSpent: oneColorChain.chainSpent,
         chainBonus: oneColorChain.chainBonus,
         chainRemaining: state.chainMeter ?? 0,
+        connectTargets: state.connectTargets ? {
+            ...state.connectTargets,
+            a: { ...state.connectTargets.a },
+            b: { ...state.connectTargets.b },
+        } : null,
+        connectTargetBonus: connectTargets.bonusDamage,
+        connectTargetConnected: connectTargets.connected,
         scoredTileKeys: [...getScoredTileKeys({ score })],
     };
 
@@ -1364,6 +1496,13 @@ export function startNextTileRound(state, { run, battle, settings, tiles }) {
         && countPlacedTiles(state.board) > 0
         && !hasAnyValidPlacement(state.board, state.hand, settings)) {
         state.board = createEmptyBoard(settings.boardSize);
+    }
+
+    if (isConnectTargetsVariant(settings)) {
+        state.connectTargets = state.connectTargets?.scored
+            ? null
+            : state.connectTargets;
+        ensureConnectTargets(state, settings);
     }
 
     state.selectedHandIndex = state.hand.findIndex(Boolean);

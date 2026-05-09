@@ -4,7 +4,7 @@ Tilebreaker — быстрый roguelite tile-placement battler. Игрок вы
 
 Текущий MVP строится вокруг v3 two-color capture-fill эксперимента на v2-арте:
 
-- active gameplay variant: `gameplayVariant: "legacy"`; это сохраненный текущий `queue + two-color capture-fill`; Variant A (`placement_payoff`) реализует Focus за полезные setup-постановки, Variant B (`one_color_chain`) реализует один land-color и Chain за непрерывный рост, а варианты `C-D` пока остаются каркасами до своих отдельных задач;
+- active gameplay variant: `gameplayVariant: "legacy"`; это сохраненный текущий `queue + two-color capture-fill`; Variant A (`placement_payoff`) реализует Focus за полезные setup-постановки, Variant B (`one_color_chain`) реализует один land-color и Chain за непрерывный рост, Variant C (`connect_targets`) реализует цели A/B, которые нужно соединить землей, а Variant D пока остается каркасом до отдельной задачи;
 - тайлы: `assets/tiles_v2/tile_manifest.json`;
 - активные стартовые боевые цвета: `red` и `blue`; `green` остается в manifest, но не входит в стартовую колоду и ранние атаки;
 - поле: 6x6 macro-тайлов, каждый тайл — 3x3 micro-cells;
@@ -18,11 +18,12 @@ Tilebreaker — быстрый roguelite tile-placement battler. Игрок вы
 - между раундами закрытые/засчитанные тайлы очищаются, а незакрытая территория остается для достраивания;
 - в Variant A полезная постановка без закрытия рядом с существующей землей дает `Focus +1`; Focus не наносит прямой урон, копится до cap и тратится как бонус к следующему захвату;
 - в Variant B все combat-тайлы считаются одной землей для правил выкладки/захвата, атаки сводятся в одну land-линию, а продолжение того же connected region растит `Chain xN`; chain тратится как bonus damage на следующий захват;
+- в Variant C все combat-тайлы тоже считаются одной землей, но вместо Chain на поле есть цели A/B: если connected land связывает обе клетки, раунд получает разовый `connectTargets.bonusDamage`, а новая пара появляется в следующем раунде;
 - забег использует стартовую колоду из `startingDeckRecipe`, draw pile, discard pile и награды между боями; стартовая v3-колода сейчас 25 тайлов: red/blue lines x2, red/blue tees/corners x1, один gray blank, без plus.
 
 ## Где Что Хранится
 
-- `configs/game.json` — глобальные настройки tile-battle: размер поля, размер руки, `drawMode`, `gameplayVariant`, `activeCombatColors`, стартовое HP игрока, размер стартовой колоды/recipe, opening `drawBag`, формула урона, `placementPayoff` для Variant A, `oneColorChain` для Variant B, бонусы за большую зону и серые тайлы внутри закрытия, путь к активному tile manifest, debug-сглаживание добора, gray wildcard placement, очистка доски между раундами, восстановление после dead-end, legacy-настройки off-color leap и число битв в забеге.
+- `configs/game.json` — глобальные настройки tile-battle: размер поля, размер руки, `drawMode`, `gameplayVariant`, `activeCombatColors`, стартовое HP игрока, размер стартовой колоды/recipe, opening `drawBag`, формула урона, `placementPayoff` для Variant A, `oneColorChain` для Variant B, `connectTargets` для Variant C, бонусы за большую зону и серые тайлы внутри закрытия, путь к активному tile manifest, debug-сглаживание добора, gray wildcard placement, очистка доски между раундами, восстановление после dead-end, legacy-настройки off-color leap и число битв в забеге.
 - `configs/levels.json` — список битв, HP врагов и цветовые атаки по раундам.
 - `assets/tiles_v2/tile_manifest.json` — активный набор тайлов MVP.
 - `src/entities/run.js` — состояние забега: колода, добор, сброс, награды и цветовые множители.
@@ -72,6 +73,12 @@ Variant B можно открыть так:
 
 ```sh
 http://127.0.0.1:5173/?seed=20260508&variant=b
+```
+
+Variant C можно открыть так:
+
+```sh
+http://127.0.0.1:5173/?seed=20260508&variant=c
 ```
 
 Или прогнать симуляцию:
