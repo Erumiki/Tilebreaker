@@ -188,6 +188,7 @@ function showMainMenu() {
         config,
         input,
         ui,
+        artTextures,
         onStart: startRun,
     });
 }
@@ -221,6 +222,7 @@ function showResult(outcome) {
     scene = createBattleResultScene({
         input,
         ui,
+        artTextures,
         result,
         onContinue() {
             if (result.isRunVictory || outcome === BattleOutcome.Defeat) {
@@ -237,6 +239,7 @@ function showUpgrades() {
     scene = createUpgradeScene({
         input,
         ui,
+        artTextures,
         run,
         upgrades: getRewardChoices(run, tiles, config.game.tileBattle),
         onChoose(upgrade) {

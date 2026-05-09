@@ -176,7 +176,8 @@ function createPortraitLayout(screen, settings) {
     const buttonY = screen.height - margin - buttonHeight;
     const handY = buttonY - 10 - handHeight;
     const hud = rect(margin, 8, availableWidth, 34);
-    const monsterBanner = rect(margin, hud.y + hud.height + 6, availableWidth, 38);
+    const monsterBannerHeight = Math.max(68, Math.min(118, Math.round(screen.height * 0.13)));
+    const monsterBanner = rect(margin, hud.y + hud.height + 6, availableWidth, monsterBannerHeight);
     const boardTop = monsterBanner.y + monsterBanner.height + 8;
     const feedbackHeight = 34;
     const logHeight = Math.max(30, Math.min(48, Math.round(screen.height * 0.055)));

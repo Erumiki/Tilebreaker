@@ -332,6 +332,31 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
+### ~~[2026-05-09] MVP Art Pass: make the live game match the Astral Archive fake shot~~ DONE
+
+**Idea:** pause the next mechanics task and make the live game visually read like the accepted fake screenshot.
+
+**Why:** the fake shot already established the intended first impression: ornate star-archive UI, dark observatory backdrop, monster breach pressure, brass-framed board cells, glowing red/blue ward paths, readable hand tray and a large submit-hand control. Before adding more economy, the current game needed to stop looking like a mechanics prototype.
+
+**MVP:**
+
+- regenerate active `assets/tiles_v2` PNGs as brass-framed stone plates with crisp neon red/blue ward lines while preserving `matrix`, `edges`, tile ids and special starter semantics;
+- regenerate the MVP art pack in `assets/art_mvp` toward the Astral Archive style: backgrounds, backdrops, board cells, slots, buttons, panels, icons, overlays/effects and monster portraits/icons;
+- route normal menu, intro, battle, result and upgrades screens through manifest-backed art where they were still visible prototype rectangles;
+- enlarge the portrait battle monster band and use the per-battle backdrop there so the screen composition resembles the portrait fake shot;
+- keep board-cell states from drawing fake red/blue exits that could confuse tile topology;
+- run art and UIX agent audits, fold concrete notes into the implementation, then verify with checks/e2e and a live portrait screenshot.
+
+**Acceptance:** with the accepted portrait fake shot open beside the game, the current default battle should clearly read as the same direction: dark archive, breach/monster header, brass board, glowing red/blue seal tiles, ornate hand/hold slots and red submit bar. Active topology and tests must remain unchanged.
+
+**Status:** implemented a first live fake-shot match pass. Two audit agents identified the remaining prototype visuals and UIX blockers; their P0/P1 notes were folded into this pass. `scripts/generate-tile-art-v2.js` now emits stone/brass/neon ward tiles without changing topology data, and `scripts/generate-art-mvp-placeholders.js` now emits Astral Archive backgrounds, board cells, slots, panels, buttons, icons, overlays/effects and monster art. Runtime now passes `artTextures` into menu/result/upgrades, uses art-backed backgrounds/buttons/cards, uses asset-backed battle board cells/panels/buttons, and portrait battle now has a larger monster breach banner backed by `level_backdrop_battle_0N`. A visual check caught and fixed a false-exit problem in `board_cell_valid`. Follow-up art-director correction: battle backgrounds, level backdrops and board-cell underlays were redone away from flat star-chart placeholders into darker observatory stone, quieter brass astrolabe marks, richer void breach silhouettes and warmer beveled stone cells. Unit tests, `check` and the 9-test Playwright smoke suite pass.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
 ### [2026-05-09] MVP Battle Economy: field gold, hearts and monster kill bounty
 
 **Idea:** make battles develop economically, not only tactically, by adding resources on the board and a clear monster reward.
@@ -435,18 +460,18 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Art Track 2: replace hardcoded prototype visuals and run art-lead audit
+### [2026-05-09] MVP Art Track 3: remaining art extraction cleanup and final art-lead audit
 
-**Idea:** move current prototype visuals out of scene code and verify that the game can be reskinned by files/manifests.
+**Idea:** finish the remaining art extraction after the fake-shot pass and verify that the game can be fully reskinned by files/manifests.
 
-**Why:** `drawRect` and hardcoded colors are fine for mechanics, but a beautiful MVP needs the project to select asset ids and states, not draw almost all presentation in code.
+**Why:** the fake-shot pass replaced the largest visible prototype look, but some low-level borders, text treatments, debug/variant surfaces and future shop elements still use procedural drawing. A beautiful MVP needs the project to select asset ids and states consistently, not hide late prototype visuals in scene code.
 
 **MVP:**
 
-- extend the Pixi UI renderer with sprite/stateful asset helpers such as `drawSprite`, `drawNineSlice`, `drawIcon` and `drawStatefulButton`;
-- keep `drawText` as a system text layer, but move panels, buttons, board cells, slots, frames, icons, backgrounds, overlays and resource visuals to files from the art manifest;
-- convert low-risk scenes first: menu, result and shop;
-- convert battle after the layout contract exists: board base/cells, valid/hover/invalid placement overlays, hand/hold slots, selected/held frames, capture/closure overlays, gold/heart underlays, monster portrait and battle backgrounds;
+- formalize the ad hoc asset helpers added during the fake-shot pass into shared renderer helpers such as `drawSprite`, `drawNineSlice`, `drawIcon` and `drawStatefulButton`;
+- keep `drawText` as a system text layer, but move any remaining panels, buttons, board cells, slots, frames, icons, backgrounds, overlays and resource visuals to files from the art manifest;
+- complete future shop/resource routes once those mechanics exist;
+- finish battle extraction: capture/closure overlays, resource underlays, richer HUD rails, pressed states and any remaining hardcoded borders;
 - remove the procedural tile fallback from active presentation: missing tile art should show an explicit missing asset state or fail validation instead of silently drawing a colored 3x3 fallback;
 - add static checks with a small allowlist for remaining hardcoded drawing/color usage in `src/scenes` and `src/render`;
 - add manifest validation: unique ids, files exist, lowercase underscore names, expected dimensions and loadable PNGs;

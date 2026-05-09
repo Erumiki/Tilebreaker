@@ -200,16 +200,35 @@ function getTexture(artTextures, assetId) {
     return artTextures?.textures?.get(assetId) ?? null;
 }
 
-function drawImageOrRect(ui, artTextures, assetId, rect, fallbackColor, alpha = 1) {
+function drawImageOrRect(ui, artTextures, assetId, rect, fallbackColor, alpha = 1, fit = 'cover') {
     const texture = getTexture(artTextures, assetId);
 
     if (texture) {
-        ui.drawImage(texture, rect, { alpha });
+        ui.drawImage(texture, rect, { alpha, fit });
         return true;
     }
 
     ui.drawRect(rect, fallbackColor, alpha);
     return false;
+}
+
+function drawArtButton(ui, artTextures, rect, label, options = {}) {
+    const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
+    const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
+    const texture = getTexture(artTextures, `button_primary_${state}`);
+
+    if (!texture) {
+        ui.drawButton(rect, label, options);
+        return;
+    }
+
+    ui.drawImage(texture, rect, { alpha: 1 });
+    ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - (options.textSize ?? 22) / 2 - 2, {
+        align: 'center',
+        size: options.textSize ?? 22,
+        color: '#fff2ca',
+        weight: 700,
+    });
 }
 
 function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
@@ -299,8 +318,7 @@ export function createBattleIntroScene({
             ui.drawRect(rect(0, 0, screen.width, screen.height), '#06101a', 0.38);
 
             if (layout.mode === 'portrait') {
-                ui.drawRect(layout.hud, '#0f1d2b', 0.96);
-                drawBorder(ui, layout.hud, '#28445c', 1, 0.85);
+                drawImageOrRect(ui, artTextures, 'panel_dark', layout.hud, '#0f1d2b', 0.92, 'stretch');
                 ui.drawText(`Б${preview.battleNumber}/${preview.totalBattles}`, layout.hud.x + 10, layout.hud.y + 9, {
                     size: 13,
                     color: '#eef8ff',
@@ -338,8 +356,7 @@ export function createBattleIntroScene({
                 drawBorder(ui, layout.portrait, '#486a87', 2, 0.9);
             }
 
-            ui.drawRect(layout.details, '#0f1d2b', 0.94);
-            drawBorder(ui, layout.details, '#28445c', 2, 0.9);
+            drawImageOrRect(ui, artTextures, 'panel_dark', layout.details, '#0f1d2b', 0.92, 'stretch');
 
             if (layout.mode === 'desktop') {
                 drawImageOrRect(ui, artTextures, preview.assetIds.icon, layout.icon, '#20394d', 0.98);
@@ -366,14 +383,10 @@ export function createBattleIntroScene({
             drawStatRow(ui, statX, statY + 52, 'Игрок', formatHearts(preview.playerHp), '#c8f7dd');
             drawStatRow(ui, statX, statY + 78, 'Золото', String(preview.gold), '#f3d991');
 
-            const rewardY = layout.mode === 'desktop' ? layout.details.y + 260 : layout.details.y + 122;
+            const rewardY = layout.mode === 'desktop' ? layout.details.y + 260 : statY + 102;
             if (layout.mode === 'portrait') {
-                ui.drawText('Награда будет позже', statX, rewardY, {
-                    size: 13,
-                    color: '#9fb8ca',
-                });
-                ui.drawText(`показана как +${preview.reward} золота`, statX, rewardY + 18, {
-                    size: 13,
+                ui.drawText(`Победа: +${preview.reward} золота`, statX, rewardY, {
+                    size: 12,
                     color: '#9fb8ca',
                 });
             } else {
@@ -384,7 +397,7 @@ export function createBattleIntroScene({
                 });
             }
 
-            ui.drawButton(layout.primaryButton, 'Битва', {
+            drawArtButton(ui, artTextures, layout.primaryButton, 'Битва', {
                 mouse,
                 color: '#243f54',
                 hoverColor: '#66c7f4',

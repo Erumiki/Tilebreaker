@@ -27,7 +27,7 @@
         "monster_portrait": ["battle_01", "battle_02", "battle_03", "battle_04", "battle_05"],
         "monster_icon": ["battle_01", "battle_02", "battle_03", "battle_04", "battle_05"],
         "icon": ["heart_full", "heart_empty", "heart_lost", "gold", "strike", "deck", "discard", "hold", "multiplier", "submit", "lock"],
-        "overlay": ["capture_red", "capture_blue", "valid_cell", "invalid_cell", "selected_tile", "hover_tile", "target_a", "target_b", "gate_start", "gate_end"],
+        "overlay": ["capture_red", "capture_blue", "zone_filled_red", "zone_filled_blue", "zone_filled_green", "zone_filled_land", "valid_cell", "invalid_cell", "selected_tile", "hover_tile", "target_a", "target_b", "gate_start", "gate_end"],
         "effect": ["capture_flash", "gold_pickup", "heart_heal", "strike_burst", "submit_damage"],
         "shop_card": ["offer", "affordable", "unaffordable", "bought"]
     },
@@ -580,6 +580,42 @@
             "size": [256, 256],
             "alpha": true,
             "usage": "Blue captured-area overlay."
+        },
+        {
+            "id": "overlay_zone_filled_red",
+            "file": "overlay_zone_filled_red.png",
+            "category": "overlay",
+            "state": "zone_filled_red",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Art overlay for filled red zone micro-cells."
+        },
+        {
+            "id": "overlay_zone_filled_blue",
+            "file": "overlay_zone_filled_blue.png",
+            "category": "overlay",
+            "state": "zone_filled_blue",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Art overlay for filled blue zone micro-cells."
+        },
+        {
+            "id": "overlay_zone_filled_green",
+            "file": "overlay_zone_filled_green.png",
+            "category": "overlay",
+            "state": "zone_filled_green",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Art overlay for filled green zone micro-cells."
+        },
+        {
+            "id": "overlay_zone_filled_land",
+            "file": "overlay_zone_filled_land.png",
+            "category": "overlay",
+            "state": "zone_filled_land",
+            "size": [256, 256],
+            "alpha": true,
+            "usage": "Art overlay for filled land zone micro-cells."
         },
         {
             "id": "overlay_valid_cell",

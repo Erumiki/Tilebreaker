@@ -193,6 +193,45 @@ function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
     ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
 }
 
+function drawCornerMarkers(ui, rect, color, options = {}) {
+    const thickness = options.thickness ?? Math.max(2, Math.floor(rect.width * 0.045));
+    const length = options.length ?? Math.max(10, Math.floor(rect.width * 0.24));
+    const alpha = options.alpha ?? 1;
+    const inset = options.inset ?? Math.max(2, Math.floor(rect.width * 0.06));
+    const left = rect.x + inset;
+    const right = rect.x + rect.width - inset;
+    const top = rect.y + inset;
+    const bottom = rect.y + rect.height - inset;
+
+    ui.drawRect({ x: left, y: top, width: length, height: thickness }, color, alpha);
+    ui.drawRect({ x: left, y: top, width: thickness, height: length }, color, alpha);
+    ui.drawRect({ x: right - length, y: top, width: length, height: thickness }, color, alpha);
+    ui.drawRect({ x: right - thickness, y: top, width: thickness, height: length }, color, alpha);
+    ui.drawRect({ x: left, y: bottom - thickness, width: length, height: thickness }, color, alpha);
+    ui.drawRect({ x: left, y: bottom - length, width: thickness, height: length }, color, alpha);
+    ui.drawRect({ x: right - length, y: bottom - thickness, width: length, height: thickness }, color, alpha);
+    ui.drawRect({ x: right - thickness, y: bottom - length, width: thickness, height: length }, color, alpha);
+}
+
+function drawPlacementHint(ui, rect, { valid, hovered }) {
+    const color = valid ? '#8fe8ff' : '#ff7b83';
+    const fill = valid ? '#4fc3ff' : '#ff4f5f';
+    const alpha = hovered ? 0.95 : 0.58;
+    const inset = Math.max(3, Math.floor(rect.width * 0.065));
+
+    ui.drawRect(insetRect(rect, inset), fill, hovered ? 0.14 : 0.07);
+    drawCornerMarkers(ui, rect, color, {
+        alpha,
+        thickness: hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
+        length: hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
+        inset,
+    });
+
+    if (hovered) {
+        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.035))), color, 2, 0.72);
+    }
+}
+
 function getBattleAssetId(prefix, battle) {
     return `${prefix}_${battle.id}`;
 }
@@ -215,8 +254,68 @@ function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
     ui.drawImage(texture, rect, {
         alpha: options.alpha ?? 1,
         tint: options.tint,
+        fit: options.fit,
     });
     return true;
+}
+
+function getZoneFilledOverlayAssetId(color, settings) {
+    if (isOneColorLandVariant(settings) && color !== 'gray') {
+        return 'overlay_zone_filled_land';
+    }
+
+    return `overlay_zone_filled_${color}`;
+}
+
+function drawZoneFilledCell(ui, rect, color, settings) {
+    const inset = Math.max(1, rect.width * 0.08);
+
+    ui.drawRect(insetRect(rect, inset), getColorHex(color, settings), 0.08);
+}
+
+function getZoneTileBounds(layout, cells) {
+    if (cells.length === 0) {
+        return null;
+    }
+
+    const minX = Math.min(...cells.map((cell) => Math.floor(cell.x / 3)));
+    const maxX = Math.max(...cells.map((cell) => Math.floor(cell.x / 3)));
+    const minY = Math.min(...cells.map((cell) => Math.floor(cell.y / 3)));
+    const maxY = Math.max(...cells.map((cell) => Math.floor(cell.y / 3)));
+
+    return {
+        x: layout.board.x + minX * layout.cellSize,
+        y: layout.board.y + minY * layout.cellSize,
+        width: (maxX - minX + 1) * layout.cellSize,
+        height: (maxY - minY + 1) * layout.cellSize,
+    };
+}
+
+function drawZoneFilledSeal(ui, artTextures, layout, microSize, zone, settings) {
+    const zoneCells = [...zone.interiorCells, ...zone.boundaryCells];
+    const bounds = getZoneTileBounds(layout, zoneCells);
+    if (!bounds) {
+        return;
+    }
+
+    const assetId = getZoneFilledOverlayAssetId(zone.color, settings);
+    const sealRect = {
+        x: bounds.x + layout.cellSize * 0.05,
+        y: bounds.y + layout.cellSize * 0.05,
+        width: bounds.width - layout.cellSize * 0.1,
+        height: bounds.height - layout.cellSize * 0.1,
+    };
+
+    drawArtImage(ui, artTextures, assetId, sealRect, { alpha: 0.3, fit: 'stretch' });
+    drawArtImage(ui, artTextures, 'effect_capture_flash', sealRect, {
+        alpha: 0.82,
+        fit: 'stretch',
+        tint: getColorHex(zone.color, settings),
+    });
+    drawArtImage(ui, artTextures, 'effect_capture_flash', sealRect, {
+        alpha: 0.34,
+        fit: 'stretch',
+    });
 }
 
 function drawIconText(ui, artTextures, assetId, x, y, iconSize, text, options = {}) {
@@ -247,6 +346,27 @@ function drawIconText(ui, artTextures, assetId, x, y, iconSize, text, options = 
         size: options.textSize ?? 15,
         color: options.color ?? '#ffffff',
         weight: options.weight ?? 600,
+    });
+}
+
+function drawArtButton(ui, artTextures, rect, label, options = {}) {
+    const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
+    const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
+    const prefix = options.secondary ? 'button_secondary' : 'button_primary';
+    const drawn = drawArtImage(ui, artTextures, `${prefix}_${state}`, rect, {
+        alpha: options.alpha ?? 1,
+    });
+
+    if (!drawn) {
+        ui.drawButton(rect, label, options);
+        return;
+    }
+
+    ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - (options.textSize ?? 20) / 2 - 2, {
+        align: 'center',
+        size: options.textSize ?? 20,
+        color: options.textColor ?? '#fff2ca',
+        weight: 700,
     });
 }
 
@@ -361,8 +481,11 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     });
 }
 
-function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
+function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures) {
     const selectedTile = state.hand[state.selectedHandIndex];
+    const canShowPlacementHints = state.phase === 'placing'
+        && !state.outcome
+        && Boolean(selectedTile);
 
     for (let y = 0; y < settings.boardSize; y += 1) {
         for (let x = 0; x < settings.boardSize; x += 1) {
@@ -373,9 +496,13 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
                 height: layout.cellSize,
             };
             const isHovered = ui.contains(rect, mouse);
-            const isValid = state.phase === 'placing'
-                && !state.outcome
+            const isEmpty = !state.board[y][x];
+            const isValid = canShowPlacementHints
                 && canPlaceTile(state.board, selectedTile, x, y, settings);
+            const isInvalidHovered = canShowPlacementHints
+                && isHovered
+                && isEmpty
+                && !isValid;
             const fill = isValid
                 ? isHovered ? '#31566b' : '#203748'
                 : '#162432';
@@ -383,12 +510,64 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
                 ? isHovered ? '#9de7ff' : '#4f93b2'
                 : '#24394c';
 
-            ui.drawRect(rect, fill, 1);
-            drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
+            const cellAssetId = isHovered
+                ? isInvalidHovered ? 'board_cell_invalid' : 'board_cell_hover'
+                : 'board_cell_empty';
+            if (!drawArtImage(ui, artTextures, cellAssetId, rect, { alpha: 1 })) {
+                ui.drawRect(rect, fill, 1);
+                drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
+            }
             drawTile(ui, state.board[y][x], insetRect(rect, 5), {
                 oneColorLand: isOneColorLandVariant(settings),
                 tileTextures,
             });
+
+        }
+    }
+
+    if (state.lastResult) {
+        const microSize = layout.cellSize / 3;
+        for (const zone of state.lastResult.score.zones) {
+            for (const cell of zone.interiorCells) {
+                drawZoneFilledCell(ui, {
+                    x: layout.board.x + cell.x * microSize,
+                    y: layout.board.y + cell.y * microSize,
+                    width: microSize,
+                    height: microSize,
+                }, zone.color, settings);
+            }
+            drawZoneFilledSeal(ui, artTextures, layout, microSize, zone, settings);
+        }
+    }
+
+    for (let y = 0; y < settings.boardSize; y += 1) {
+        for (let x = 0; x < settings.boardSize; x += 1) {
+            const rect = {
+                x: layout.board.x + x * layout.cellSize,
+                y: layout.board.y + y * layout.cellSize,
+                width: layout.cellSize,
+                height: layout.cellSize,
+            };
+            const isHovered = ui.contains(rect, mouse);
+            const isEmpty = !state.board[y][x];
+            const isValid = canShowPlacementHints
+                && canPlaceTile(state.board, selectedTile, x, y, settings);
+            const isInvalidHovered = canShowPlacementHints
+                && isHovered
+                && isEmpty
+                && !isValid;
+
+            if (isEmpty && isValid) {
+                drawPlacementHint(ui, rect, {
+                    valid: true,
+                    hovered: isHovered,
+                });
+            } else if (isInvalidHovered) {
+                drawPlacementHint(ui, rect, {
+                    valid: false,
+                    hovered: true,
+                });
+            }
 
             const targets = state.connectTargets;
             const isTargetA = targets?.a.x === x && targets?.a.y === y;
@@ -399,29 +578,17 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures) {
                 const label = isRoadModeVariant(settings)
                     ? isTargetA ? 'S' : 'E'
                     : isTargetA ? 'A' : 'B';
-                drawBorder(ui, insetRect(rect, 4), targetColor, 4, 1);
+                const overlayId = isRoadModeVariant(settings)
+                    ? isTargetA ? 'overlay_gate_start' : 'overlay_gate_end'
+                    : isTargetA ? 'overlay_target_a' : 'overlay_target_b';
+                drawArtImage(ui, artTextures, overlayId, insetRect(rect, 4), { alpha: 0.88 });
+                drawBorder(ui, insetRect(rect, 4), targetColor, 2, 0.86);
                 ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - 13, {
                     align: 'center',
                     size: 26,
                     color: targetColor,
                 });
             }
-        }
-    }
-
-    if (!state.lastResult) {
-        return;
-    }
-
-    const microSize = layout.cellSize / 3;
-    for (const zone of state.lastResult.score.zones) {
-        for (const cell of zone.interiorCells) {
-            ui.drawRect({
-                x: layout.board.x + cell.x * microSize,
-                y: layout.board.y + cell.y * microSize,
-                width: microSize,
-                height: microSize,
-            }, getColorHex(zone.color, settings), 0.42);
         }
     }
 }
@@ -532,8 +699,10 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
 
-    ui.drawRect(panel, '#0f1d2b', 0.94);
-    drawBorder(ui, panel, '#28445c', 2, 0.9);
+    if (!drawArtImage(ui, artTextures, 'panel_dark', panel, { alpha: 0.94 })) {
+        ui.drawRect(panel, '#0f1d2b', 0.94);
+        drawBorder(ui, panel, '#28445c', 2, 0.9);
+    }
     const monsterIconSize = 54;
     const monsterIconId = getBattleAssetId('monster_icon', battle);
     const headerTextX = panel.x + 18 + monsterIconSize + 12;
@@ -708,8 +877,10 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
         const hud = layout.hud;
         const banner = layout.monsterBanner;
 
-        ui.drawRect(hud, '#0f1d2b', 0.96);
-        drawBorder(ui, hud, '#28445c', 1, 0.85);
+        if (!drawArtImage(ui, artTextures, 'panel_dark', hud, { alpha: 0.92 })) {
+            ui.drawRect(hud, '#0f1d2b', 0.96);
+            drawBorder(ui, hud, '#28445c', 1, 0.85);
+        }
         ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
             size: 13,
             color: '#eef8ff',
@@ -739,24 +910,33 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
             color: '#f3d991',
         });
 
-        ui.drawRect(banner, '#132334', 0.94);
-        drawBorder(ui, banner, '#31566b', 1, 0.85);
+        const backdropId = getBattleAssetId('level_backdrop', battle);
+        if (drawArtImage(ui, artTextures, backdropId, banner, { alpha: 0.94, fit: 'cover' })) {
+            ui.drawRect(banner, '#03070c', 0.32);
+        } else if (!drawArtImage(ui, artTextures, 'panel_dark', banner, { alpha: 0.9 })) {
+            ui.drawRect(banner, '#132334', 0.94);
+            drawBorder(ui, banner, '#31566b', 1, 0.85);
+        }
         drawIconText(
             ui,
             artTextures,
             getBattleAssetId('monster_icon', battle),
             banner.x + 8,
-            banner.y + 7,
-            24,
+            banner.y + Math.max(8, banner.height - 54),
+            Math.min(42, banner.height - 16),
             '',
             {
                 fallback: 'M',
                 fallbackColor: '#f3d991',
             },
         );
-        ui.drawText(getCompactBattleLine(battle, state, settings), banner.x + 40, banner.y + 9, {
-            size: 15,
-            color: '#d8e7f2',
+        ui.drawText(getMonsterName(battle), banner.x + 58, banner.y + Math.max(12, banner.height - 56), {
+            size: 18,
+            color: '#fff2ca',
+        });
+        ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, banner.x + 58, banner.y + Math.max(37, banner.height - 30), {
+            size: 13,
+            color: '#d7c59e',
         });
         return;
     }
@@ -851,15 +1031,15 @@ function drawPortraitFeedback(ui, layout, settings, state) {
                 ? `Сдать руку ${formatHeartDelta(submitCost.totalDamage)} · карт ${submitCost.unplayedHandCards}`
                 : 'Ход';
 
-    ui.drawRect(feedback, '#101c2a', 0.96);
-    drawBorder(ui, feedback, '#28445c', 1, 0.85);
+    ui.drawRect(feedback, '#101c2a', 0.36);
+    drawBorder(ui, feedback, '#7d5a34', 1, 0.55);
     ui.drawText(state.feedback ?? fallback, feedback.x + 10, feedback.y + 8, {
         size: 14,
         color: state.feedback?.startsWith('Нельзя') ? '#ff8b9c' : '#f3d991',
     });
 
-    ui.drawRect(log, '#0d1824', 0.92);
-    drawBorder(ui, log, '#21384c', 1, 0.75);
+    ui.drawRect(log, '#0d1824', 0.42);
+    drawBorder(ui, log, '#7d5a34', 1, 0.45);
     const latestLog = (state.battleLog ?? []).slice(-2);
     const lines = latestLog.length > 0
         ? latestLog
@@ -1327,7 +1507,7 @@ export function createBattleScene({
                 y: 0,
                 width: screen.width,
                 height: screen.height,
-            }, { alpha: 0.92 });
+            }, { alpha: 0.95, fit: 'cover' });
             ui.drawRect({
                 x: 0,
                 y: 0,
@@ -1335,7 +1515,7 @@ export function createBattleScene({
                 height: screen.height,
             }, '#06101a', 0.22);
             drawBattleHeader(ui, this.layout, run, battle, settings, state, artTextures);
-            drawBoard(ui, this.layout, settings, state, mouse, tileTextures);
+            drawBoard(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawSidePanel(ui, this.layout, battle, run, settings, state, artTextures);
             drawHold(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawHand(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
@@ -1344,8 +1524,9 @@ export function createBattleScene({
                 && state.phase === 'placing'
                 && !state.outcome
                 && !getHandSubmitCostPreview(state, settings).canPay;
-            ui.drawButton(this.layout.endRoundButton, getButtonLabel(state, settings), {
+            drawArtButton(ui, artTextures, this.layout.endRoundButton, getButtonLabel(state, settings), {
                 mouse,
+                disabled: submitBlocked,
                 color: submitBlocked
                     ? '#2b323a'
                     : state.phase === 'placing' && !state.outcome ? '#243f54' : '#1f4b3c',

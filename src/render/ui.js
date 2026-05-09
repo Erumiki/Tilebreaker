@@ -87,10 +87,26 @@ export function createUiRenderer(PIXI, stage) {
     function drawImage(texture, rect, options = {}) {
         const sprite = useDrawItem('image', () => new PIXI.Sprite());
         sprite.texture = texture;
-        sprite.x = rect.x;
-        sprite.y = rect.y;
-        sprite.width = rect.width;
-        sprite.height = rect.height;
+        const fit = options.fit ?? 'stretch';
+        const sourceWidth = texture.width || rect.width;
+        const sourceHeight = texture.height || rect.height;
+
+        if (fit === 'cover' || fit === 'contain') {
+            const scale = fit === 'cover'
+                ? Math.max(rect.width / sourceWidth, rect.height / sourceHeight)
+                : Math.min(rect.width / sourceWidth, rect.height / sourceHeight);
+            const width = sourceWidth * scale;
+            const height = sourceHeight * scale;
+            sprite.x = rect.x + (rect.width - width) / 2;
+            sprite.y = rect.y + (rect.height - height) / 2;
+            sprite.width = width;
+            sprite.height = height;
+        } else {
+            sprite.x = rect.x;
+            sprite.y = rect.y;
+            sprite.width = rect.width;
+            sprite.height = rect.height;
+        }
         sprite.alpha = options.alpha ?? 1;
         sprite.tint = options.tint ? colorToPixi(options.tint) : 0xffffff;
 
