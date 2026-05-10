@@ -107,6 +107,7 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
         size: options.textSize ?? 22,
         color: options.textColor ?? '#f7e7bd',
         weight: 700,
+        maxWidth: rect.width - 28,
     });
 }
 
@@ -189,6 +190,7 @@ function drawOfferCard(ui, {
         color: textColor,
         weight: 700,
         lineHeight: compact ? 15 : 20,
+        maxWidth: rect.width - 24,
     });
 
     if (tileTexture) {
@@ -208,6 +210,7 @@ function drawOfferCard(ui, {
             size: 13,
             color: offer.bought ? '#b7c9aa' : '#d7c59e',
             lineHeight: 17,
+            maxWidth: rect.width - 28,
         });
     }
 
@@ -217,11 +220,14 @@ function drawOfferCard(ui, {
         size: compact ? 13 : 16,
         color: affordable || offer.bought ? '#f3d991' : '#8f7780',
         weight: 700,
+        maxWidth: rect.width - 24,
     });
-    ui.drawText('баланс: не проверена', rect.x + rect.width / 2, rect.y + rect.height - (compact ? 15 : 22), {
+    const statusLabel = offer.balanceStatus?.startsWith('mvp_keep') ? 'пул MVP' : 'стейдж';
+    ui.drawText(statusLabel, rect.x + rect.width / 2, rect.y + rect.height - (compact ? 15 : 22), {
         align: 'center',
         size: compact ? 10 : 11,
         color: '#9e8d71',
+        maxWidth: rect.width - 24,
     });
 
     if (hovered && affordable) {
@@ -290,16 +296,19 @@ export function createShopScene({
                 align: 'center',
                 size: screen.width < 620 ? 32 : 46,
                 color: '#ffe7ad',
+                maxWidth: screen.width - 32,
             });
             ui.drawText(`Перед битвой ${shopState.nextBattle}: покупай сколько хватает золота`, screen.width / 2, screen.width < 620 ? 68 : screen.height * 0.23, {
                 align: 'center',
                 size: screen.width < 620 ? 15 : 21,
                 color: '#d7c59e',
+                maxWidth: screen.width - 28,
             });
             ui.drawText(`Золото ${run.gold ?? 0}  |  Колода ${run.deck.length}  |  Добор ${run.drawPile.length}  |  Сброс ${run.discardPile.length}`, screen.width / 2, screen.width < 620 ? 96 : screen.height * 0.29, {
                 align: 'center',
                 size: screen.width < 620 ? 13 : 17,
                 color: '#f3d991',
+                maxWidth: screen.width - 28,
             });
 
             shopState.offers.forEach((offer, index) => {

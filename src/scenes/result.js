@@ -1,4 +1,5 @@
 import { BattleOutcome } from '../entities/run.js';
+import { drawBorder, drawCornerBrackets } from '../render/chrome.js';
 
 function getResultLayout(screen) {
     const isPortrait = screen.width < 620;
@@ -71,37 +72,6 @@ function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
     return true;
 }
 
-function drawLineRect(ui, rect, color, alpha = 1) {
-    ui.drawRect(rect, color, alpha);
-}
-
-function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
-    drawLineRect(ui, { x: rect.x, y: rect.y, width: rect.width, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: rect.x, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-    drawLineRect(ui, { x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-}
-
-function drawCornerBrackets(ui, rect, color, options = {}) {
-    const length = options.length ?? 34;
-    const thickness = options.thickness ?? 4;
-    const alpha = options.alpha ?? 0.95;
-    const inset = options.inset ?? 10;
-    const left = rect.x + inset;
-    const right = rect.x + rect.width - inset;
-    const top = rect.y + inset;
-    const bottom = rect.y + rect.height - inset;
-
-    drawLineRect(ui, { x: left, y: top, width: length, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: left, y: top, width: thickness, height: length }, color, alpha);
-    drawLineRect(ui, { x: right - length, y: top, width: length, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: right - thickness, y: top, width: thickness, height: length }, color, alpha);
-    drawLineRect(ui, { x: left, y: bottom - thickness, width: length, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: left, y: bottom - length, width: thickness, height: length }, color, alpha);
-    drawLineRect(ui, { x: right - length, y: bottom - thickness, width: length, height: thickness }, color, alpha);
-    drawLineRect(ui, { x: right - thickness, y: bottom - length, width: thickness, height: length }, color, alpha);
-}
-
 function drawResultPanel(ui, rect, isDefeat) {
     const accent = isDefeat ? '#d78486' : '#d6a25c';
     ui.drawRect(rect, '#050911', isDefeat ? 0.9 : 0.86);
@@ -150,6 +120,7 @@ function drawResultButton(ui, rect, label, options = {}) {
         size: options.textSize ?? 22,
         color: options.textColor ?? '#f7e7bd',
         weight: 700,
+        maxWidth: rect.width - 28,
     });
 }
 
@@ -207,22 +178,28 @@ export function createBattleResultScene({
                 align: 'center',
                 size: this.layout.mode === 'portrait' ? 42 : 48,
                 color: isDefeat ? '#ffb4c0' : '#ffe7ad',
+                maxWidth: this.layout.panel.width - 32,
             });
             ui.drawText(subtitle, screen.width / 2, this.layout.subtitleY, {
                 align: 'center',
                 size: this.layout.mode === 'portrait' ? 22 : 24,
                 color: '#d7c59e',
+                maxWidth: this.layout.panel.width - 36,
             });
             ui.drawText(`Пройдено: ${result.completedBattles} / ${result.totalBattles}`, screen.width / 2, this.layout.progressY, {
                 align: 'center',
                 size: 22,
                 color: '#bca77e',
+                maxWidth: this.layout.panel.width - 36,
             });
             if (!isDefeat && (result.bountyGold ?? 0) > 0) {
                 ui.drawText(`Награда за монстра: +${result.bountyGold} золота · всего ${result.gold}`, screen.width / 2, this.layout.rewardY, {
                     align: 'center',
-                    size: 20,
+                    size: this.layout.mode === 'portrait' ? 18 : 20,
                     color: '#f3d991',
+                    lineHeight: this.layout.mode === 'portrait' ? 21 : 24,
+                    maxWidth: this.layout.panel.width - 38,
+                    wordWrap: this.layout.mode === 'portrait',
                 });
             }
             drawResultButton(ui, this.actionButton, label, {

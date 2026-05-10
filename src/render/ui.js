@@ -79,6 +79,9 @@ export function createUiRenderer(PIXI, stage) {
             fill: colorToPixi(options.color ?? '#ffffff'),
             align,
             lineHeight: options.lineHeight ?? Math.round((options.size ?? 24) * 1.25),
+            wordWrap: options.wordWrap ?? false,
+            wordWrapWidth: options.maxWidth,
+            breakWords: options.breakWords ?? true,
         };
 
         if (align === 'center') {
@@ -89,6 +92,11 @@ export function createUiRenderer(PIXI, stage) {
 
         label.x = x;
         label.y = y;
+        label.scale.set(1);
+        if (options.maxWidth && options.fit !== false && !options.wordWrap && label.width > options.maxWidth) {
+            const scale = Math.max(options.minScale ?? 0.72, Math.min(1, options.maxWidth / label.width));
+            label.scale.set(scale);
+        }
         label.alpha = options.alpha ?? 1;
         return label;
     }
@@ -135,6 +143,7 @@ export function createUiRenderer(PIXI, stage) {
             align: 'center',
             size: options.textSize ?? 22,
             color: hovered ? options.hoverTextColor ?? '#061018' : options.textColor ?? '#ffffff',
+            maxWidth: rect.width - 24,
         });
     }
 

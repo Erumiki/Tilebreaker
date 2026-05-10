@@ -78,6 +78,7 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
         size: options.textSize ?? 22,
         color: hovered ? options.hoverTextColor ?? '#fff2ca' : options.textColor ?? '#f7e7bd',
         weight: 700,
+        maxWidth: rect.width - 28,
     });
 }
 

@@ -1,3 +1,5 @@
+import { drawBorder } from '../render/chrome.js';
+
 const PORTRAIT_BREAKPOINT = 760;
 const PORTRAIT_ASPECT = 1.08;
 const MIN_TOUCH_SIZE = 44;
@@ -228,24 +230,22 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
         size: options.textSize ?? 22,
         color: '#fff2ca',
         weight: 700,
+        maxWidth: rect.width - 28,
     });
 }
 
-function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
-    ui.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: thickness }, color, alpha);
-    ui.drawRect({ x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color, alpha);
-    ui.drawRect({ x: rect.x, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-    ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-}
+function drawStatRow(ui, x, y, label, value, color = '#d8e7f2', options = {}) {
+    const size = options.size ?? 15;
 
-function drawStatRow(ui, x, y, label, value, color = '#d8e7f2') {
     ui.drawText(label, x, y, {
-        size: 15,
+        size,
         color: '#8fb1cb',
+        maxWidth: options.labelWidth ?? 108,
     });
-    ui.drawText(value, x + 118, y, {
-        size: 15,
+    ui.drawText(value, x + (options.valueOffset ?? 118), y, {
+        size,
         color,
+        maxWidth: options.valueWidth,
     });
 }
 
@@ -318,23 +318,28 @@ export function createBattleIntroScene({
             ui.drawRect(rect(0, 0, screen.width, screen.height), '#06101a', 0.38);
 
             if (layout.mode === 'portrait') {
+                ui.drawRect(layout.hud, '#06101a', 0.72);
                 drawImageOrRect(ui, artTextures, 'panel_dark', layout.hud, '#0f1d2b', 0.92, 'stretch');
                 ui.drawText(`Б${preview.battleNumber}/${preview.totalBattles}`, layout.hud.x + 10, layout.hud.y + 9, {
                     size: 13,
                     color: '#eef8ff',
+                    maxWidth: layout.hud.width * 0.22,
                 });
                 ui.drawText(`Игрок ${formatHearts(preview.playerHp)}`, layout.hud.x + layout.hud.width * 0.24, layout.hud.y + 8, {
                     size: 14,
                     color: '#c8f7dd',
+                    maxWidth: layout.hud.width * 0.42,
                 });
                 ui.drawText(`${preview.gold} зол`, layout.hud.x + layout.hud.width - 58, layout.hud.y + 8, {
                     size: 14,
                     color: '#f3d991',
+                    maxWidth: 54,
                 });
                 ui.drawText(preview.monsterName, layout.title.x + layout.title.width / 2, layout.title.y + 5, {
                     align: 'center',
                     size: 25,
                     color: '#f3fbff',
+                    maxWidth: layout.title.width - 20,
                 });
                 drawImageOrRect(ui, artTextures, preview.assetIds.portrait, layout.portrait, '#182838', 0.98);
                 drawBorder(ui, layout.portrait, '#486a87', 2, 0.9);
@@ -364,36 +369,51 @@ export function createBattleIntroScene({
                 ui.drawText(preview.monsterName, layout.details.x + 122, layout.details.y + 20, {
                     size: 28,
                     color: '#f3fbff',
+                    maxWidth: layout.details.width - 146,
                 });
                 ui.drawText(`${preview.battleName} · ${preview.danger}`, layout.details.x + 122, layout.details.y + 58, {
                     size: 17,
                     color: '#f3d991',
+                    maxWidth: layout.details.width - 146,
                 });
             } else {
                 ui.drawText(`${preview.battleName} · ${preview.danger}`, layout.details.x + 14, layout.details.y + 12, {
                     size: 17,
                     color: '#f3d991',
+                    maxWidth: layout.details.width - 28,
                 });
             }
 
             const statX = layout.details.x + (layout.mode === 'desktop' ? 24 : 14);
             const statY = layout.details.y + (layout.mode === 'desktop' ? 128 : 44);
-            drawStatRow(ui, statX, statY, 'Сердца', formatHearts(preview.enemyHp), '#ffd4d8');
-            drawStatRow(ui, statX, statY + 26, 'Ставка', `${preview.ante} сердца риска`, '#f3d991');
-            drawStatRow(ui, statX, statY + 52, 'Игрок', formatHearts(preview.playerHp), '#c8f7dd');
-            drawStatRow(ui, statX, statY + 78, 'Золото', String(preview.gold), '#f3d991');
+            const statGap = layout.mode === 'desktop' ? 26 : 22;
+            const statOptions = layout.mode === 'desktop'
+                ? {}
+                : {
+                    size: 14,
+                    valueOffset: 104,
+                    valueWidth: layout.details.width - 132,
+                };
+            drawStatRow(ui, statX, statY, 'Сердца', formatHearts(preview.enemyHp), '#ffd4d8', statOptions);
+            drawStatRow(ui, statX, statY + statGap, 'Ставка', `${preview.ante} сердца риска`, '#f3d991', statOptions);
+            drawStatRow(ui, statX, statY + statGap * 2, 'Игрок', formatHearts(preview.playerHp), '#c8f7dd', statOptions);
+            drawStatRow(
+                ui,
+                statX,
+                statY + statGap * 3,
+                'Золото',
+                layout.mode === 'portrait' ? `${preview.gold} · победа +${preview.reward}` : String(preview.gold),
+                '#f3d991',
+                statOptions,
+            );
 
-            const rewardY = layout.mode === 'desktop' ? layout.details.y + 260 : statY + 102;
-            if (layout.mode === 'portrait') {
-                ui.drawText(`Победа: +${preview.reward} золота`, statX, rewardY, {
-                    size: 12,
-                    color: '#9fb8ca',
-                });
-            } else {
+            if (layout.mode === 'desktop') {
+                const rewardY = layout.details.y + 260;
                 ui.drawText(preview.rewardPreview, statX, rewardY, {
                     size: 16,
                     color: '#9fb8ca',
                     lineHeight: 20,
+                    maxWidth: layout.details.width - 48,
                 });
             }
 

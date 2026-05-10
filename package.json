@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "preview": "vite preview --host 127.0.0.1",
-    "check": "node --check src/main.js && node --check src/core/config.js && node --check src/core/input.js && node --check src/core/renderer.js && node --check src/entities/cards.js && node --check src/entities/gameplayVariants.js && node --check src/entities/run.js && node --check src/entities/tileBattle.js && node --check src/render/ui.js && node --check src/scenes/mainmenu.js && node --check src/scenes/battleIntro.js && node --check src/scenes/battleLayout.js && node --check src/scenes/battle.js && node --check src/scenes/result.js && node --check src/scenes/upgrades.js",
+    "check": "node --check src/main.js && node --check src/core/config.js && node --check src/core/input.js && node --check src/core/renderer.js && node --check src/entities/cards.js && node --check src/entities/gameplayVariants.js && node --check src/entities/run.js && node --check src/entities/tileBattle.js && node --check src/render/chrome.js && node --check src/render/ui.js && node --check src/scenes/mainmenu.js && node --check src/scenes/battleIntro.js && node --check src/scenes/battleLayout.js && node --check src/scenes/battle.js && node --check src/scenes/result.js && node --check src/scenes/upgrades.js",
     "test:e2e": "playwright test"
   },
   "dependencies": {

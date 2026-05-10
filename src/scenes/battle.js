@@ -1,5 +1,11 @@
 import { BattleOutcome, getRunDeckStats } from '../entities/run.js';
 import { getGameplayVariant } from '../entities/gameplayVariants.js';
+import {
+    drawBorder,
+    drawCornerBrackets,
+    drawFramedPanel,
+    insetRect,
+} from '../render/chrome.js';
 import { createBattleLayout } from './battleLayout.js';
 import {
     advanceTileQueue,
@@ -179,42 +185,6 @@ function formatHeartDelta(value) {
     return hearts > 0 ? `-${formatHearts(hearts)}` : '0';
 }
 
-function insetRect(rect, amount) {
-    return {
-        x: rect.x + amount,
-        y: rect.y + amount,
-        width: rect.width - amount * 2,
-        height: rect.height - amount * 2,
-    };
-}
-
-function drawBorder(ui, rect, color, thickness = 2, alpha = 1) {
-    ui.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: thickness }, color, alpha);
-    ui.drawRect({ x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color, alpha);
-    ui.drawRect({ x: rect.x, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-    ui.drawRect({ x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color, alpha);
-}
-
-function drawCornerMarkers(ui, rect, color, options = {}) {
-    const thickness = options.thickness ?? Math.max(2, Math.floor(rect.width * 0.045));
-    const length = options.length ?? Math.max(10, Math.floor(rect.width * 0.24));
-    const alpha = options.alpha ?? 1;
-    const inset = options.inset ?? Math.max(2, Math.floor(rect.width * 0.06));
-    const left = rect.x + inset;
-    const right = rect.x + rect.width - inset;
-    const top = rect.y + inset;
-    const bottom = rect.y + rect.height - inset;
-
-    ui.drawRect({ x: left, y: top, width: length, height: thickness }, color, alpha);
-    ui.drawRect({ x: left, y: top, width: thickness, height: length }, color, alpha);
-    ui.drawRect({ x: right - length, y: top, width: length, height: thickness }, color, alpha);
-    ui.drawRect({ x: right - thickness, y: top, width: thickness, height: length }, color, alpha);
-    ui.drawRect({ x: left, y: bottom - thickness, width: length, height: thickness }, color, alpha);
-    ui.drawRect({ x: left, y: bottom - length, width: thickness, height: length }, color, alpha);
-    ui.drawRect({ x: right - length, y: bottom - thickness, width: length, height: thickness }, color, alpha);
-    ui.drawRect({ x: right - thickness, y: bottom - length, width: thickness, height: length }, color, alpha);
-}
-
 function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
     const color = valid ? '#d6a05c' : '#ff7b83';
     const fill = valid ? '#d6a05c' : '#ff4f5f';
@@ -232,7 +202,7 @@ function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
     });
 
     if (!drewOverlay) {
-        drawCornerMarkers(ui, rect, color, {
+        drawCornerBrackets(ui, rect, color, {
             alpha: valid ? hovered ? 0.78 : 0.28 : hovered ? 1 : 0.72,
             thickness: valid
                 ? hovered ? Math.max(2, Math.floor(rect.width * 0.04)) : Math.max(1, Math.floor(rect.width * 0.025))
@@ -437,6 +407,7 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
         size: options.textSize ?? 20,
         color: options.textColor ?? '#fff2ca',
         weight: 700,
+        maxWidth: rect.width - 34,
     });
 }
 
@@ -556,25 +527,33 @@ function drawFieldResources(ui, artTextures, rect, resources, occupied) {
 function drawAttackRow(ui, rect, color, attack, result, settings) {
     const handSubmitEconomy = usesHandSubmitEconomy(settings);
     const compact = rect.width < 270;
+    const tight = rect.height < 62;
+    const titleY = rect.y + (tight ? 7 : 9);
+    const detailY = rect.y + (tight ? 28 : 29);
+    const outcomeY = rect.y + (tight ? 44 : 49);
+    const promptY = rect.y + (tight ? 32 : 34);
 
     ui.drawRect(rect, '#132334', 0.96);
     ui.drawRect({ x: rect.x, y: rect.y, width: 6, height: rect.height }, getColorHex(color, settings), 1);
-    ui.drawText(getColorLabel(color, settings), rect.x + 18, rect.y + 9, {
+    ui.drawText(getColorLabel(color, settings), rect.x + 18, titleY, {
         size: 16,
         color: '#ecf6ff',
+        maxWidth: rect.width * 0.45,
     });
-    ui.drawText(handSubmitEconomy ? 'Захват' : `Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - (compact ? 92 : 124), rect.y + 9, {
+    ui.drawText(handSubmitEconomy ? 'Захват' : `Атака ${formatHearts(attack[color] ?? 0)}`, rect.x + rect.width - (compact ? 92 : 124), titleY, {
         size: 15,
         color: '#afc4d7',
+        maxWidth: compact ? 84 : 116,
     });
 
     if (!result) {
         const prompt = compact
             ? handSubmitEconomy ? 'Замкни границу' : 'Ждет захвата'
             : handSubmitEconomy ? 'Замкни границу, чтобы ударить' : 'Ждет твоего захвата';
-        ui.drawText(prompt, rect.x + 18, rect.y + 34, {
+        ui.drawText(prompt, rect.x + 18, promptY, {
             size: 14,
             color: '#7f9aad',
+            maxWidth: rect.width - 34,
         });
         return;
     }
@@ -590,27 +569,22 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     const outcomeColor = handSubmitEconomy || colorResult.enemyDamage > 0 ? '#c9ffd9' : '#ffd0d7';
 
     const multiplier = result.score.zones.find((zone) => zone.color === color)?.multiplier ?? 1;
-    ui.drawText(`Площадь ${areaByColor[color]}  |  Удар ${formatHearts(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, rect.y + 29, {
+    ui.drawText(`Площадь ${areaByColor[color]}  |  Удар ${formatHearts(colorResult.closedDamage)}  |  x${multiplier}`, rect.x + 18, detailY, {
         size: 14,
         color: '#d8e7f2',
+        maxWidth: rect.width - 34,
     });
-    ui.drawText(outcomeLabel, rect.x + 18, rect.y + 49, {
+    ui.drawText(outcomeLabel, rect.x + 18, outcomeY, {
         size: 14,
         color: outcomeColor,
+        maxWidth: rect.width - 34,
     });
 }
 
 function drawBattlePanelSurface(ui, rect, isUrgent = false) {
-    const accent = isUrgent ? '#d78486' : '#d6a25c';
-    ui.drawRect(rect, '#050911', 0.84);
-    ui.drawRect(insetRect(rect, 10), '#0b121d', 0.56);
-    drawBorder(ui, rect, '#1c130f', 4, 0.9);
-    drawBorder(ui, insetRect(rect, 7), accent, 2, isUrgent ? 0.54 : 0.48);
-    drawCornerMarkers(ui, rect, accent, {
-        inset: 7,
-        length: 28,
-        thickness: 4,
-        alpha: isUrgent ? 0.72 : 0.62,
+    drawFramedPanel(ui, rect, {
+        urgent: isUrgent,
+        accent: isUrgent ? '#d78486' : '#d6a25c',
     });
 }
 
@@ -850,9 +824,20 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
     const monsterIconSize = compact ? 48 : 54;
     const monsterIconId = getBattleAssetId('monster_icon', battle);
     const headerTextX = panel.x + 18 + monsterIconSize + 12;
-    const lowerBlockY = panel.y + Math.min(400, Math.max(346, panel.height - 56));
-    const submitBlockY = panel.y + Math.min(444, Math.max(350, panel.height - 52));
-    const logBlockY = Math.min(panel.y + panel.height - 48, submitBlockY + 23);
+    const sectionTitleY = panel.y + 176;
+    const attackRowHeight = visibleColors.length >= 3 ? 52 : 58;
+    const attackRowStep = attackRowHeight + 6;
+    const attackRowsY = panel.y + 198;
+    const attackRowsBottom = attackRowsY
+        + Math.max(0, visibleColors.length - 1) * attackRowStep
+        + attackRowHeight;
+    const lowerBlockY = attackRowsBottom + 14;
+    const summaryLineGap = 20;
+    const submitBlockY = handSubmitEconomy
+        ? Math.min(panel.y + panel.height - 44, state.lastResult ? lowerBlockY + 44 : attackRowsBottom + 18)
+        : panel.y + panel.height - 44;
+    const logBlockY = submitBlockY + 22;
+    const textWidth = panel.width - 36;
 
     ui.drawRect({
         x: panel.x + 18,
@@ -875,10 +860,12 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
     ui.drawText(getMonsterName(battle), headerTextX, panel.y + 18, {
         size: compact ? 20 : 24,
         color: '#ffffff',
+        maxWidth: panel.x + panel.width - headerTextX - 18,
     });
     ui.drawText(`Раунд ${state.round} · ${variant.shortLabel}`, headerTextX, panel.y + 52, {
         size: compact ? 16 : 17,
         color: '#9fb8ca',
+        maxWidth: panel.x + panel.width - headerTextX - 18,
     });
     drawIconText(ui, artTextures, 'icon_heart_full', panel.x + 18, panel.y + 88, 21, `Игрок ${state.playerHp}`, {
         fallback: '♥',
@@ -916,18 +903,21 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ui.drawText(`Queue ${state.queuePlayedThisRound} / ${settings.handSize}`, panel.x + panel.width - 112, panel.y + 52, {
             size: 15,
             color: '#f6f0a8',
+            maxWidth: 96,
         });
     }
     if (isPlacementPayoffVariant(settings)) {
         ui.drawText(`Focus ${state.placementFocus ?? 0}/${getPlacementFocusMax(settings)}`, panel.x + panel.width - 112, panel.y + 166, {
             size: 15,
             color: '#f3d991',
+            maxWidth: 96,
         });
     }
     if (isOneColorChainVariant(settings)) {
         ui.drawText(`Chain x${state.chainMeter ?? 0}/${getOneColorChainMax(settings)}`, panel.x + panel.width - 118, panel.y + 166, {
             size: 15,
             color: '#f3d991',
+            maxWidth: 104,
         });
     }
     if (isConnectTargetsVariant(settings) && state.connectTargets) {
@@ -937,6 +927,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ui.drawText(targetStatus, panel.x + panel.width - 128, panel.y + 166, {
             size: 15,
             color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
+            maxWidth: 112,
         });
     }
     if (isRoadModeVariant(settings) && state.connectTargets) {
@@ -946,22 +937,24 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ui.drawText(roadStatus, panel.x + panel.width - 128, panel.y + 166, {
             size: 15,
             color: state.connectTargets.connected ? '#c9ffd9' : '#f3d991',
+            maxWidth: 112,
         });
     }
 
     ui.drawText(handSubmitEconomy
         ? state.lastResult ? 'Последний захват' : 'Цель хода'
-        : state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, panel.y + 190, {
+        : state.lastResult ? 'Итог раунда' : 'Атаки врага', panel.x + 18, sectionTitleY, {
         size: 16,
         color: '#8fb1cb',
+        maxWidth: textWidth,
     });
 
     visibleColors.forEach((color, index) => {
         drawAttackRow(ui, {
             x: panel.x + 16,
-            y: panel.y + 212 + index * 68,
+            y: attackRowsY + index * attackRowStep,
             width: panel.width - 32,
-            height: 62,
+            height: attackRowHeight,
         }, color, attack, state.lastResult, settings);
     });
 
@@ -981,18 +974,21 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ui.drawText(summary, panel.x + 18, lowerBlockY, {
             size: 15,
             color: '#d8e7f2',
+            maxWidth: textWidth,
         });
         ui.drawText(handSubmitEconomy
             ? `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку 0`
-            : `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, lowerBlockY + 22, {
+            : `Монстру ${formatHeartDelta(state.lastResult.enemyDamage)}  |  Игроку ${formatHeartDelta(state.lastResult.playerDamage)}`, panel.x + 18, lowerBlockY + summaryLineGap, {
             size: 15,
             color: state.lastResult.playerDamage > 0 ? '#ffd0d7' : '#c9ffd9',
+            maxWidth: textWidth,
         });
         if (!handSubmitEconomy && !state.outcome && (state.lastResult.newPickDamage?.totalDamage ?? 0) > 0) {
             const pickDamage = state.lastResult.newPickDamage;
-            ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, lowerBlockY + 44, {
+            ui.drawText(`Новый пик ${formatHeartDelta(pickDamage.totalDamage)}: база ${formatHearts(pickDamage.baseDamage)}, невыставлено ${pickDamage.unplayedTiles}`, panel.x + 18, lowerBlockY + summaryLineGap * 2, {
                 size: 15,
                 color: pickDamage.totalDamage > 0 ? '#ffd0d7' : '#c9ffd9',
+                maxWidth: textWidth,
             });
         }
     }
@@ -1002,6 +998,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: карт ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}`, panel.x + 18, submitBlockY, {
             size: 15,
             color: submitCost.canPay ? '#ffd0d7' : '#ff8b9c',
+            maxWidth: textWidth,
         });
 
         const maxLogRows = Math.max(0, Math.floor((panel.y + panel.height - logBlockY - 14) / 18));
@@ -1010,6 +1007,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
                 ui.drawText(entry, panel.x + 18, logBlockY + index * 18, {
                     size: 13,
                     color: '#9fb8ca',
+                    maxWidth: textWidth,
                 });
             });
         }
@@ -1022,43 +1020,35 @@ function getCompactBattleLine(battle, state, settings) {
     return `${getMonsterName(battle)} · Раунд ${state.round} · ${variant.shortLabel}`;
 }
 
+function drawPortraitBattleHud(ui, hud, run, state) {
+    ui.drawRect(hud, '#06101a', 0.9);
+    drawBorder(ui, hud, '#d6a25c', 1, 0.42);
+    ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
+        size: 14,
+        color: '#ffffff',
+        maxWidth: hud.width * 0.18,
+    });
+    ui.drawText(`Игрок ${state.playerHp}`, hud.x + hud.width * 0.23, hud.y + 9, {
+        size: 14,
+        color: '#c8f7dd',
+        maxWidth: hud.width * 0.24,
+    });
+    ui.drawText(`Монстр ${state.enemyHp}`, hud.x + hud.width * 0.50, hud.y + 9, {
+        size: 14,
+        color: '#ffd4d8',
+        maxWidth: hud.width * 0.26,
+    });
+    ui.drawText(`${run.gold ?? 0} зол`, hud.x + hud.width - 64, hud.y + 9, {
+        size: 14,
+        color: '#f3d991',
+        maxWidth: 58,
+    });
+}
+
 function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures) {
     if (layout.mode === 'portrait') {
         const hud = layout.hud;
         const banner = layout.monsterBanner;
-
-        if (!drawArtImage(ui, artTextures, 'panel_dark', hud, { alpha: 0.92 })) {
-            ui.drawRect(hud, '#0f1d2b', 0.96);
-            drawBorder(ui, hud, '#28445c', 1, 0.85);
-        }
-        ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
-            size: 13,
-            color: '#eef8ff',
-        });
-        drawIconText(ui, artTextures, 'icon_heart_full', hud.x + hud.width * 0.24, hud.y + 8, 18, state.playerHp, {
-            fallback: '♥',
-            textSize: 14,
-            color: '#c8f7dd',
-        });
-        drawIconText(
-            ui,
-            artTextures,
-            getBattleAssetId('monster_icon', battle),
-            hud.x + hud.width * 0.52,
-            hud.y + 7,
-            20,
-            state.enemyHp,
-            {
-                fallback: 'M',
-                textSize: 14,
-                color: '#ffd4d8',
-            },
-        );
-        drawIconText(ui, artTextures, 'icon_gold', hud.x + hud.width - 62, hud.y + 8, 18, run.gold ?? 0, {
-            fallback: 'G',
-            textSize: 14,
-            color: '#f3d991',
-        });
 
         const backdropId = getBattleAssetId('level_backdrop', battle);
         if (drawArtImage(ui, artTextures, backdropId, banner, { alpha: 0.94, fit: 'cover' })) {
@@ -1088,6 +1078,7 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
             size: 13,
             color: '#d7c59e',
         });
+        drawPortraitBattleHud(ui, hud, run, state);
         return;
     }
 
