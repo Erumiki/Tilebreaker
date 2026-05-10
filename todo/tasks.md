@@ -214,6 +214,100 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
+### [2026-05-10] Itch Mobile Hotfix: battle safe area and submit-hand clarity
+
+**Idea:** resolve the first itch-hosted mobile feedback before any stretch work: the battle screen still has field/chrome elements that read as spilling downward or out of the intended mobile area, the `Сдать руку` button contains unclear image fragments, and touch placement would benefit from a slightly larger board with slightly smaller selectable cards.
+
+**Why:** the uploaded itch build is now the player-facing surface, and mobile Safari/Telegram/itch chrome is harsher than the previous local portrait smoke viewports. If the board, hand, log or submit action looks clipped or visually ambiguous on a phone, first players will read it as broken even if the underlying loop works.
+
+**Source feedback 2026-05-10:**
+
+- "какие-то поля все равно вылезают вниз" on an itch-hosted mobile screenshot;
+- "непонятные картинки в сдаче руки" on the red `Сдать руку (-♥♥)` button area.
+- "давай чуть уменьшим выбираемые карточки и чуть увеличим поле, что бы удобнее ставились плитки."
+
+**MVP:**
+
+- reproduce the issue from the itch-hosted page or a matching mobile viewport with browser chrome pressure, including a short-height case around `390x664`/`390x700` and `360x640`;
+- inspect portrait sizing in `src/scenes/battleLayout.js`, especially minimum board sizing, vertical gaps and the accumulated height of board, feedback/log, hand and primary button;
+- tune the portrait balance so the active board/drop zone grows slightly and selectable hand cards shrink only enough to create touch room;
+- verify whether `src/core/renderer.js` / `index.html` need a safer mobile viewport height strategy for iOS Safari/itch iframe behavior;
+- remove or redesign the unclear left-side image treatment on `Сдать руку` so the button reads as one control with one explicit icon at most (`icon_submit` or `icon_lock`);
+- reserve button label space around any left icon so the submit text and heart cost never visually collide with the icon/chrome;
+- keep the fix focused on layout/readability; do not solve it by shrinking the whole UI or hand cards into unreadable/tiny targets, or by adding new submit-button effects;
+- capture updated itch/mobile proof screenshots after the fix and replace QA evidence only if it reflects the production build.
+
+**Acceptance:** on the itch-hosted or production-preview mobile battle screen, the board, feedback/log, hold slot, hand cards and `Сдать руку` button stay inside the visible viewport without overlap or cut-off; the board is measurably larger than the current portrait baseline while hand/hold cards remain readable and at least comfortable tap targets; there is no empty/decorative left field zone that reads as a broken layout; the submit button has no stray decorative image fragment and its text/cost/icon are readable as one action; portrait smoke coverage includes at least one shorter Safari-like viewport and checks key battle UI rects for overflow/overlap.
+
+**Parallelization:** safe as a release-polish lane. Code owns layout/viewport/debug assertions; art owns the submit-button/icon read. Neither lane should change rules, prices, deck composition or itch page copy.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-10] Itch Runtime Polish: fullscreen, substrate and loading screen
+
+**Idea:** fix the remaining itch-facing runtime polish issues: itch fullscreen does not currently work as expected, the page/game needs a lightweight substrate so the background feels intentional, and boot needs a loading screen.
+
+**Why:** the first public page should not feel like a raw iframe around a canvas. Fullscreen is the intended play mode, a quiet substrate can make the empty surrounding space feel finished without inflating the bundle, and a visible loading state prevents a blank page during asset startup.
+
+**Source feedback 2026-05-10:**
+
+- "full screen кнопка в итче не работает";
+- "давай нарисуем подложку легкую (повторяющуюся? что бы не увеличивать сильно размер)";
+- "лоадинг скрин."
+
+**MVP:**
+
+- verify whether the fullscreen failure is itch project settings, browser/embed permissions or missing in-game/fullscreen affordance, and document the chosen fix;
+- prefer itch `Click to launch in fullscreen` settings if they solve it cleanly; add only minimal code-side fullscreen handling if a user gesture inside the game is required;
+- ensure entering/exiting fullscreen resizes the canvas cleanly and does not break mouse/touch input;
+- add a subtle repeating or procedural substrate behind the main scenes, using a tiny PNG/tile or code-generated pattern rather than a large full-screen raster;
+- keep the substrate quiet enough that board cells, hand cards, monster art, text and feedback remain higher priority;
+- add a lightweight loading screen that appears before Pixi/config/art readiness and transitions cleanly into the main menu;
+- make loading failure visible enough for QA instead of leaving a blank screen;
+- keep bundle-size growth minimal and keep art validation/update scripts aware of any new asset.
+
+**Acceptance:** the itch-hosted private page can launch fullscreen on supported desktop browsers or has a documented tested fallback; canvas sizing remains correct after fullscreen enter/exit; the loading screen is visible on a throttled or cold load before the main menu and disappears without layout flash; the new substrate tiles or renders cleanly on mobile and desktop, adds only a small asset/runtime footprint, and does not reduce gameplay readability.
+
+**Parallelization:** safe as a release-polish lane. The itch/settings check can happen separately from the code/art work, but code and art should agree on whether the substrate is manifest-backed PNG or procedural.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-10] English Release Localization Pass
+
+**Idea:** translate the whole player-facing game and release surface to English for the next itch build.
+
+**Why:** the current game UI, feedback, level text and itch copy are Russian-first. If the itch page targets a broader jam/public audience, mixed-language UI will make rules, buttons, shop decisions and bug reports harder to understand.
+
+**Source feedback 2026-05-10:** "перевод всей игры на английский."
+
+**MVP:**
+
+- inventory all player-facing Cyrillic strings in `src/`, `configs/`, tests, README/release copy and itch page text;
+- choose the fastest safe implementation path for the MVP: direct English replacement, or a tiny string helper only if it reduces risk without turning into a localization framework;
+- translate scene UI, battle feedback/logs, result/shop/intro copy, monster/level text, button labels, error/fallback strings and release instructions consistently;
+- keep core terms short and stable, for example hand submit, seal, hearts, gold, shop, hold, battle and run;
+- update smoke tests and layout expectations that currently search for Russian labels;
+- check portrait layout again after English text because longer labels can overflow compact buttons/cards;
+- update itch page copy and screenshots only after the in-game English build is accepted.
+
+**Acceptance:** `rg "[А-Яа-яЁё]" src configs tests README.md todo/itch-release-plan.md` leaves only explicitly allowed non-player-facing notes or archived Russian copy; all normal-path scenes are fully English in the production build; smoke tests pass with English expectations; portrait/mobile screenshots show no clipped or overlapping English labels; itch page copy matches the English game.
+
+**Parallelization:** risky to split across many files unless one lane owns the glossary. A single localization owner should make wording decisions; a separate verifier can run Cyrillic scans, smoke tests and portrait screenshots.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
 ### [2026-05-09] Stretch: rotate token design note
 
 **Idea:** evaluate a limited rotate token as a small control tool instead of adding free rotation to every tile.
