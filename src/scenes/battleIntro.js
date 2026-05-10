@@ -48,6 +48,16 @@ function getRewardPreview(battle) {
         : 'Награда после победы будет уточнена';
 }
 
+function getBattleBrief(battle) {
+    return {
+        battle_01: 'Небольшой прорыв: первая закрытая печать решит бой.',
+        battle_02: 'Кометная пасть рвет незакрытые контуры.',
+        battle_03: 'Гончая давит темпом: золото поля стоит запечатать.',
+        battle_04: 'Гигант переживает слабые печати, ищи крупный контур.',
+        battle_05: 'Финальная брешь: каждое сердце - цена новой руки.',
+    }[battle.id] ?? 'Закрывай печати, пока хватает сердец.';
+}
+
 function getAssetId(prefix, battle) {
     return `${prefix}_${battle.id}`;
 }
@@ -259,6 +269,7 @@ function createPreview(battle, run) {
         danger: getBattleDanger(battle),
         reward: battle.reward ?? 0,
         rewardPreview: getRewardPreview(battle),
+        brief: getBattleBrief(battle),
         playerHp: run.playerHp,
         gold: run.gold ?? 0,
         assetIds: {
@@ -373,16 +384,26 @@ export function createBattleIntroScene({
                     color: '#f3d991',
                     maxWidth: layout.details.width - 146,
                 });
+                ui.drawText(preview.brief, layout.details.x + 122, layout.details.y + 88, {
+                    size: 15,
+                    color: '#bfd2df',
+                    maxWidth: layout.details.width - 146,
+                });
             } else {
                 ui.drawText(`${preview.battleName} · ${preview.danger}`, layout.details.x + 14, layout.details.y + 12, {
                     size: 17,
                     color: '#f3d991',
                     maxWidth: layout.details.width - 28,
                 });
+                ui.drawText(preview.brief, layout.details.x + 14, layout.details.y + 34, {
+                    size: 12,
+                    color: '#bfd2df',
+                    maxWidth: layout.details.width - 28,
+                });
             }
 
             const statX = layout.details.x + (layout.mode === 'desktop' ? 24 : 14);
-            const statY = layout.details.y + (layout.mode === 'desktop' ? 128 : 44);
+            const statY = layout.details.y + (layout.mode === 'desktop' ? 128 : 58);
             const statGap = layout.mode === 'desktop' ? 26 : 22;
             const statOptions = layout.mode === 'desktop'
                 ? {}
@@ -433,6 +454,7 @@ export function createBattleIntroScene({
                     monsterName: preview.monsterName,
                     battleName: preview.battleName,
                     enemyHp: preview.enemyHp,
+                    brief: preview.brief,
                     assetIds: preview.assetIds,
                 },
                 danger: {

@@ -33,6 +33,7 @@ import {
     discardRoundHand,
     getHandSubmitCostPreview,
     getNewPickDamagePreview,
+    getTilePlacementFailure,
     holdSelectedTile,
     placeTile,
     resolveHandSubmitDefeatIfNeeded,
@@ -418,6 +419,38 @@ test('free cells without direct neighbors stay valid after the first tile', () =
 
     assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 5, 5, settings), true);
     assert.equal(canPlaceTile(board, tile('tile_blue_line_v'), 0, 0, settings), true);
+});
+
+test('placement failure explains no card, occupied cells, edge mismatch, and macro footprint', () => {
+    const board = emptyBoard();
+    board[2][2] = tile('tile_red_line_h');
+
+    assert.equal(
+        getTilePlacementFailure(board, null, 1, 1, settings).code,
+        'no_selected_card',
+    );
+    assert.equal(
+        getTilePlacementFailure(board, tile('tile_blue_line_v'), 2, 2, settings).code,
+        'occupied_cell',
+    );
+    assert.equal(
+        getTilePlacementFailure(board, tile('tile_blue_line_h'), 3, 2, settings).code,
+        'edge_mismatch',
+    );
+
+    const macroSettings = {
+        ...settings,
+        boardSize: 7,
+        specialTiles: stagedCatalogSpecialTiles,
+    };
+    const macroTiles = createTilesFromManifest(manifest, macroSettings);
+    const macroTile = macroTiles.find((tileDef) => tileDef.id === 'double_red_line_h');
+    const macroBoard = Array.from({ length: 7 }, () => Array(7).fill(null));
+
+    assert.equal(
+        getTilePlacementFailure(macroBoard, macroTile, 6, 1, macroSettings).code,
+        'outside_macro_footprint',
+    );
 });
 
 test('legacy starts on a 7x7 board with one universal red-blue center anchor', () => {
@@ -899,7 +932,7 @@ test('submitting a legacy hand pays hearts, redeals, resets strike and keeps hol
     };
     const run = {
         currentBattle: 1,
-        playerHp: 10,
+        playerHp: 12,
         gold: 0,
         drawPile: [
             'tile_red_line_v',
@@ -1046,7 +1079,7 @@ test('heart combat lets a minimal matching capture damage the monster', () => {
     };
     const state = {
         round: 1,
-        playerHp: 12,
+        playerHp: 10,
         enemyHp: 3,
         board: emptyBoard(),
         hand: [],
@@ -1141,22 +1174,28 @@ test('legacy placement scores closure immediately, pays gold, and skips monster 
     assert.equal(state.board.flat().filter(Boolean).length, 0);
 });
 
-test('field gold is picked up by placing on its cell exactly once', () => {
+test('field resources are picked up by placing on their cells exactly once', () => {
     const resourceSettings = {
         ...settings,
         gameplayVariant: 'legacy',
+        hearts: {
+            maxPlayerHp: 12,
+        },
     };
     const run = {
         gold: 2,
+        playerHp: 10,
+        maxPlayerHp: 12,
         colorMultipliers: { red: 1, blue: 1, green: 1 },
     };
     const state = {
         round: 1,
-        playerHp: 12,
+        playerHp: 10,
         enemyHp: 3,
         board: emptyBoard(),
         boardResources: [
             { id: 'gold_a', type: 'gold', x: 1, y: 1, amount: 2, consumed: false },
+            { id: 'heart_a', type: 'heart', x: 5, y: 5, amount: 4, consumed: false },
         ],
         hand: [tile('tile_red_line_h'), tile('tile_blue_line_h')],
         heldTile: null,
@@ -1183,6 +1222,14 @@ test('field gold is picked up by placing on its cell exactly once', () => {
 
     assert.equal(placeTile(state, resourceSettings, 5, 5, run), true);
     assert.equal(run.gold, 4);
+    assert.equal(state.playerHp, 12);
+    assert.equal(run.playerHp, 12);
+    assert.equal(state.boardResources[1].consumed, true);
+    assert.equal(state.boardResources[1].consumedBy, 'placement');
+    assert.equal(state.lastPlacementResourceResult.heartAmount, 4);
+    assert.equal(state.lastPlacementResourceResult.heartHeal, 2);
+    assert.equal(state.resourceEvents.at(-1).source, 'placement');
+    assert.equal(state.battleLog.at(-1), 'Heart picked up: +2 hearts.');
 });
 
 test('closed fields consume resource gold and heal hearts up to max', () => {
@@ -1270,6 +1317,10 @@ test('closed fields consume resource gold and heal hearts up to max', () => {
     assert.equal(state.resourceEvents.at(-1).heartHeal, 2);
     assert.equal(state.battleLog.some((entry) => entry === 'Field gold sealed: +2 gold.'), true);
     assert.equal(state.battleLog.some((entry) => entry === 'Heart sealed: +2 hearts.'), true);
+    assert.ok(
+        state.battleLog.findIndex((entry) => entry.startsWith('Closed red zone')) <
+        state.battleLog.findIndex((entry) => entry === 'Field gold sealed: +2 gold.'),
+    );
 });
 
 test('empty locked last-chance hand loses if the monster survived', () => {

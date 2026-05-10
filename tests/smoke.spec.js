@@ -244,6 +244,8 @@ async function buyAffordableShopOffers(page, maxBuys) {
     debug = await getShopDebug(page);
     expect(debug.shop.goldAfter).toBe(goldBefore - offer.cost);
     expect(debug.deck.deck).toBe(deckBefore + 1);
+    expect(debug.feedback).toContain('Куплено:');
+    expect(debug.uiState.boughtCount).toBeGreaterThanOrEqual(1);
     expect(debug.boughtCards.at(-1)).toEqual(expect.objectContaining({
       cardId: offer.cardId,
       cost: offer.cost,
@@ -268,6 +270,12 @@ async function continueFromShop(page, { maxBuys = 0 } = {}) {
   expect(shopDebug.offers.some((offer) => ['card_joker_line_v', 'card_double_line'].includes(offer.cardId))).toBe(false);
   expect(shopDebug.offers.every((offer) => offer.cardId.startsWith('card_'))).toBe(true);
   expect(shopDebug.offers.some((offer) => ['add_tile', 'remove_tile', 'boost_color'].includes(offer.type))).toBe(false);
+  expect(shopDebug.feedback).toEqual(expect.any(String));
+  expect(shopDebug.uiState).toEqual(expect.objectContaining({
+    canContinue: true,
+    boughtCount: expect.any(Number),
+    unaffordableCount: expect.any(Number),
+  }));
 
   if (maxBuys > 0) {
     await buyAffordableShopOffers(page, maxBuys);
@@ -536,6 +544,8 @@ async function submitLegacyHand(page) {
   expect(after.strikeCount).toBe(0);
   expect(after.strikeWindowOpen).toBe(false);
   expect(after.battleLog.some((entry) => entry.startsWith('Hand submitted'))).toBe(true);
+  expect(after.feedback).toContain('Рука сдана');
+  expect(after.eventBadges.map((badge) => badge.id)).toContain('submit');
 }
 
 async function playLegacyUntilBattleResult(page) {
@@ -574,6 +584,8 @@ async function playLegacyUntilBattleResult(page) {
       expect(debug.lastResult.enemyDamage).toBeGreaterThan(0);
       expect(debug.lastResult.goldEarned).toBeGreaterThan(0);
       expect(debug.gold).toBe(debug.lastResult.goldAfter);
+      expect(debug.feedback).toContain('Печать закрыта');
+      expect(debug.eventBadges.map((badge) => badge.id)).toEqual(expect.arrayContaining(['monster', 'gold']));
       sawDamage = true;
 
       if (debug.outcome) {
@@ -753,6 +765,18 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
     + (battleDebug.heldTile ? 1 : 0)
     + (battleDebug.queueReserve?.filter(Boolean).length ?? 0),
   ).toBe(run.deck.length);
+
+  await page.mouse.click(
+    battleDebug.layout.board.x + (3 + 0.5) * battleDebug.layout.cellSize,
+    battleDebug.layout.board.y + (3 + 0.5) * battleDebug.layout.cellSize,
+  );
+  battleDebug = await getBattleDebug(page);
+  expect(battleDebug.lastInvalidPlacement).toEqual(expect.objectContaining({
+    code: 'occupied_cell',
+    x: 3,
+    y: 3,
+  }));
+  expect(battleDebug.feedback).toContain('клетка уже занята');
 
   for (let battle = 1; battle <= 5; battle += 1) {
     await playUntilBattleResult(page);

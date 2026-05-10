@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(sourceDir, '..');
-const baseUrl = 'http://127.0.0.1:5173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand';
+const baseUrl = process.env.TILEBREAKER_SCREENSHOT_URL
+  ?? 'http://127.0.0.1:5173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand';
 
 function sleep(ms) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
@@ -270,6 +271,7 @@ await openRun(portraitBattle, { width: 390, height: 844 });
 menuDebug = await getMenuDebug(portraitBattle);
 await clickRect(portraitBattle, menuDebug.layout.startButton);
 introDebug = await getIntroDebug(portraitBattle);
+await screenshot(portraitBattle, 'qa_portrait_intro_390x844.png');
 await clickRect(portraitBattle, introDebug.buttonRect);
 await expectScene(portraitBattle, 'battle');
 await screenshot(portraitBattle, 'qa_portrait_battle_390x844.png');
@@ -282,6 +284,7 @@ introDebug = await getIntroDebug(portraitShop);
 await clickRect(portraitShop, introDebug.buttonRect);
 await expectScene(portraitShop, 'battle');
 await playUntilResult(portraitShop);
+await screenshot(portraitShop, 'qa_portrait_result_390x844.png');
 const portraitResult = await getResultDebug(portraitShop);
 await clickRect(portraitShop, portraitResult.layout.actionButton);
 await expectScene(portraitShop, 'shop');

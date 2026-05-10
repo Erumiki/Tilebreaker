@@ -139,7 +139,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Readability And Juice Pass: first-player feedback
+### ~~[2026-05-09] MVP Readability And Juice Pass: first-player feedback~~
 
 **Idea:** make the current loop understandable through moment-to-moment feedback, not a tutorial wall.
 
@@ -156,6 +156,8 @@ The single list of planned features, improvements, work order and statuses for T
 - capture desktop and portrait screenshots with a stable seed for battle, intro, shop and result after the pass.
 
 **Acceptance:** a new player can infer the loop from the UI feedback: select/place a card, close a contour, see monster hearts drop, understand gained gold/hearts/strike, decide whether to submit the hand and buy or skip shop cards.
+
+**Completed 2026-05-10:** added explicit invalid-placement reasons for no selected card, occupied cells, edge mismatches and macro-card footprint overflow; routed those reasons into battle feedback/log/debug. Tightened closure feedback with visible event badges for monster heart loss, gold, heart heal and strike, clearer closure summary text, ordered closure/resource/strike battle-log rows and direct placement pickup for field gold/heart resources. Made last-chance hands more urgent with lock-state logs, red feedback/chrome and clearer submit copy. Improved shop affordability/buy/continue feedback, intro battle-specific microcopy and screenshot capture coverage. Captured stable-seed desktop screenshots for intro, battle closure, result and shop, plus portrait screenshots for intro, battle, result and shop under `release/itch/art/`. Verified with `./scripts/npm.sh run check`, `./scripts/node.sh --test tests/tileBattle.logic.js`, full `./scripts/npm.sh run test:e2e`, and the screenshot capture script.
 
 **Priority:** must
 

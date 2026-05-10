@@ -195,7 +195,12 @@ function drawOfferCard(ui, {
         });
     }
 
-    const priceLabel = offer.bought ? 'Куплено' : `${offer.cost} золота`;
+    const shortage = Math.max(0, offer.cost - gold);
+    const priceLabel = offer.bought
+        ? 'Куплено'
+        : affordable
+            ? `${offer.cost} золота`
+            : `Не хватает ${shortage}`;
     ui.drawText(priceLabel, rect.x + rect.width / 2, rect.y + rect.height - (compact ? 31 : 43), {
         align: 'center',
         size: compact ? 13 : 16,
@@ -214,6 +219,31 @@ function drawOfferCard(ui, {
     if (hovered && affordable) {
         ui.drawRect(rect, '#f4d36f', 0.08);
     }
+}
+
+function getShopFeedback(result, run, shopState) {
+    if (!result) {
+        const boughtCount = shopState.boughtCards.length;
+
+        return boughtCount > 0
+            ? `Куплено карт: ${boughtCount}. Золото ${run.gold ?? 0}.`
+            : `Золото ${run.gold ?? 0}. Можно купить карту или идти дальше.`;
+    }
+
+    if (result.bought) {
+        return `Куплено: ${result.offer.name}. -${result.offer.cost} золота, карта ушла в сброс.`;
+    }
+
+    if (result.reason === 'not_enough_gold') {
+        const missing = Math.max(0, (result.offer?.cost ?? 0) - (run.gold ?? 0));
+        return `Не хватает золота для "${result.offer?.name ?? 'карты'}": нужно еще ${missing}.`;
+    }
+
+    if (result.reason === 'already_bought') {
+        return 'Эта карта уже куплена.';
+    }
+
+    return 'Эту карту сейчас купить нельзя.';
 }
 
 function getDeckDebug(run) {
@@ -238,6 +268,7 @@ export function createShopScene({
         name: 'shop',
         layout: null,
         lastPurchaseResult: null,
+        shopFeedback: null,
         update() {
             const click = input.consumeClick();
 
@@ -254,6 +285,7 @@ export function createShopScene({
 
             if (index >= 0) {
                 this.lastPurchaseResult = onBuy(shopState.offers[index]);
+                this.shopFeedback = getShopFeedback(this.lastPurchaseResult, run, shopState);
             }
         },
         render(app) {
@@ -293,6 +325,13 @@ export function createShopScene({
                 size: screen.width < 620 ? 13 : 17,
                 color: '#f3d991',
                 maxWidth: screen.width - 28,
+            });
+            const feedbackText = this.shopFeedback ?? getShopFeedback(null, run, shopState);
+            ui.drawText(feedbackText, screen.width / 2, screen.width < 620 ? 111 : screen.height * 0.315, {
+                align: 'center',
+                size: screen.width < 620 ? 12 : 14,
+                color: this.lastPurchaseResult?.bought ? '#c8f7dd' : this.lastPurchaseResult?.reason ? '#ffb4c0' : '#9fb8ca',
+                maxWidth: screen.width - 32,
             });
 
             shopState.offers.forEach((offer, index) => {
@@ -339,6 +378,12 @@ export function createShopScene({
                 })),
                 boughtCards: [...shopState.boughtCards],
                 lastPurchaseResult: this.lastPurchaseResult,
+                feedback: this.shopFeedback ?? getShopFeedback(null, run, shopState),
+                uiState: {
+                    canContinue: true,
+                    boughtCount: shopState.boughtCards.length,
+                    unaffordableCount: shopState.offers.filter((offer) => !offer.bought && (run.gold ?? 0) < offer.cost).length,
+                },
                 deck: getDeckDebug(run),
                 layout: this.layout,
             };

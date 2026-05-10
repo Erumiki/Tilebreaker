@@ -596,22 +596,33 @@ function getUnconsumedResourcesAt(state, x, y, type = null) {
     ));
 }
 
-function collectPlacementResources(state, run, x, y) {
-    const resources = getUnconsumedResourcesAt(state, x, y, 'gold');
-    const amount = resources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
+function collectPlacementResources(state, run, settings, x, y) {
+    const resources = getUnconsumedResourcesAt(state, x, y);
+    const goldResources = resources.filter((resource) => resource.type === 'gold');
+    const heartResources = resources.filter((resource) => resource.type === 'heart');
+    const amount = goldResources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
+    const heartAmount = heartResources.reduce((sum, resource) => sum + (resource.amount ?? 0), 0);
     const goldBefore = run?.gold ?? 0;
+    const playerHeartsBefore = state.playerHp ?? 0;
+    const maxPlayerHp = getMaxPlayerHp(settings, run);
+    const heartHeal = Math.max(0, Math.min(heartAmount, maxPlayerHp - playerHeartsBefore));
     const result = {
         source: 'placement',
-        type: 'gold',
+        type: resources.length === 1 ? resources[0].type : 'mixed',
         amount,
+        goldAmount: amount,
+        heartAmount,
+        heartHeal,
         resources: resources.map(describeResource),
         goldBefore,
         goldAfter: goldBefore + amount,
+        playerHeartsBefore,
+        playerHeartsAfter: playerHeartsBefore + heartHeal,
     };
 
     state.lastPlacementResourceResult = result;
 
-    if (amount <= 0) {
+    if (resources.length === 0) {
         return result;
     }
 
@@ -622,13 +633,48 @@ function collectPlacementResources(state, run, x, y) {
         result.goldAfter = run.gold;
     }
 
+    if (heartResources.length > 0) {
+        state.playerHp = playerHeartsBefore + heartHeal;
+        if (run) {
+            run.playerHp = state.playerHp;
+        }
+        result.playerHeartsAfter = state.playerHp;
+    }
+
     addResourceEvent(state, result);
-    addBattleLog(state, `Field gold picked up: +${amount} gold.`);
+
+    if (amount > 0) {
+        addBattleLog(state, `Field gold picked up: +${amount} gold.`);
+    }
+
+    if (heartResources.length > 0) {
+        addBattleLog(
+            state,
+            heartHeal > 0
+                ? `Heart picked up: +${heartHeal} hearts.`
+                : 'Heart picked up: already at max hearts.',
+        );
+    }
 
     return result;
 }
 
-function collectClosureResources(state, run, settings, score) {
+function addClosureResourceLogs(state, result) {
+    if ((result.goldAmount ?? 0) > 0) {
+        addBattleLog(state, `Field gold sealed: +${result.goldAmount} gold.`);
+    }
+
+    if ((result.heartAmount ?? 0) > 0) {
+        addBattleLog(
+            state,
+            (result.heartHeal ?? 0) > 0
+                ? `Heart sealed: +${result.heartHeal} hearts.`
+                : 'Heart sealed: already at max hearts.',
+        );
+    }
+}
+
+function collectClosureResources(state, run, settings, score, options = {}) {
     const scoredTileKeys = getScoredTileKeys({ score });
     const resources = (state.boardResources ?? []).filter((resource) => (
         !resource.consumed
@@ -677,17 +723,8 @@ function collectClosureResources(state, run, settings, score) {
 
     addResourceEvent(state, result);
 
-    if (goldAmount > 0) {
-        addBattleLog(state, `Field gold sealed: +${goldAmount} gold.`);
-    }
-
-    if (heartResources.length > 0) {
-        addBattleLog(
-            state,
-            heartHeal > 0
-                ? `Heart sealed: +${heartHeal} hearts.`
-                : 'Heart sealed: already at max hearts.',
-        );
+    if (options.log !== false) {
+        addClosureResourceLogs(state, result);
     }
 
     return result;
@@ -747,9 +784,17 @@ function updateHandSubmitLock(state, settings) {
         return;
     }
 
+    const wasLocked = state.handSubmitLocked === true;
     const preview = computeHandSubmitCostPreview(state, settings, { ignoreLock: true });
     state.handSubmitLocked = preview.canPay === false;
     state.lockedSubmitCost = state.handSubmitLocked ? preview.totalDamage : null;
+
+    if (state.handSubmitLocked && !wasLocked && Array.isArray(state.battleLog)) {
+        addBattleLog(
+            state,
+            `Last chance hand: cannot submit ${preview.totalDamage} hearts.`,
+        );
+    }
 }
 
 export function getNewPickDamagePreview(state, settings) {
@@ -2123,6 +2168,113 @@ export function canPlaceTile(board, tileDef, x, y, settings) {
     return true;
 }
 
+function hasMacroEdgeMismatch(board, placement, settings) {
+    for (const segment of placement.segments) {
+        for (const direction of DIRECTIONS) {
+            const nextX = segment.x + direction.dx;
+            const nextY = segment.y + direction.dy;
+
+            if (!isInsideBoard(settings.boardSize, nextX, nextY)) {
+                continue;
+            }
+
+            const internalNeighbor = placement.segmentByKey.get(boardKey(nextX, nextY));
+
+            if (internalNeighbor) {
+                if (!edgesMatch(segment.tileDef, internalNeighbor.tileDef, direction, settings)) {
+                    return true;
+                }
+                continue;
+            }
+
+            const neighbor = board[nextY][nextX];
+
+            if (neighbor && !edgesMatch(segment.tileDef, neighbor, direction, settings)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+export function getTilePlacementFailure(board, tileDef, x, y, settings) {
+    if (!tileDef) {
+        return {
+            code: 'no_selected_card',
+            message: 'Сначала выбери карту для постановки.',
+        };
+    }
+
+    if (!isInsideBoard(settings.boardSize, x, y)) {
+        return {
+            code: 'outside_board',
+            message: 'Нельзя поставить: клетка вне доски.',
+        };
+    }
+
+    const segments = getTilePlacementSegments(tileDef, x, y);
+    const segmentByKey = new Map();
+
+    for (const segment of segments) {
+        if (!segment.tileDef || !isInsideBoard(settings.boardSize, segment.x, segment.y)) {
+            return {
+                code: isMacroTile(tileDef) ? 'outside_macro_footprint' : 'outside_board',
+                message: isMacroTile(tileDef)
+                    ? 'Нельзя поставить: большая карта выходит за поле.'
+                    : 'Нельзя поставить: клетка вне доски.',
+            };
+        }
+
+        const keyValue = boardKey(segment.x, segment.y);
+
+        if (segmentByKey.has(keyValue)) {
+            return {
+                code: 'outside_macro_footprint',
+                message: 'Нельзя поставить: клетки большой карты пересекаются.',
+            };
+        }
+
+        if (board[segment.y][segment.x]) {
+            return {
+                code: 'occupied_cell',
+                message: 'Нельзя поставить: клетка уже занята.',
+            };
+        }
+
+        segmentByKey.set(keyValue, segment);
+    }
+
+    if (isMacroTile(tileDef)) {
+        const placement = {
+            segments,
+            segmentByKey,
+        };
+
+        if (hasMacroEdgeMismatch(board, placement, settings)) {
+            return {
+                code: 'edge_mismatch',
+                message: 'Нельзя поставить: края большой карты не совпадают.',
+            };
+        }
+
+        return null;
+    }
+
+    if (countPlacedTiles(board) === 0 || canPlaceAdjacentTile(board, tileDef, x, y, settings)) {
+        return null;
+    }
+
+    if (hasDirectNeighbor(board, x, y, settings)) {
+        return {
+            code: 'edge_mismatch',
+            message: 'Нельзя поставить: смежные края должны совпасть.',
+        };
+    }
+
+    return null;
+}
+
 function placeTileDefOnBoard(board, tileDef, x, y) {
     for (const segment of getTilePlacementSegments(tileDef, x, y)) {
         board[segment.y][segment.x] = segment.tileDef;
@@ -2153,7 +2305,7 @@ export function placeTile(state, settings, x, y, run = null) {
     state.lastPlacedTileColor = tileDef.color;
     state.lastPlacedTileId = tileDef.id;
     for (const segment of placementSegments) {
-        collectPlacementResources(state, run, segment.x, segment.y);
+        collectPlacementResources(state, run, settings, segment.x, segment.y);
     }
     const postPlacementScore = scoreTileBoard(state.board, settings);
     state.lastPlacementClosedZones = postPlacementScore.zones.length;
@@ -2441,7 +2593,9 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
         run.gold = (run.gold ?? 0) + baseGoldEarned;
     }
 
-    const closureResources = collectClosureResources(state, run, settings, score);
+    const closureResources = collectClosureResources(state, run, settings, score, {
+        log: false,
+    });
     const fieldGold = closureResources.goldAmount;
     const heartHeal = closureResources.heartHeal;
     const goldEarned = baseGoldEarned + fieldGold;
@@ -2502,6 +2656,8 @@ export function resolveImmediatePlacement(state, battle, settings, run = null) {
             `Closed ${entry.color} zone: -${entry.damage} monster hearts, +${colorClosureGold} gold.`,
         );
     }
+
+    addClosureResourceLogs(state, closureResources);
 
     if (strikeGold > 0) {
         addBattleLog(state, `Strike x${state.strikeCount}: +${strikeGold} gold.`);

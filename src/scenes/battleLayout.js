@@ -140,7 +140,7 @@ function createDesktopLayout(screen, settings) {
     return withMetadata({
         mode: 'desktop',
         boardCells: settings.boardSize,
-        hud: rect(28, 20, Math.min(620, screen.width - 56), 58),
+        hud: rect(16, 12, screen.width - 32, 70),
         monsterBanner: rect(sidePanel.x + 16, sidePanel.y + 16, sidePanel.width - 32, 72),
         board: rect(boardX, boardY, boardSize, boardSize),
         feedback: rect(boardX, handY - 38, boardSize, 26),
@@ -176,7 +176,7 @@ function createPortraitLayout(screen, settings) {
     const buttonHeight = 56;
     const buttonY = screen.height - margin - buttonHeight;
     const handY = buttonY - 10 - handHeight;
-    const hud = rect(margin, 8, availableWidth, 34);
+    const hud = rect(margin, 8, availableWidth, 44);
     const monsterBannerHeight = Math.max(68, Math.min(118, Math.round(screen.height * 0.13)));
     const monsterBanner = rect(margin, hud.y + hud.height + 6, availableWidth, monsterBannerHeight);
     const boardTop = monsterBanner.y + monsterBanner.height + 8;

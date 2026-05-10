@@ -17,6 +17,7 @@ import {
     createTilesFromManifest,
     discardRoundHand,
     getHandSubmitCostPreview,
+    getTilePlacementFailure,
     getRoundAttack,
     getConnectedCombatTileKeys,
     getShortestCombatPathKeys,
@@ -186,6 +187,21 @@ function formatHeartDelta(value) {
     return hearts > 0 ? `-${formatHearts(hearts)}` : '0';
 }
 
+function formatPositiveHeartDelta(value) {
+    const hearts = Math.max(0, Math.ceil(value || 0));
+
+    return hearts > 0 ? `+${formatHearts(hearts)}` : '+0';
+}
+
+function pushBattleLog(state, message) {
+    state.battleLog ??= [];
+    state.battleLog.push(message);
+
+    if (state.battleLog.length > 6) {
+        state.battleLog.splice(0, state.battleLog.length - 6);
+    }
+}
+
 function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
     const color = valid ? '#d6a05c' : '#ff7b83';
     const fill = valid ? '#d6a05c' : '#ff4f5f';
@@ -194,11 +210,11 @@ function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
 
     ui.drawRect(insetRect(rect, inset), fill, valid
         ? hovered ? 0.08 : 0.025
-        : hovered ? 0.18 : 0.08);
+        : hovered ? 0.22 : 0.14);
     const drewOverlay = drawArtImage(ui, artTextures, overlayId, insetRect(rect, Math.max(2, inset * 0.5)), {
         alpha: valid
             ? hovered ? 0.38 : 0.22
-            : hovered ? 0.94 : 0.55,
+            : hovered ? 0.98 : 0.68,
         fit: 'stretch',
         required: true,
     });
@@ -212,6 +228,16 @@ function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
             length: valid
                 ? hovered ? Math.max(10, Math.floor(rect.width * 0.24)) : Math.max(7, Math.floor(rect.width * 0.16))
                 : hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.22)),
+            inset,
+        });
+    }
+
+    if (!valid) {
+        drawBorder(ui, insetRect(rect, Math.max(2, Math.floor(rect.width * 0.045))), color, hovered ? 3 : 2, hovered ? 0.82 : 0.54);
+        drawCornerBrackets(ui, rect, color, {
+            alpha: hovered ? 0.95 : 0.62,
+            thickness: hovered ? Math.max(3, Math.floor(rect.width * 0.055)) : Math.max(2, Math.floor(rect.width * 0.04)),
+            length: hovered ? Math.max(12, Math.floor(rect.width * 0.32)) : Math.max(9, Math.floor(rect.width * 0.24)),
             inset,
         });
     }
@@ -380,6 +406,240 @@ function drawIconText(ui, artTextures, assetId, x, y, iconSize, text, options = 
         size: options.textSize ?? 15,
         color: options.color ?? '#ffffff',
         weight: options.weight ?? 600,
+        maxWidth: options.maxWidth,
+    });
+}
+
+function drawOrnatePanelFrame(ui, artTextures, rect, options = {}) {
+    const drewPanel = drawArtImage(ui, artTextures, 'panel_dark', rect, {
+        alpha: options.panelAlpha ?? 0.9,
+        fit: 'stretch',
+        required: true,
+    });
+
+    if (!drewPanel) {
+        ui.drawRect(rect, options.background ?? '#06101a', options.fallbackAlpha ?? 0.86);
+    }
+
+    const accent = options.accent ?? '#d6a25c';
+    drawBorder(ui, rect, '#1c130f', options.outerThickness ?? 3, 0.88);
+    drawBorder(ui, insetRect(rect, options.inset ?? 6), accent, options.innerThickness ?? 1, options.innerAlpha ?? 0.58);
+    drawCornerBrackets(ui, rect, accent, {
+        inset: options.bracketInset ?? 6,
+        length: options.bracketLength ?? 28,
+        thickness: options.bracketThickness ?? 3,
+        alpha: options.bracketAlpha ?? 0.7,
+    });
+}
+
+function drawDiamondProgress(ui, rect, current, total) {
+    const safeTotal = Math.max(1, total || 1);
+    const clampedCurrent = Math.max(0, Math.min(safeTotal, current || 0));
+    const gap = Math.min(24, rect.width / Math.max(1, safeTotal + 1));
+    const startX = rect.x + rect.width / 2 - ((safeTotal - 1) * gap) / 2;
+    const y = rect.y;
+
+    for (let index = 0; index < safeTotal; index += 1) {
+        ui.drawText('◆', startX + index * gap, y, {
+            align: 'center',
+            size: 13,
+            color: index < clampedCurrent ? '#f3d991' : '#604b32',
+            weight: 700,
+        });
+    }
+}
+
+function drawHudPips(ui, artTextures, {
+    assetId,
+    x,
+    y,
+    value,
+    maxPips = 4,
+    size = 18,
+    gap = 4,
+    color = '#fff2ca',
+    fallback = '♥',
+    text = null,
+}) {
+    const pipCount = Math.max(1, Math.min(maxPips, Math.ceil(value || 0)));
+
+    for (let index = 0; index < maxPips; index += 1) {
+        const active = index < pipCount;
+        const rect = {
+            x: x + index * (size + gap),
+            y,
+            width: size,
+            height: size,
+        };
+
+        if (!drawArtImage(ui, artTextures, assetId, rect, {
+            alpha: active ? 1 : 0.2,
+            required: true,
+        })) {
+            ui.drawText(fallback, rect.x + size / 2, rect.y + 1, {
+                align: 'center',
+                size,
+                color: active ? color : '#51473f',
+                weight: 700,
+            });
+        }
+    }
+
+    ui.drawText(text ?? `x${Math.max(0, Math.ceil(value || 0))}`, x + maxPips * (size + gap) + 3, y + 1, {
+        size: Math.max(12, size - 2),
+        color,
+        weight: 700,
+        maxWidth: 46,
+    });
+}
+
+function drawMonsterThreatBar(ui, rect, current, max) {
+    const safeMax = Math.max(1, max || current || 1);
+    const ratio = Math.max(0, Math.min(1, (current || 0) / safeMax));
+
+    ui.drawRect(rect, '#1d1422', 0.82);
+    drawBorder(ui, rect, '#604b32', 1, 0.62);
+    ui.drawRect({
+        x: rect.x + 2,
+        y: rect.y + 2,
+        width: Math.max(0, (rect.width - 4) * ratio),
+        height: rect.height - 4,
+    }, '#8f38d6', 0.86);
+    ui.drawRect({
+        x: rect.x + 2,
+        y: rect.y + 2,
+        width: Math.max(0, (rect.width - 4) * ratio),
+        height: Math.max(1, (rect.height - 4) * 0.36),
+    }, '#d57bff', 0.5);
+}
+
+function drawEventBadge(ui, artTextures, rect, assetId, label, options = {}) {
+    const iconSize = options.iconSize ?? 18;
+
+    ui.drawRect(rect, options.background ?? '#07121f', options.alpha ?? 0.78);
+    drawBorder(ui, rect, options.edgeColor ?? '#d6a25c', 1, options.edgeAlpha ?? 0.55);
+    drawIconText(ui, artTextures, assetId, rect.x + 7, rect.y + rect.height / 2 - iconSize / 2, iconSize, label, {
+        fallback: options.fallback,
+        fallbackColor: options.color,
+        textSize: options.textSize ?? 13,
+        color: options.color ?? '#f3d991',
+        weight: 700,
+        gap: 4,
+    });
+}
+
+function getLatestEventBadges(state) {
+    const badges = [];
+
+    if (state.lastResult?.lastClosureImmediate) {
+        badges.push({
+            id: 'monster',
+            assetId: 'icon_heart_lost',
+            label: formatHeartDelta(state.lastResult.enemyDamage ?? 0),
+            color: '#ffd4d8',
+            fallback: '♥',
+        });
+
+        if ((state.lastResult.goldEarned ?? 0) > 0) {
+            badges.push({
+                id: 'gold',
+                assetId: 'icon_gold',
+                label: `+${state.lastResult.goldEarned}`,
+                color: '#f3d991',
+                fallback: 'G',
+            });
+        }
+
+        if ((state.lastResult.heartHeal ?? 0) > 0) {
+            badges.push({
+                id: 'heart',
+                assetId: 'icon_heart_full',
+                label: formatPositiveHeartDelta(state.lastResult.heartHeal),
+                color: '#c8f7dd',
+                fallback: '♥',
+            });
+        }
+
+        if ((state.lastResult.strikeGold ?? 0) > 0) {
+            badges.push({
+                id: 'strike',
+                assetId: 'icon_strike',
+                label: `x${state.lastResult.strikeCount}`,
+                color: '#ffe7ad',
+                fallback: '*',
+            });
+        }
+
+        return badges;
+    }
+
+    const placement = state.lastPlacementResourceResult;
+    if (placement) {
+        if ((placement.goldAmount ?? placement.amount ?? 0) > 0) {
+            badges.push({
+                id: 'fieldGold',
+                assetId: 'icon_gold',
+                label: `+${placement.goldAmount ?? placement.amount}`,
+                color: '#f3d991',
+                fallback: 'G',
+            });
+        }
+
+        if ((placement.heartHeal ?? 0) > 0) {
+            badges.push({
+                id: 'fieldHeart',
+                assetId: 'icon_heart_full',
+                label: formatPositiveHeartDelta(placement.heartHeal),
+                color: '#c8f7dd',
+                fallback: '♥',
+            });
+        }
+    }
+
+    if (state.lastSubmitResult?.submitted) {
+        badges.push({
+            id: 'submit',
+            assetId: 'icon_heart_lost',
+            label: formatHeartDelta(state.lastSubmitResult.totalDamage ?? 0),
+            color: '#ffd4d8',
+            fallback: '♥',
+        });
+    }
+
+    return badges;
+}
+
+function drawBattleEventBadges(ui, artTextures, layout, state) {
+    const badges = getLatestEventBadges(state).slice(0, layout.mode === 'portrait' ? 4 : 5);
+
+    if (badges.length === 0) {
+        return;
+    }
+
+    const gap = 6;
+    const badgeHeight = layout.mode === 'portrait' ? 26 : 30;
+    const badgeWidth = layout.mode === 'portrait' ? 72 : 82;
+    const totalWidth = badges.length * badgeWidth + (badges.length - 1) * gap;
+    const startX = Math.max(
+        layout.board.x + 6,
+        layout.board.x + layout.board.width - totalWidth - 6,
+    );
+    const y = layout.board.y + 7;
+
+    badges.forEach((badge, index) => {
+        drawEventBadge(ui, artTextures, {
+            x: startX + index * (badgeWidth + gap),
+            y,
+            width: badgeWidth,
+            height: badgeHeight,
+        }, badge.assetId, badge.label, {
+            iconSize: layout.mode === 'portrait' ? 17 : 19,
+            textSize: layout.mode === 'portrait' ? 12 : 13,
+            color: badge.color,
+            fallback: badge.fallback,
+            edgeColor: badge.id === 'submit' ? '#d78486' : '#d6a25c',
+            background: badge.id === 'submit' ? '#21131b' : '#07121f',
+        });
     });
 }
 
@@ -635,6 +895,9 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
             const isEmpty = !state.board[y][x];
             const isValid = canShowPlacementHints
                 && canPlaceTile(state.board, selectedTile, x, y, settings);
+            const isUnavailable = canShowPlacementHints
+                && isEmpty
+                && !isValid;
             const isInvalidHovered = canShowPlacementHints
                 && isHovered
                 && !isValid;
@@ -648,13 +911,14 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
             const cellAssetId = isHovered
                 ? isInvalidHovered ? 'board_cell_invalid' : 'board_cell_hover'
                 : isValid ? 'board_cell_valid'
+                : isUnavailable ? 'board_cell_invalid'
                 : 'board_cell_empty';
             if (!drawArtImage(ui, artTextures, cellAssetId, rect, {
-                alpha: 1,
+                alpha: isUnavailable && !isHovered ? 0.82 : 1,
                 required: true,
             })) {
                 ui.drawRect(rect, fill, 1);
-                drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
+                drawBorder(ui, rect, isUnavailable ? '#a84c5c' : border, isHovered && isValid ? 3 : 1, isUnavailable ? 0.95 : isValid ? 1 : 0.7);
             }
             const resources = getBoardResourcesAt(state, x, y);
             if (isEmpty && resources.length > 0) {
@@ -698,8 +962,7 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
             const isEmpty = !state.board[y][x];
             const isValid = canShowPlacementHints
                 && canPlaceTile(state.board, selectedTile, x, y, settings);
-            const isInvalidHovered = canShowPlacementHints
-                && isHovered
+            const isUnavailable = canShowPlacementHints
                 && isEmpty
                 && !isValid;
 
@@ -709,10 +972,10 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                     hovered: isHovered,
                     artTextures,
                 });
-            } else if (isInvalidHovered) {
+            } else if (isUnavailable) {
                 drawPlacementHint(ui, rect, {
                     valid: false,
-                    hovered: true,
+                    hovered: isHovered,
                     artTextures,
                 });
             }
@@ -856,11 +1119,19 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
     const variant = getGameplayVariant(settings);
     const visibleColors = getVisibleCombatColors(settings);
     const handSubmitEconomy = usesHandSubmitEconomy(settings);
+    const submitCostPreview = handSubmitEconomy
+        ? getHandSubmitCostPreview(state, settings)
+        : null;
     const totalCaptureArea = state.lastResult
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
 
-    drawBattlePanelSurface(ui, artTextures, panel, state.outcome === 'defeat');
+    drawBattlePanelSurface(
+        ui,
+        artTextures,
+        panel,
+        state.outcome === 'defeat' || (submitCostPreview?.canPay === false),
+    );
     const compact = panel.width < 330;
     const monsterIconSize = compact ? 48 : 54;
     const monsterIconId = getBattleAssetId('monster_icon', battle);
@@ -1037,8 +1308,9 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
     }
 
     if (handSubmitEconomy) {
-        const submitCost = getHandSubmitCostPreview(state, settings);
-        ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: карт ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}`, panel.x + 18, submitBlockY, {
+        const submitCost = submitCostPreview;
+        const lockText = submitCost.canPay ? '' : ' · последний шанс';
+        ui.drawText(`Сдать руку ${formatHeartDelta(submitCost.totalDamage)}: карт ${submitCost.unplayedHandCards}, сдач ${submitCost.handSubmitsThisBattle}${lockText}`, panel.x + 18, submitBlockY, {
             size: 15,
             color: submitCost.canPay ? '#ffd0d7' : '#ff8b9c',
             maxWidth: textWidth,
@@ -1064,33 +1336,46 @@ function getCompactBattleLine(battle, state, settings) {
 }
 
 function drawPortraitBattleHud(ui, artTextures, hud, run, state) {
-    if (!drawArtImage(ui, artTextures, 'panel_dark', hud, {
-        alpha: 0.92,
-        fit: 'stretch',
-        required: true,
-    })) {
-        ui.drawRect(hud, '#06101a', 0.9);
-    }
-    drawBorder(ui, hud, '#d6a25c', 1, 0.42);
-    ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
-        size: 14,
-        color: '#ffffff',
-        maxWidth: hud.width * 0.18,
+    drawOrnatePanelFrame(ui, artTextures, hud, {
+        panelAlpha: 0.94,
+        inset: 5,
+        bracketLength: 26,
+        bracketThickness: 3,
+        innerAlpha: 0.52,
     });
-    ui.drawText(`Игрок ${state.playerHp}`, hud.x + hud.width * 0.23, hud.y + 9, {
-        size: 14,
-        color: '#c8f7dd',
-        maxWidth: hud.width * 0.24,
-    });
-    ui.drawText(`Монстр ${state.enemyHp}`, hud.x + hud.width * 0.50, hud.y + 9, {
-        size: 14,
-        color: '#ffd4d8',
-        maxWidth: hud.width * 0.26,
-    });
-    ui.drawText(`${run.gold ?? 0} зол`, hud.x + hud.width - 64, hud.y + 9, {
-        size: 14,
-        color: '#f3d991',
+
+    ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 13, hud.y + 11, {
+        size: 17,
+        color: '#fff2ca',
+        weight: 800,
         maxWidth: 58,
+    });
+
+    drawHudPips(ui, artTextures, {
+        assetId: 'icon_heart_full',
+        x: hud.x + hud.width * 0.24,
+        y: hud.y + 11,
+        value: state.playerHp,
+        maxPips: 2,
+        size: 18,
+        color: '#c8f7dd',
+        fallback: '♥',
+    });
+    drawHudPips(ui, artTextures, {
+        assetId: 'icon_heart_lost',
+        x: hud.x + hud.width * 0.51,
+        y: hud.y + 11,
+        value: state.enemyHp,
+        maxPips: 2,
+        size: 18,
+        color: '#ffd4d8',
+        fallback: '♥',
+    });
+    drawIconText(ui, artTextures, 'icon_gold', hud.x + hud.width - 61, hud.y + 11, 18, String(run.gold ?? 0), {
+        fallback: 'G',
+        textSize: 16,
+        color: '#f3d991',
+        weight: 800,
     });
 }
 
@@ -1100,56 +1385,199 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
         const banner = layout.monsterBanner;
 
         const backdropId = getBattleAssetId('level_backdrop', battle);
+        const portraitId = getBattleAssetId('monster_portrait', battle);
         if (drawArtImage(ui, artTextures, backdropId, banner, {
             alpha: 0.94,
             fit: 'cover',
             required: true,
         })) {
-            ui.drawRect(banner, '#03070c', 0.32);
+            ui.drawRect(banner, '#03070c', 0.18);
         } else if (!drawArtImage(ui, artTextures, 'panel_dark', banner, {
             alpha: 0.9,
             fit: 'stretch',
             required: true,
         })) {
             ui.drawRect(banner, '#132334', 0.94);
-            drawBorder(ui, banner, '#31566b', 1, 0.85);
         }
+
+        drawArtImage(ui, artTextures, portraitId, {
+            x: banner.x + banner.width * 0.46,
+            y: banner.y - banner.height * 0.25,
+            width: banner.width * 0.6,
+            height: banner.height * 1.42,
+        }, {
+            alpha: 0.94,
+            fit: 'contain',
+            required: true,
+        });
+        ui.drawRect({
+            x: banner.x,
+            y: banner.y,
+            width: banner.width * 0.68,
+            height: banner.height,
+        }, '#03070c', 0.22);
+        drawBorder(ui, banner, '#1c130f', 3, 0.88);
+        drawBorder(ui, insetRect(banner, 7), '#d6a25c', 1, 0.58);
+        drawCornerBrackets(ui, banner, '#d6a25c', {
+            inset: 7,
+            length: 34,
+            thickness: 3,
+            alpha: 0.76,
+        });
+
+        const titleX = banner.x + 18;
+        const titleY = banner.y + Math.max(14, banner.height * 0.22);
         drawIconText(
             ui,
             artTextures,
             getBattleAssetId('monster_icon', battle),
-            banner.x + 8,
-            banner.y + Math.max(8, banner.height - 54),
-            Math.min(42, banner.height - 16),
+            titleX,
+            titleY - 2,
+            Math.min(36, banner.height * 0.34),
             '',
             {
                 fallback: 'M',
                 fallbackColor: '#f3d991',
             },
         );
-        ui.drawText(getMonsterName(battle), banner.x + 58, banner.y + Math.max(12, banner.height - 56), {
-            size: 18,
+        ui.drawText(getMonsterName(battle), titleX + 44, titleY + 1, {
+            size: 20,
             color: '#fff2ca',
+            weight: 800,
+            maxWidth: banner.width * 0.48,
         });
-        ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, banner.x + 58, banner.y + Math.max(37, banner.height - 30), {
-            size: 13,
+        ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, titleX + 44, titleY + 28, {
+            size: 14,
             color: '#d7c59e',
+            maxWidth: banner.width * 0.44,
         });
+        drawHudPips(ui, artTextures, {
+            assetId: 'icon_heart_lost',
+            x: titleX,
+            y: banner.y + banner.height - 33,
+            value: state.enemyHp,
+            maxPips: 4,
+            size: 19,
+            color: '#ffd4d8',
+            fallback: '♥',
+            text: '',
+        });
+        drawMonsterThreatBar(ui, {
+            x: titleX,
+            y: banner.y + banner.height - 12,
+            width: Math.min(190, banner.width * 0.54),
+            height: 7,
+        }, state.enemyHp, battle.enemyHp);
+
+        drawDiamondProgress(ui, {
+            x: banner.x + banner.width * 0.34,
+            y: banner.y + 10,
+            width: banner.width * 0.32,
+            height: 18,
+        }, run.currentBattle, run.totalBattles);
+
         drawPortraitBattleHud(ui, artTextures, hud, run, state);
         return;
     }
 
-    ui.drawText(`Битва ${run.currentBattle} / ${run.totalBattles}`, 28, 24, {
-        size: 24,
-        color: '#eef8ff',
+    const screen = layout.viewport?.screen ?? {
+        width: layout.hud.x + layout.hud.width + 16,
+        height: layout.hud.y + layout.hud.height + 16,
+    };
+    const hud = {
+        x: 12,
+        y: 10,
+        width: screen.width - 24,
+        height: 72,
+    };
+    const deck = getRunDeckStats(run);
+
+    drawOrnatePanelFrame(ui, artTextures, hud, {
+        panelAlpha: 0.92,
+        inset: 7,
+        bracketLength: 34,
+        bracketThickness: 3,
+        innerAlpha: 0.5,
     });
-    ui.drawText(usesHandSubmitEconomy(settings)
-        ? 'Замыкай зоны: закрытие бьет монстра, сдача руки стоит сердца'
+    drawIconText(ui, artTextures, 'icon_multiplier', hud.x + 24, hud.y + 18, 34, '', {
+        fallback: '*',
+        fallbackColor: '#f3d991',
+    });
+    drawHudPips(ui, artTextures, {
+        assetId: 'icon_heart_full',
+        x: hud.x + 78,
+        y: hud.y + 20,
+        value: state.playerHp,
+        maxPips: 5,
+        size: 23,
+        color: '#c8f7dd',
+        fallback: '♥',
+    });
+    drawIconText(ui, artTextures, 'icon_gold', hud.x + Math.min(360, hud.width * 0.28), hud.y + 22, 22, String(run.gold ?? 0), {
+        fallback: 'G',
+        textSize: 20,
+        color: '#f3d991',
+        weight: 800,
+    });
+    drawIconText(ui, artTextures, 'icon_deck', hud.x + Math.min(470, hud.width * 0.37), hud.y + 22, 22, String(deck.drawPile), {
+        fallback: 'D',
+        textSize: 18,
+        color: '#9fb8ca',
+    });
+    ui.drawText(`Битва ${run.currentBattle}/${run.totalBattles}`, hud.x + hud.width / 2, hud.y + 17, {
+        align: 'center',
+        size: 20,
+        color: '#fff2ca',
+        weight: 800,
+        maxWidth: 210,
+    });
+    drawDiamondProgress(ui, {
+        x: hud.x + hud.width / 2 - 120,
+        y: hud.y + 44,
+        width: 240,
+        height: 18,
+    }, run.currentBattle, run.totalBattles);
+    drawHudPips(ui, artTextures, {
+        assetId: 'icon_heart_lost',
+        x: hud.x + hud.width - 365,
+        y: hud.y + 20,
+        value: state.enemyHp,
+        maxPips: 5,
+        size: 23,
+        color: '#ffd4d8',
+        fallback: '♥',
+    });
+    drawIconText(
+        ui,
+        artTextures,
+        getBattleAssetId('monster_icon', battle),
+        hud.x + hud.width - 180,
+        hud.y + 16,
+        36,
+        getMonsterName(battle),
+        {
+            fallback: 'M',
+            textSize: 18,
+            color: '#fff2ca',
+            gap: 9,
+            maxWidth: 124,
+        },
+    );
+    ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, hud.x + hud.width - 135, hud.y + 47, {
+        size: 13,
+        color: '#d7c59e',
+        maxWidth: 122,
+    });
+
+    const subtitle = usesHandSubmitEconomy(settings)
+        ? 'Замыкай печати: закрытие бьет монстра, сдача руки стоит сердца'
         : isRoadModeVariant(settings)
             ? 'Проведи дорогу от S к E и перебей атаки'
-            : 'Собери замкнутую цветную границу и перебей атаки', 28, 58, {
-        size: 17,
+            : 'Собери замкнутую цветную границу и перебей атаки';
+    ui.drawText(subtitle, 28, hud.y + hud.height + 12, {
+        size: 15,
         color: '#98b4c8',
+        maxWidth: Math.min(720, screen.width - 56),
     });
 }
 
@@ -1211,6 +1639,7 @@ function drawPortraitFeedback(ui, artTextures, layout, settings, state) {
             ui.drawText(state.feedback, layout.board.x, layout.hand[0].y - 34, {
                 size: 16,
                 color: '#f3d991',
+                maxWidth: layout.board.width,
             });
         }
         return;
@@ -1226,8 +1655,13 @@ function drawPortraitFeedback(ui, artTextures, layout, settings, state) {
         : state.outcome === 'defeat'
             ? 'Поражение'
             : submitCost
-                ? `Сдать руку ${formatHeartDelta(submitCost.totalDamage)} · карт ${submitCost.unplayedHandCards}`
+                ? submitCost.canPay
+                    ? `Сдать руку ${formatHeartDelta(submitCost.totalDamage)} · карт ${submitCost.unplayedHandCards}`
+                    : `Последний шанс: сдача руки недоступна (${formatHeartDelta(submitCost.totalDamage)})`
                 : 'Ход';
+    const isUrgent = state.feedback?.startsWith('Нельзя')
+        || submitCost?.canPay === false
+        || state.outcome === 'defeat';
 
     if (!drawArtImage(ui, artTextures, 'panel_dark', feedback, {
         alpha: 0.48,
@@ -1236,10 +1670,11 @@ function drawPortraitFeedback(ui, artTextures, layout, settings, state) {
     })) {
         ui.drawRect(feedback, '#101c2a', 0.36);
     }
-    drawBorder(ui, feedback, '#7d5a34', 1, 0.55);
+    drawBorder(ui, feedback, isUrgent ? '#d78486' : '#7d5a34', 1, isUrgent ? 0.82 : 0.55);
     ui.drawText(state.feedback ?? fallback, feedback.x + 10, feedback.y + 8, {
         size: 14,
-        color: state.feedback?.startsWith('Нельзя') ? '#ff8b9c' : '#f3d991',
+        color: isUrgent ? '#ffb4c0' : '#f3d991',
+        maxWidth: feedback.width - 20,
     });
 
     if (!drawArtImage(ui, artTextures, 'panel_dark', log, {
@@ -1261,6 +1696,7 @@ function drawPortraitFeedback(ui, artTextures, layout, settings, state) {
         ui.drawText(entry, log.x + 10, log.y + 6 + index * 18, {
             size: 12,
             color: index === 0 ? '#bfd2df' : '#8fb1cb',
+            maxWidth: log.width - 20,
         });
     });
 }
@@ -1288,6 +1724,10 @@ function getButtonLabel(state, settings) {
     return 'Новый раунд';
 }
 
+function getClosureArea(result) {
+    return result?.score?.zones?.reduce((sum, zone) => sum + (zone.area ?? 0), 0) ?? 0;
+}
+
 function getPlacedFeedback(state, settings) {
     if (usesHandSubmitEconomy(settings)) {
         if (state.outcome === 'defeat') {
@@ -1296,12 +1736,27 @@ function getPlacedFeedback(state, settings) {
 
         if ((state.lastPlacementClosedZones ?? 0) > 0) {
             const heal = state.lastResult?.heartHeal ?? 0;
-            const healText = heal > 0 ? `, сердца +${heal}` : '';
-            return `Зона закрыта: монстру ${formatHeartDelta(state.lastResult?.enemyDamage ?? 0)}, золото +${state.lastResult?.goldEarned ?? 0}${healText}`;
+            const fieldGold = state.lastResult?.fieldGold ?? 0;
+            const strikeGold = state.lastResult?.strikeGold ?? 0;
+            const area = getClosureArea(state.lastResult);
+            const extras = [
+                fieldGold > 0 ? `поле +${fieldGold}` : null,
+                heal > 0 ? `сердца +${heal}` : null,
+                strikeGold > 0 ? `strike +${strikeGold}` : null,
+            ].filter(Boolean);
+            const extraText = extras.length > 0 ? ` · ${extras.join(', ')}` : '';
+            return `Печать закрыта: площадь ${area}, монстру ${formatHeartDelta(state.lastResult?.enemyDamage ?? 0)}, золото +${state.lastResult?.goldEarned ?? 0}${extraText}`;
         }
 
-        if ((state.lastPlacementResourceResult?.amount ?? 0) > 0) {
-            return `Золото поля +${state.lastPlacementResourceResult.amount}`;
+        if ((state.lastPlacementResourceResult?.goldAmount ?? state.lastPlacementResourceResult?.amount ?? 0) > 0
+            || (state.lastPlacementResourceResult?.heartHeal ?? 0) > 0) {
+            const gold = state.lastPlacementResourceResult?.goldAmount ?? state.lastPlacementResourceResult?.amount ?? 0;
+            const heal = state.lastPlacementResourceResult?.heartHeal ?? 0;
+            const parts = [
+                gold > 0 ? `золото +${gold}` : null,
+                heal > 0 ? `сердца +${heal}` : null,
+            ].filter(Boolean);
+            return `Ресурс поля: ${parts.join(', ')}`;
         }
 
         return state.selectedHandIndex >= 0
@@ -1639,15 +2094,32 @@ export function createBattleScene({
 
             const boardCell = getBoardCell(this.layout, settings, click);
             if (state.phase === 'placing' && !state.outcome && boardCell) {
+                const selectedTile = state.hand[state.selectedHandIndex];
+                const placementFailure = getTilePlacementFailure(
+                    state.board,
+                    selectedTile,
+                    boardCell.x,
+                    boardCell.y,
+                    settings,
+                );
                 const placed = placeTile(state, settings, boardCell.x, boardCell.y, run);
                 if (placed) {
+                    state.lastInvalidPlacement = null;
                     advanceTileQueue(run, state, settings, tiles);
                     resolveImmediatePlacement(state, battle, settings, run);
                     resolveHandSubmitDefeatIfNeeded(state, settings);
+                } else if (placementFailure) {
+                    state.lastInvalidPlacement = {
+                        ...placementFailure,
+                        x: boardCell.x,
+                        y: boardCell.y,
+                        tileId: selectedTile?.id ?? null,
+                    };
+                    pushBattleLog(state, placementFailure.message);
                 }
                 state.feedback = placed
                     ? getPlacedFeedback(state, settings)
-                    : 'Нельзя поставить: смежные края должны совпасть';
+                    : placementFailure?.message ?? 'Нельзя поставить сюда.';
                 return;
             }
 
@@ -1678,7 +2150,9 @@ export function createBattleScene({
                         tiles,
                     });
                     state.feedback = submit.submitted
-                        ? `Рука сдана: ${formatHeartDelta(submit.totalDamage)}`
+                        ? state.handSubmitLocked
+                            ? `Рука сдана: ${formatHeartDelta(submit.totalDamage)}. Последний шанс: победить этой рукой.`
+                            : `Рука сдана: ${formatHeartDelta(submit.totalDamage)}`
                         : 'Не хватает сердец, чтобы сдать руку';
                     return;
                 }
@@ -1750,6 +2224,7 @@ export function createBattleScene({
             }, '#06101a', 0.22);
             drawBattleHeader(ui, this.layout, run, battle, settings, state, artTextures);
             drawBoard(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
+            drawBattleEventBadges(ui, artTextures, this.layout, state);
             drawSidePanel(ui, this.layout, battle, run, settings, state, artTextures);
             drawHold(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawHand(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
@@ -1792,6 +2267,7 @@ export function createBattleScene({
                 enemyHp: state.enemyHp,
                 playerHp: state.playerHp,
                 round: state.round,
+                feedback: state.feedback ?? null,
                 selectedHandIndex: state.selectedHandIndex,
                 placedCount: state.board.reduce((sum, row) => (
                     sum + row.filter(Boolean).length
@@ -1854,8 +2330,10 @@ export function createBattleScene({
                     .filter((resource) => resource.consumed)
                     .map((resource) => ({ ...resource })),
                 resourceEvents: [...state.resourceEvents ?? []],
+                eventBadges: getLatestEventBadges(state),
                 lastPlacementResourceResult: state.lastPlacementResourceResult,
                 lastClosureResourceResult: state.lastClosureResourceResult,
+                lastInvalidPlacement: state.lastInvalidPlacement ?? null,
                 submitCost: getHandSubmitCostPreview(state, settings),
                 handSubmitLocked: state.handSubmitLocked ?? false,
                 lockedSubmitCost: state.lockedSubmitCost ?? null,
