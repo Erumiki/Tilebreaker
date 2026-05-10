@@ -158,37 +158,47 @@ function createDesktopLayout(screen, settings) {
 }
 
 function createPortraitLayout(screen, settings) {
-    const margin = screen.width <= 370 ? 10 : 12;
-    const gap = screen.width <= 370 ? 6 : 8;
+    const compactHeight = screen.height <= 700;
+    const veryCompactHeight = screen.height <= 664;
+    const margin = screen.width <= 370 || compactHeight ? 10 : 12;
+    const gap = screen.width <= 370 || compactHeight ? 6 : 8;
     const availableWidth = screen.width - margin * 2;
     const isQueue = isQueueDrawMode(settings);
     const holdEnabled = isHoldEnabled(settings);
     const handCount = isQueue ? 2 : settings.handSize;
     const slotCount = handCount + (holdEnabled ? 1 : 0);
     const columns = isQueue ? slotCount : 4;
-    const maxSlot = isQueue ? 112 : 92;
+    const maxSlot = isQueue
+        ? compactHeight ? 96 : 112
+        : compactHeight ? 72 : 92;
     const slot = Math.max(
         MIN_TOUCH_SIZE,
         Math.min(maxSlot, Math.floor((availableWidth - gap * (columns - 1)) / columns)),
     );
     const rows = Math.ceil(slotCount / columns);
     const handHeight = rows * slot + (rows - 1) * gap;
-    const buttonHeight = 56;
+    const buttonHeight = compactHeight ? 50 : 56;
     const buttonY = screen.height - margin - buttonHeight;
-    const handY = buttonY - 10 - handHeight;
-    const hud = rect(margin, 8, availableWidth, 44);
-    const monsterBannerHeight = Math.max(68, Math.min(118, Math.round(screen.height * 0.13)));
-    const monsterBanner = rect(margin, hud.y + hud.height + 6, availableWidth, monsterBannerHeight);
-    const boardTop = monsterBanner.y + monsterBanner.height + 8;
-    const feedbackHeight = 34;
-    const logHeight = Math.max(30, Math.min(48, Math.round(screen.height * 0.055)));
-    const afterBoardHeight = 8 + feedbackHeight + 6 + logHeight + 8;
+    const handY = buttonY - (compactHeight ? 6 : 10) - handHeight;
+    const hudHeight = compactHeight ? 36 : 44;
+    const hud = rect(margin, 8, availableWidth, hudHeight);
+    const monsterBannerHeight = compactHeight
+        ? veryCompactHeight ? 40 : 44
+        : Math.max(68, Math.min(118, Math.round(screen.height * 0.13)));
+    const monsterBanner = rect(margin, hud.y + hud.height + (compactHeight ? 4 : 6), availableWidth, monsterBannerHeight);
+    const boardTop = monsterBanner.y + monsterBanner.height + (compactHeight ? 4 : 8);
+    const feedbackHeight = compactHeight ? 28 : 34;
+    const logHeight = compactHeight ? 28 : Math.max(30, Math.min(48, Math.round(screen.height * 0.055)));
+    const boardFeedbackGap = compactHeight ? 4 : 8;
+    const feedbackLogGap = compactHeight ? 3 : 6;
+    const logHandGap = compactHeight ? 4 : 8;
+    const afterBoardHeight = boardFeedbackGap + feedbackHeight + feedbackLogGap + logHeight + logHandGap;
     const maxBoardByHeight = handY - boardTop - afterBoardHeight;
-    const boardSize = Math.floor(Math.min(availableWidth, Math.max(238, maxBoardByHeight)));
+    const boardSize = Math.floor(Math.min(availableWidth, Math.max(MIN_TOUCH_SIZE * 3, maxBoardByHeight)));
     const boardX = Math.round(screen.width / 2 - boardSize / 2);
     const board = rect(boardX, boardTop, boardSize, boardSize);
-    const feedback = rect(margin, board.y + board.height + 8, availableWidth, feedbackHeight);
-    const log = rect(margin, feedback.y + feedback.height + 6, availableWidth, logHeight);
+    const feedback = rect(margin, board.y + board.height + boardFeedbackGap, availableWidth, feedbackHeight);
+    const log = rect(margin, feedback.y + feedback.height + feedbackLogGap, availableWidth, logHeight);
     const gridWidth = columns * slot + (columns - 1) * gap;
     const gridX = Math.round(screen.width / 2 - gridWidth / 2);
     const slotRects = Array.from({ length: slotCount }, (_, index) => {

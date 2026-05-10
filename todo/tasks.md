@@ -190,7 +190,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-10] Itch.io Release Execution: package, page setup and art handoff
+### ~~[2026-05-10] Itch.io Release Execution: package, page setup and art handoff~~
 
 **Idea:** turn the final jam build into a browser-playable itch.io page without improvising upload settings, copy or marketing art at the last minute.
 
@@ -208,13 +208,15 @@ The single list of planned features, improvements, work order and statuses for T
 
 **Acceptance:** the itch.io page is public or jam-submitted as required, the browser build launches from itch on desktop and mobile, and every visible field/art asset came from `todo/itch-release-plan.md` or a recorded lead-approved change.
 
+**Completed 2026-05-10:** user completed this release execution outside the current Codex pass: the itch HTML5 package/page/art handoff path was handled manually, and the follow-up player-facing feedback is now tracked by the next mobile hotfix task.
+
 **Priority:** must
 
 **Layer:** MVP
 
 ---
 
-### [2026-05-10] Itch Mobile Hotfix: battle safe area and submit-hand clarity
+### ~~[2026-05-10] Itch Mobile Hotfix: battle safe area and submit-hand clarity~~
 
 **Idea:** resolve the first itch-hosted mobile feedback before any stretch work: the battle screen still has field/chrome elements that read as spilling downward or out of the intended mobile area, the `Сдать руку` button contains unclear image fragments, and touch placement would benefit from a slightly larger board with slightly smaller selectable cards.
 
@@ -240,6 +242,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** on the itch-hosted or production-preview mobile battle screen, the board, feedback/log, hold slot, hand cards and `Сдать руку` button stay inside the visible viewport without overlap or cut-off; the board is measurably larger than the current portrait baseline while hand/hold cards remain readable and at least comfortable tap targets; there is no empty/decorative left field zone that reads as a broken layout; the submit button has no stray decorative image fragment and its text/cost/icon are readable as one action; portrait smoke coverage includes at least one shorter Safari-like viewport and checks key battle UI rects for overflow/overlap.
 
 **Parallelization:** safe as a release-polish lane. Code owns layout/viewport/debug assertions; art owns the submit-button/icon read. Neither lane should change rules, prices, deck composition or itch page copy.
+
+**Completed 2026-05-10:** fixed short itch/mobile portrait battle layout with designer and artist lanes: compact portrait screens now reduce hand/hold cards to 72px, use a 50px submit button, tighten vertical gaps and let the board grow to 289px on `390x664`, 321px on `390x700` and 265px on `360x640` without feedback/log/hand/button overlap. Added compact monster-banner rendering for short screens so header art/text no longer spills into the board. Redesigned the submit button as one control with a single `icon_submit`/`icon_lock` well and a reserved label rect, removed the old separate icon overlay pass, exposed button-content debug rects and added smoke assertions for icon/text non-overlap. Captured production-preview proof at `release/itch/art/qa_portrait_battle_390x664_hotfix.png` and listed it in the art handoff. Verified with `./scripts/npm.sh run check`, full `./scripts/npm.sh run test:e2e`, `./scripts/npm.sh run build`, `./scripts/npm.sh run test:e2e:preview -- --grep "portrait battle layout fits"` and production screenshot capture.
 
 **Priority:** must
 

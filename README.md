@@ -83,6 +83,14 @@ Production build and local preview:
 
 The production build uses relative Vite asset paths (`--base=./`) so the generated `dist/` contents can be packaged as an itch.io HTML5 upload with `index.html` at the ZIP root.
 
+Current itch project: `https://mikitava.itch.io/tilebreaker`.
+
+Butler hotfix upload target:
+
+```sh
+.tools/butler/butler push --userversion <version-label> dist mikitava/tilebreaker:html5
+```
+
 ## Checks
 
 ```sh

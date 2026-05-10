@@ -657,13 +657,81 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
         return;
     }
 
-    ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - (options.textSize ?? 20) / 2 - 2, {
+    const content = getArtButtonContentRects(rect, options);
+
+    if (content.iconWell && content.iconRect) {
+        ui.drawRect(content.iconWell, options.iconWellColor ?? (options.disabled ? '#25282e' : '#4a1a1b'), options.iconWellAlpha ?? 0.86);
+        drawBorder(ui, content.iconWell, options.iconWellEdgeColor ?? (options.disabled ? '#66666a' : '#d78486'), 1, options.iconWellEdgeAlpha ?? 0.42);
+        drawIconText(
+            ui,
+            artTextures,
+            options.iconAssetId,
+            content.iconRect.x,
+            content.iconRect.y,
+            content.iconRect.width,
+            '',
+            {
+                fallback: options.iconFallback,
+                fallbackColor: options.iconFallbackColor,
+                iconAlpha: options.disabled ? 0.82 : 1,
+            },
+        );
+    }
+
+    ui.drawText(label, content.labelX, content.labelRect.y, {
         align: 'center',
         size: options.textSize ?? 20,
         color: options.textColor ?? '#fff2ca',
         weight: 700,
-        maxWidth: rect.width - 34,
+        maxWidth: content.labelRect.width,
     });
+}
+
+function getArtButtonContentRects(rect, options = {}) {
+    const textSize = options.textSize ?? 20;
+    const labelY = rect.y + rect.height / 2 - textSize / 2 - 2;
+    let labelRect = {
+        x: rect.x + 17,
+        y: labelY,
+        width: rect.width - 34,
+        height: textSize + 4,
+    };
+    let iconWell = null;
+    let iconRect = null;
+
+    if (options.iconAssetId) {
+        const iconSize = options.iconSize ?? Math.min(26, rect.height - 22);
+        const iconPadding = options.iconPadding ?? 12;
+        const iconWellWidth = Math.max(iconSize + iconPadding * 2, options.iconWellWidth ?? 68);
+        iconWell = {
+            x: rect.x + 9,
+            y: rect.y + 8,
+            width: iconWellWidth,
+            height: rect.height - 16,
+        };
+        iconRect = {
+            x: iconWell.x + iconWell.width / 2 - iconSize / 2,
+            y: rect.y + rect.height / 2 - iconSize / 2,
+            width: iconSize,
+            height: iconSize,
+        };
+
+        const labelLeft = iconWell.x + iconWell.width + 10;
+        const labelRight = rect.x + rect.width - 18;
+        labelRect = {
+            x: labelLeft,
+            y: labelY,
+            width: Math.max(48, labelRight - labelLeft),
+            height: textSize + 4,
+        };
+    }
+
+    return {
+        iconWell,
+        iconRect,
+        labelRect,
+        labelX: labelRect.x + labelRect.width / 2,
+    };
 }
 
 function getBoardCell(layout, settings, point) {
@@ -1383,6 +1451,7 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
     if (layout.mode === 'portrait') {
         const hud = layout.hud;
         const banner = layout.monsterBanner;
+        const compactBanner = banner.height < 56;
 
         const backdropId = getBattleAssetId('level_backdrop', battle);
         const portraitId = getBattleAssetId('monster_portrait', battle);
@@ -1401,12 +1470,12 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
         }
 
         drawArtImage(ui, artTextures, portraitId, {
-            x: banner.x + banner.width * 0.46,
-            y: banner.y - banner.height * 0.25,
-            width: banner.width * 0.6,
-            height: banner.height * 1.42,
+            x: banner.x + banner.width * (compactBanner ? 0.58 : 0.46),
+            y: banner.y - banner.height * (compactBanner ? 0.03 : 0.25),
+            width: banner.width * (compactBanner ? 0.36 : 0.6),
+            height: banner.height * (compactBanner ? 1.06 : 1.42),
         }, {
-            alpha: 0.94,
+            alpha: compactBanner ? 0.7 : 0.94,
             fit: 'contain',
             required: true,
         });
@@ -1420,61 +1489,66 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
         drawBorder(ui, insetRect(banner, 7), '#d6a25c', 1, 0.58);
         drawCornerBrackets(ui, banner, '#d6a25c', {
             inset: 7,
-            length: 34,
+            length: compactBanner ? 22 : 34,
             thickness: 3,
             alpha: 0.76,
         });
 
         const titleX = banner.x + 18;
-        const titleY = banner.y + Math.max(14, banner.height * 0.22);
+        const titleY = compactBanner
+            ? banner.y + Math.max(9, banner.height * 0.24)
+            : banner.y + Math.max(14, banner.height * 0.22);
+        const iconSize = compactBanner ? 20 : Math.min(36, banner.height * 0.34);
         drawIconText(
             ui,
             artTextures,
             getBattleAssetId('monster_icon', battle),
             titleX,
-            titleY - 2,
-            Math.min(36, banner.height * 0.34),
+            titleY - (compactBanner ? 1 : 2),
+            iconSize,
             '',
             {
                 fallback: 'M',
                 fallbackColor: '#f3d991',
             },
         );
-        ui.drawText(getMonsterName(battle), titleX + 44, titleY + 1, {
-            size: 20,
+        ui.drawText(getMonsterName(battle), titleX + (compactBanner ? 28 : 44), titleY, {
+            size: compactBanner ? 16 : 20,
             color: '#fff2ca',
             weight: 800,
-            maxWidth: banner.width * 0.48,
+            maxWidth: banner.width * (compactBanner ? 0.46 : 0.48),
         });
-        ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, titleX + 44, titleY + 28, {
-            size: 14,
-            color: '#d7c59e',
-            maxWidth: banner.width * 0.44,
-        });
-        drawHudPips(ui, artTextures, {
-            assetId: 'icon_heart_lost',
-            x: titleX,
-            y: banner.y + banner.height - 33,
-            value: state.enemyHp,
-            maxPips: 4,
-            size: 19,
-            color: '#ffd4d8',
-            fallback: '♥',
-            text: '',
-        });
-        drawMonsterThreatBar(ui, {
-            x: titleX,
-            y: banner.y + banner.height - 12,
-            width: Math.min(190, banner.width * 0.54),
-            height: 7,
-        }, state.enemyHp, battle.enemyHp);
+        if (!compactBanner) {
+            ui.drawText(`Раунд ${state.round} · ${getGameplayVariant(settings).shortLabel}`, titleX + 44, titleY + 28, {
+                size: 14,
+                color: '#d7c59e',
+                maxWidth: banner.width * 0.44,
+            });
+            drawHudPips(ui, artTextures, {
+                assetId: 'icon_heart_lost',
+                x: titleX,
+                y: banner.y + banner.height - 33,
+                value: state.enemyHp,
+                maxPips: 4,
+                size: 19,
+                color: '#ffd4d8',
+                fallback: '♥',
+                text: '',
+            });
+            drawMonsterThreatBar(ui, {
+                x: titleX,
+                y: banner.y + banner.height - 12,
+                width: Math.min(190, banner.width * 0.54),
+                height: 7,
+            }, state.enemyHp, battle.enemyHp);
 
-        drawDiamondProgress(ui, {
-            x: banner.x + banner.width * 0.34,
-            y: banner.y + 10,
-            width: banner.width * 0.32,
-            height: 18,
-        }, run.currentBattle, run.totalBattles);
+            drawDiamondProgress(ui, {
+                x: banner.x + banner.width * 0.34,
+                y: banner.y + 10,
+                width: banner.width * 0.32,
+                height: 18,
+            }, run.currentBattle, run.totalBattles);
+        }
 
         drawPortraitBattleHud(ui, artTextures, hud, run, state);
         return;
@@ -1722,6 +1796,49 @@ function getButtonLabel(state, settings) {
     }
 
     return 'Новый раунд';
+}
+
+function getPrimaryButtonOptions(state, settings, layout, mouse = null) {
+    const submitBlocked = usesHandSubmitEconomy(settings)
+        && state.phase === 'placing'
+        && !state.outcome
+        && !getHandSubmitCostPreview(state, settings).canPay;
+    const showSubmitIcon = usesHandSubmitEconomy(settings)
+        && state.phase === 'placing'
+        && !state.outcome;
+
+    return {
+        mouse,
+        disabled: submitBlocked,
+        color: submitBlocked
+            ? '#2b323a'
+            : state.phase === 'placing' && !state.outcome ? '#243f54' : '#1f4b3c',
+        hoverColor: submitBlocked
+            ? '#3a434d'
+            : state.phase === 'placing' && !state.outcome ? '#66c7f4' : '#69d29d',
+        edgeColor: submitBlocked ? '#5b6872' : '#9fdfff',
+        textSize: layout.mode === 'portrait' ? 18 : 20,
+        iconAssetId: showSubmitIcon ? submitBlocked ? 'icon_lock' : 'icon_submit' : null,
+        iconSize: layout.mode === 'portrait' ? 24 : 26,
+        iconFallback: submitBlocked ? '!' : '>',
+        iconFallbackColor: submitBlocked ? '#ff8b9c' : '#d8e7f2',
+        iconWellColor: submitBlocked ? '#25282e' : '#4b1a1a',
+        iconWellEdgeColor: submitBlocked ? '#66666a' : '#d78486',
+    };
+}
+
+function getPrimaryButtonContentDebug(layout, state, settings) {
+    const options = getPrimaryButtonOptions(state, settings, layout);
+    const content = getArtButtonContentRects(layout.endRoundButton, options);
+
+    return {
+        label: getButtonLabel(state, settings),
+        disabled: options.disabled,
+        iconAssetId: options.iconAssetId,
+        iconRect: content.iconRect,
+        iconWell: content.iconWell,
+        labelRect: content.labelRect,
+    };
 }
 
 function getClosureArea(result) {
@@ -2229,35 +2346,12 @@ export function createBattleScene({
             drawHold(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawHand(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawPortraitFeedback(ui, artTextures, this.layout, settings, state);
-            const submitBlocked = usesHandSubmitEconomy(settings)
-                && state.phase === 'placing'
-                && !state.outcome
-                && !getHandSubmitCostPreview(state, settings).canPay;
-            drawArtButton(ui, artTextures, this.layout.endRoundButton, getButtonLabel(state, settings), {
-                mouse,
-                disabled: submitBlocked,
-                color: submitBlocked
-                    ? '#2b323a'
-                    : state.phase === 'placing' && !state.outcome ? '#243f54' : '#1f4b3c',
-                hoverColor: submitBlocked
-                    ? '#3a434d'
-                    : state.phase === 'placing' && !state.outcome ? '#66c7f4' : '#69d29d',
-                edgeColor: submitBlocked ? '#5b6872' : '#9fdfff',
-                textSize: this.layout.mode === 'portrait' ? 18 : 20,
-            });
-            const iconSize = this.layout.mode === 'portrait' ? 24 : 26;
-            drawIconText(
+            drawArtButton(
                 ui,
                 artTextures,
-                submitBlocked ? 'icon_lock' : 'icon_submit',
-                this.layout.endRoundButton.x + 14,
-                this.layout.endRoundButton.y + this.layout.endRoundButton.height / 2 - iconSize / 2,
-                iconSize,
-                '',
-                {
-                    fallback: submitBlocked ? '!' : '>',
-                    fallbackColor: submitBlocked ? '#ff8b9c' : '#d8e7f2',
-                },
+                this.layout.endRoundButton,
+                getButtonLabel(state, settings),
+                getPrimaryButtonOptions(state, settings, this.layout, mouse),
             );
         },
         getDebugState() {
@@ -2425,6 +2519,7 @@ export function createBattleScene({
                 colorMultipliers: { ...run.colorMultipliers },
                 visibleCombatColors: getVisibleCombatColors(settings),
                 uiState: getBattleUiState(state, settings),
+                primaryButtonContent: getPrimaryButtonContentDebug(this.layout, state, settings),
                 layout: this.layout,
             };
         },

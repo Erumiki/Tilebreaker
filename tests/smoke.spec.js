@@ -129,6 +129,13 @@ function expectRectInsideViewport(rect, viewport, label) {
   expect(rect.y + rect.height, `${label}.bottom`).toBeLessThanOrEqual(viewport.height);
 }
 
+function expectRectInsideRect(rect, parent, label) {
+  expect(rect.x, `${label}.x`).toBeGreaterThanOrEqual(parent.x);
+  expect(rect.y, `${label}.y`).toBeGreaterThanOrEqual(parent.y);
+  expect(rect.x + rect.width, `${label}.right`).toBeLessThanOrEqual(parent.x + parent.width);
+  expect(rect.y + rect.height, `${label}.bottom`).toBeLessThanOrEqual(parent.y + parent.height);
+}
+
 function expectBattleIntroFits(debug) {
   expect(debug.layout.viewport.overflows).toBe(false);
   expect(debug.layout.minTouchTarget).toBeGreaterThanOrEqual(44);
@@ -889,6 +896,9 @@ test('player can hold and swap one hand card', async ({ page }) => {
 });
 
 for (const viewport of [
+  { width: 390, height: 664, minBoard: 280, maxHand: 72 },
+  { width: 390, height: 700, minBoard: 310, maxHand: 72 },
+  { width: 360, height: 640, minBoard: 260, maxHand: 72 },
   { width: 390, height: 844 },
   { width: 360, height: 740 },
   { width: 430, height: 932 },
@@ -913,6 +923,25 @@ for (const viewport of [
     expect(battleDebug.layout.minTouchTarget).toBeGreaterThanOrEqual(44);
     expect(battleDebug.layout.hand).toHaveLength(7);
     expect(battleDebug.layout.hold).not.toBeNull();
+    expect(battleDebug.layout.board.y + battleDebug.layout.board.height, 'board before feedback').toBeLessThanOrEqual(battleDebug.layout.feedback.y);
+    expect(battleDebug.layout.feedback.y + battleDebug.layout.feedback.height, 'feedback before log').toBeLessThanOrEqual(battleDebug.layout.log.y);
+    expect(battleDebug.layout.log.y + battleDebug.layout.log.height, 'log before hand').toBeLessThanOrEqual(battleDebug.layout.hold.y);
+    expect(Math.max(...battleDebug.layout.hand.map((rect) => rect.y + rect.height)), 'hand before submit').toBeLessThanOrEqual(battleDebug.layout.primaryButton.y);
+    if (viewport.minBoard) {
+      expect(battleDebug.layout.board.width, 'short portrait board width').toBeGreaterThanOrEqual(viewport.minBoard);
+    }
+    if (viewport.maxHand) {
+      expect(battleDebug.layout.hand[0].width, 'short portrait hand width').toBeLessThanOrEqual(viewport.maxHand);
+      expect(battleDebug.layout.hold.width, 'short portrait hold width').toBeLessThanOrEqual(viewport.maxHand);
+    }
+    expect(battleDebug.primaryButtonContent.label).toContain('Сдать руку');
+    expect(battleDebug.primaryButtonContent.iconAssetId).toBe('icon_submit');
+    expectRectInsideRect(battleDebug.primaryButtonContent.iconRect, battleDebug.layout.primaryButton, 'submit.icon');
+    expectRectInsideRect(battleDebug.primaryButtonContent.labelRect, battleDebug.layout.primaryButton, 'submit.label');
+    expect(rectsOverlap(
+      battleDebug.primaryButtonContent.iconWell,
+      battleDebug.primaryButtonContent.labelRect,
+    ), 'submit icon well overlaps label').toBe(false);
     expect(battleDebug.uiState.primary).toEqual(expect.any(String));
     expect(battleDebug.uiState.hold).toBe('holdEmpty');
 
@@ -942,6 +971,11 @@ for (const viewport of [
     battleDebug = await getBattleDebug(page);
     expect(battleDebug.layout.mode).toBe('portrait');
     expect(battleDebug.layout.viewport.overflows).toBe(false);
+    expect(battleDebug.layout.log.y + battleDebug.layout.log.height, 'log before hand after submit').toBeLessThanOrEqual(battleDebug.layout.hold.y);
+    expect(rectsOverlap(
+      battleDebug.primaryButtonContent.iconWell,
+      battleDebug.primaryButtonContent.labelRect,
+    ), 'submit icon well overlaps label after submit').toBe(false);
   });
 }
 

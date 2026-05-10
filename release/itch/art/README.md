@@ -18,6 +18,7 @@ Generated for the itch.io release brief in `todo/itch-release-plan.md`.
 
 - `qa_portrait_intro_390x844.png`
 - `qa_portrait_battle_390x844.png`
+- `qa_portrait_battle_390x664_hotfix.png`
 - `qa_portrait_result_390x844.png`
 - `qa_portrait_shop_390x844.png`
 

@@ -14,6 +14,18 @@ Source checks, last reviewed 2026-05-10:
 
 Release target: public playable jam/MVP prototype after the final build task is complete.
 
+Itch project:
+
+```text
+https://mikitava.itch.io/tilebreaker
+```
+
+Butler target:
+
+```text
+mikitava/tilebreaker:html5
+```
+
 Current player-facing language: Russian. Use Russian page copy for the first itch upload unless the game UI is localized before release.
 
 Public promise: a short browser-playable roguelite puzzle battler about sealing monsters in the Astral Archive. Do not promise long-term progression, deep deckbuilding, rotation, multiple modes or a fully balanced card pool.
@@ -52,6 +64,23 @@ Suggested itch upload display label:
 
 ```text
 Tilebreaker HTML5 jam MVP
+```
+
+Butler upload path for hotfixes and repeat uploads:
+
+```sh
+./scripts/npm.sh run build
+.tools/butler/butler status mikitava/tilebreaker
+.tools/butler/butler push --userversion <version-label> dist mikitava/tilebreaker:html5
+.tools/butler/butler status mikitava/tilebreaker
+```
+
+Use `dist` as the butler source so the existing itch `html5` channel/browser-playable settings stay attached to the channel. Keep the ZIP packaging path for manual itch web-form uploads or archival handoff.
+
+Latest uploaded hotfix version:
+
+```text
+hotfix-mobile-2026-05-10
 ```
 
 ### Upload Requirements To Verify
