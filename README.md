@@ -74,11 +74,33 @@ Then open the address Vite prints. By default:
 http://127.0.0.1:5173
 ```
 
+Production build and local preview:
+
+```sh
+./scripts/npm.sh run build
+./scripts/npm.sh run preview
+```
+
+The production build uses relative Vite asset paths (`--base=./`) so the generated `dist/` contents can be packaged as an itch.io HTML5 upload with `index.html` at the ZIP root.
+
 ## Checks
 
 ```sh
 ./scripts/npm.sh run check
 ./scripts/npm.sh run test:e2e
+./scripts/npm.sh run build
+```
+
+For release QA, run `./scripts/npm.sh run preview` after the build and verify the normal route from the production preview:
+
+```text
+menu -> battleIntro -> battle -> result -> shop -> battleIntro -> final
+```
+
+Full smoke against an already-running production preview:
+
+```sh
+./scripts/npm.sh run test:e2e:preview
 ```
 
 Regenerate and validate MVP art:
@@ -142,6 +164,14 @@ GAMEPLAY_VARIANT=placement_payoff DRAW_MODE=hand ./scripts/node.sh scripts/simul
 ```
 
 The start screen temporarily keeps only variants that are active for discussion; modes removed after playtest remain available through URL/debug, but do not add noise to the menu.
+
+## Known Limitations
+
+- The current public build is a jam/MVP prototype, not a long progression game.
+- Controls are mouse/touch only; keyboard and gamepad controls are not implemented.
+- Red and blue ward readability is required; there is no separate colorblind mode yet.
+- Best tested in current Chrome, Firefox and Safari.
+- Variant URLs remain for debugging, but the normal player route is the `legacy` Core 1 Rescue path.
 
 ## Stack
 

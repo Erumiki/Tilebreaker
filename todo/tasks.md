@@ -165,7 +165,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] Final Jam Build, screenshots and submission checklist
+### ~~[2026-05-09] Final Jam Build, screenshots and submission checklist~~
 
 **Idea:** produce the jam-ready build and final verification pass after balance, normal-path lock, art cleanup and readability polish.
 
@@ -181,6 +181,8 @@ The single list of planned features, improvements, work order and statuses for T
 - write a short known-issues list if anything remains intentionally rough.
 
 **Acceptance:** the jam build can be opened from a clean production preview, the normal loop works through final victory or defeat, screenshots are captured, and docs describe exactly how to run and judge the submitted MVP.
+
+**Completed 2026-05-10:** added `./scripts/npm.sh run build` using Vite relative asset paths plus a runtime asset copy step for `configs/`, `assets/art_mvp` and `assets/tiles_v2`, keeping generated `dist/` out of source history. Fixed production-only Pixi initialization by explicitly importing the browser environment before `Application.init`, and added `./scripts/npm.sh run test:e2e:preview` for smoke tests against an already-running production preview. Rebuilt `dist/`, verified it has top-level `index.html`, 130 files and about 6.4 MB of runtime content, with no absolute `/assets` or `/configs` references in the built entry. Re-captured final desktop and portrait screenshots from `http://127.0.0.1:4173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand`; the capture script now fails on console errors, page errors, failed requests and 4xx/5xx responses. Synced README, `todo/current.md`, release art handoff and `design/decisions.md` with final build/run commands, known limitations and production QA notes. Verified with `./scripts/npm.sh run check`, `./scripts/npm.sh run test:e2e`, `./scripts/npm.sh run build`, `./scripts/npm.sh run test:e2e:preview` and production screenshot capture.
 
 **Priority:** must
 

@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import 'pixi.js/browser';
 import { loadConfig } from './core/config.js';
 import { initInput } from './core/input.js';
 import { initPixi } from './core/renderer.js';
@@ -27,14 +28,40 @@ import { createBattleResultScene } from './scenes/result.js';
 import { createShopScene } from './scenes/upgrades.js';
 
 const canvas = document.getElementById('game');
-const config = await loadConfig();
-const app = await initPixi(PIXI, canvas, config);
+const bootDebug = {
+    step: 'start',
+    completed: [],
+    errors: [],
+};
+
+window.__tilebreakerBoot = bootDebug;
+
+async function bootStep(name, action) {
+    bootDebug.step = name;
+    try {
+        const value = await action();
+        bootDebug.completed.push(name);
+        return value;
+    } catch (error) {
+        bootDebug.errors.push({
+            step: name,
+            message: String(error?.message ?? error),
+        });
+        throw error;
+    }
+}
+
+const config = await bootStep('loadConfig', () => loadConfig());
+const app = await bootStep('initPixi', () => initPixi(PIXI, canvas, config));
 const input = initInput(canvas);
 const ui = createUiRenderer(PIXI, app.stage);
 const battles = config.levels.battles;
 const tiles = createTilesFromManifest(config.tileManifest, config.game.tileBattle);
-const tileTextures = await loadTileTextures(PIXI, tiles, config.game.tileBattle);
-const artTextures = await loadArtTextures(PIXI);
+const tileTextures = await bootStep(
+    'loadTileTextures',
+    () => loadTileTextures(PIXI, tiles, config.game.tileBattle),
+);
+const artTextures = await bootStep('loadArtTextures', () => loadArtTextures(PIXI));
 const totalBattles = Math.min(config.game.run.totalBattles, battles.length);
 const debugOverrides = getDebugOverrides();
 let run = null;

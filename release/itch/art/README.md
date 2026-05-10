@@ -16,7 +16,9 @@ Generated for the itch.io release brief in `todo/itch-release-plan.md`.
 
 ## Internal QA
 
+- `qa_portrait_intro_390x844.png`
 - `qa_portrait_battle_390x844.png`
+- `qa_portrait_result_390x844.png`
 - `qa_portrait_shop_390x844.png`
 
 ## Sources
@@ -27,13 +29,11 @@ Generated bases are kept in `source/*_base_generated.png`. Final marketing expor
 ./scripts/node.sh release/itch/art/source/render-itch-art.mjs
 ```
 
-Screenshots are captured from the local Vite app at `http://127.0.0.1:5173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand`:
+Screenshots are captured from the local production preview at `http://127.0.0.1:4173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand` after running `./scripts/npm.sh run build` and `./scripts/npm.sh run preview`:
 
 ```sh
-./scripts/node.sh release/itch/art/source/capture-itch-screenshots.mjs
+TILEBREAKER_SCREENSHOT_URL='http://127.0.0.1:4173/?seed=20260508&guaranteedLoopHands=true&drawMode=hand' ./scripts/node.sh release/itch/art/source/capture-itch-screenshots.mjs
 ```
-
-Current screenshot caveat: these captures use the local Vite server because the repo does not yet define an npm `build` script. Re-run after the final production build task is accepted.
 
 ## Prompt Set
 

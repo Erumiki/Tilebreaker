@@ -14,6 +14,12 @@ Important decisions are recorded with date and rationale so any team member or C
 
 ---
 
+### 2026-05-10 - Final jam build uses relative Vite production assets
+
+**Context:** The itch.io HTML5 upload needs a production `dist/` folder whose root contains `index.html` and whose asset references still work after the files are zipped and hosted from a project page.
+**Decision:** Add `./scripts/npm.sh run build` as the release build path using `vite build --base=./`, keep `dist/` as generated output and use local `vite preview` for production-route QA and final screenshot capture.
+**Rationale:** Relative asset URLs make the build portable for itch.io without changing runtime asset loading in development. Keeping `dist/` generated avoids mixing source history with build artifacts while preserving a repeatable release path.
+
 ### 2026-05-09 - MVP card balance sync stages joker and double line
 
 **Context:** The fixed-seed balance gate showed that the live guaranteed joker shop and `double_red_line_h` did not outperform the no-shop baseline enough to justify final-MVP risk.
