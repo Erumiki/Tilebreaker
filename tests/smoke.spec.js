@@ -110,6 +110,18 @@ async function getMainMenuDebug(page) {
   return page.evaluate(() => window.__tilebreakerDebug.getMainMenuDebug());
 }
 
+async function expectNoMissingArt(page) {
+  await expect.poll(() => page.evaluate(() => (
+    Boolean(window.__tilebreakerDebug?.getArtDebug)
+  ))).toBe(true);
+
+  const artDebug = await page.evaluate(() => window.__tilebreakerDebug.getArtDebug());
+
+  expect(artDebug.missingAssetIds).toEqual([]);
+  expect(artDebug.loadedCount).toBe(artDebug.manifestAssetCount);
+  expect(artDebug.loadedCount).toBeGreaterThan(0);
+}
+
 function expectRectInsideViewport(rect, viewport, label) {
   expect(rect.x, `${label}.x`).toBeGreaterThanOrEqual(0);
   expect(rect.y, `${label}.y`).toBeGreaterThanOrEqual(0);
@@ -646,6 +658,7 @@ test('player can complete the 5-battle prototype loop', async ({ page }) => {
   await page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
 
   await expect(page.locator('#game')).toBeVisible();
+  await expectNoMissingArt(page);
   await expectScene(page, 'mainmenu');
 
   let menuDebug = await getMainMenuDebug(page);

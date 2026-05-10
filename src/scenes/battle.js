@@ -6,6 +6,7 @@ import {
     drawFramedPanel,
     insetRect,
 } from '../render/chrome.js';
+import { drawArtImage as drawManifestImage, drawMissingArtAsset } from '../render/art.js';
 import { createBattleLayout } from './battleLayout.js';
 import {
     advanceTileQueue,
@@ -199,6 +200,7 @@ function drawPlacementHint(ui, rect, { valid, hovered, artTextures = null }) {
             ? hovered ? 0.38 : 0.22
             : hovered ? 0.94 : 0.55,
         fit: 'stretch',
+        required: true,
     });
 
     if (!drewOverlay) {
@@ -264,23 +266,8 @@ function getMonsterName(battle) {
     return battle.monsterName ?? battle.name;
 }
 
-function getArtTexture(artTextures, assetId) {
-    return artTextures?.textures?.get(assetId) ?? null;
-}
-
 function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
-    const texture = getArtTexture(artTextures, assetId);
-
-    if (!texture) {
-        return false;
-    }
-
-    ui.drawImage(texture, rect, {
-        alpha: options.alpha ?? 1,
-        tint: options.tint,
-        fit: options.fit,
-    });
-    return true;
+    return drawManifestImage(ui, artTextures, assetId, rect, options);
 }
 
 function getZoneFilledOverlayAssetId(color, settings) {
@@ -346,15 +333,21 @@ function drawZoneFilledSeal(ui, artTextures, layout, microSize, zone, settings) 
         height: bounds.height - layout.cellSize * 0.1,
     };
 
-    drawArtImage(ui, artTextures, assetId, sealRect, { alpha: 0.42, fit: 'stretch' });
+    drawArtImage(ui, artTextures, assetId, sealRect, {
+        alpha: 0.42,
+        fit: 'stretch',
+        required: true,
+    });
     drawArtImage(ui, artTextures, 'effect_capture_flash', sealRect, {
         alpha: 0.82,
         fit: 'stretch',
         tint: getColorHex(zone.color, settings),
+        required: true,
     });
     drawArtImage(ui, artTextures, 'effect_capture_flash', sealRect, {
         alpha: 0.34,
         fit: 'stretch',
+        required: true,
     });
 }
 
@@ -368,6 +361,7 @@ function drawIconText(ui, artTextures, assetId, x, y, iconSize, text, options = 
     const drawn = drawArtImage(ui, artTextures, assetId, iconRect, {
         alpha: options.iconAlpha ?? 1,
         tint: options.tint,
+        required: options.required ?? true,
     });
 
     if (!drawn && options.fallback) {
@@ -395,6 +389,7 @@ function drawArtButton(ui, artTextures, rect, label, options = {}) {
     const prefix = options.secondary ? 'button_secondary' : 'button_primary';
     const drawn = drawArtImage(ui, artTextures, `${prefix}_${state}`, rect, {
         alpha: options.alpha ?? 1,
+        required: true,
     });
 
     if (!drawn) {
@@ -439,6 +434,11 @@ function drawTile(ui, tileDef, rect, options = {}) {
         ui.drawImage(texture, rect, {
             alpha: options.alpha ?? 1,
         });
+        return;
+    }
+
+    if (!texture && options.tileTextures && !options.oneColorLand && options.requiredTexture !== false) {
+        drawMissingArtAsset(ui, rect, tileDef.id);
         return;
     }
 
@@ -511,9 +511,21 @@ function drawFieldResources(ui, artTextures, rect, resources, occupied) {
         const fallback = resource.type === 'heart' ? '+' : 'G';
         const backingColor = resource.type === 'heart' ? '#74314a' : '#6b4d20';
 
-        ui.drawRect(insetRect(iconRect, -Math.max(2, size * 0.08)), backingColor, occupied ? 0.72 : 0.56);
+        const backingRect = insetRect(iconRect, -Math.max(2, size * 0.08));
+        const effectId = resource.type === 'heart' ? 'effect_heart_heal' : 'effect_gold_pickup';
 
-        if (!drawArtImage(ui, artTextures, assetId, iconRect, { alpha: occupied ? 0.92 : 1 })) {
+        if (!drawArtImage(ui, artTextures, effectId, backingRect, {
+            alpha: occupied ? 0.56 : 0.48,
+            fit: 'stretch',
+            required: true,
+        })) {
+            ui.drawRect(backingRect, backingColor, occupied ? 0.72 : 0.56);
+        }
+
+        if (!drawArtImage(ui, artTextures, assetId, iconRect, {
+            alpha: occupied ? 0.92 : 1,
+            required: true,
+        })) {
             ui.drawText(fallback, x + size / 2, y + size * 0.18, {
                 align: 'center',
                 size: Math.max(13, size * 0.58),
@@ -581,10 +593,27 @@ function drawAttackRow(ui, rect, color, attack, result, settings) {
     });
 }
 
-function drawBattlePanelSurface(ui, rect, isUrgent = false) {
-    drawFramedPanel(ui, rect, {
-        urgent: isUrgent,
-        accent: isUrgent ? '#d78486' : '#d6a25c',
+function drawBattlePanelSurface(ui, artTextures, rect, isUrgent = false) {
+    if (!drawArtImage(ui, artTextures, 'panel_dark', rect, {
+        alpha: isUrgent ? 0.96 : 0.92,
+        fit: 'stretch',
+        required: true,
+    })) {
+        drawFramedPanel(ui, rect, {
+            urgent: isUrgent,
+            accent: isUrgent ? '#d78486' : '#d6a25c',
+        });
+        return;
+    }
+
+    const accent = isUrgent ? '#d78486' : '#d6a25c';
+    drawBorder(ui, rect, '#1c130f', 4, 0.9);
+    drawBorder(ui, insetRect(rect, 7), accent, 2, isUrgent ? 0.54 : 0.48);
+    drawCornerBrackets(ui, rect, accent, {
+        inset: 7,
+        length: 28,
+        thickness: 4,
+        alpha: isUrgent ? 0.72 : 0.62,
     });
 }
 
@@ -620,7 +649,10 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                 ? isInvalidHovered ? 'board_cell_invalid' : 'board_cell_hover'
                 : isValid ? 'board_cell_valid'
                 : 'board_cell_empty';
-            if (!drawArtImage(ui, artTextures, cellAssetId, rect, { alpha: 1 })) {
+            if (!drawArtImage(ui, artTextures, cellAssetId, rect, {
+                alpha: 1,
+                required: true,
+            })) {
                 ui.drawRect(rect, fill, 1);
                 drawBorder(ui, rect, border, isHovered && isValid ? 3 : 1, isValid ? 1 : 0.7);
             }
@@ -701,7 +733,10 @@ function drawBoard(ui, layout, settings, state, mouse, tileTextures, artTextures
                 const overlayId = isRoadModeVariant(settings)
                     ? isTargetA ? 'overlay_gate_start' : 'overlay_gate_end'
                     : isTargetA ? 'overlay_target_a' : 'overlay_target_b';
-                drawArtImage(ui, artTextures, overlayId, insetRect(rect, 4), { alpha: 0.88 });
+                drawArtImage(ui, artTextures, overlayId, insetRect(rect, 4), {
+                    alpha: 0.88,
+                    required: true,
+                });
                 drawBorder(ui, insetRect(rect, 4), targetColor, 2, 0.86);
                 ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - 13, {
                     align: 'center',
@@ -730,7 +765,10 @@ function drawHand(ui, layout, settings, state, mouse, tileTextures, artTextures)
             artTextures,
             selected ? 'slot_hand_selected' : hovered ? 'slot_hand_hover' : 'slot_hand_empty',
             rect,
-            { alpha: tileDef ? 1 : 0.78 },
+            {
+                alpha: tileDef ? 1 : 0.78,
+                required: true,
+            },
         );
         drawBorder(ui, rect, selected ? '#f6f0a8' : '#38536a', selected ? 4 : 2, selected ? 1 : 0.8);
         drawTile(ui, tileDef, insetRect(rect, 8), {
@@ -766,7 +804,10 @@ function drawHold(ui, layout, settings, state, mouse, tileTextures, artTextures)
         artTextures,
         tileDef ? 'slot_hold_filled' : 'slot_hold_empty',
         rect,
-        { alpha: hovered ? 1 : 0.82 },
+        {
+            alpha: hovered ? 1 : 0.82,
+            required: true,
+        },
     );
     drawBorder(ui, rect, tileDef ? '#f3d991' : '#38536a', tileDef ? 3 : 2, tileDef ? 1 : 0.8);
     drawTile(ui, tileDef, insetRect(rect, 8), {
@@ -819,7 +860,7 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         ? state.lastResult.score.zones.reduce((sum, zone) => sum + zone.area, 0)
         : 0;
 
-    drawBattlePanelSurface(ui, panel, state.outcome === 'defeat');
+    drawBattlePanelSurface(ui, artTextures, panel, state.outcome === 'defeat');
     const compact = panel.width < 330;
     const monsterIconSize = compact ? 48 : 54;
     const monsterIconId = getBattleAssetId('monster_icon', battle);
@@ -850,6 +891,8 @@ function drawSidePanel(ui, layout, battle, run, settings, state, artTextures) {
         y: panel.y + 16,
         width: monsterIconSize,
         height: monsterIconSize,
+    }, {
+        required: true,
     });
     drawBorder(ui, {
         x: panel.x + 18,
@@ -1020,8 +1063,14 @@ function getCompactBattleLine(battle, state, settings) {
     return `${getMonsterName(battle)} · Раунд ${state.round} · ${variant.shortLabel}`;
 }
 
-function drawPortraitBattleHud(ui, hud, run, state) {
-    ui.drawRect(hud, '#06101a', 0.9);
+function drawPortraitBattleHud(ui, artTextures, hud, run, state) {
+    if (!drawArtImage(ui, artTextures, 'panel_dark', hud, {
+        alpha: 0.92,
+        fit: 'stretch',
+        required: true,
+    })) {
+        ui.drawRect(hud, '#06101a', 0.9);
+    }
     drawBorder(ui, hud, '#d6a25c', 1, 0.42);
     ui.drawText(`Б${run.currentBattle}/${run.totalBattles}`, hud.x + 10, hud.y + 9, {
         size: 14,
@@ -1051,9 +1100,17 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
         const banner = layout.monsterBanner;
 
         const backdropId = getBattleAssetId('level_backdrop', battle);
-        if (drawArtImage(ui, artTextures, backdropId, banner, { alpha: 0.94, fit: 'cover' })) {
+        if (drawArtImage(ui, artTextures, backdropId, banner, {
+            alpha: 0.94,
+            fit: 'cover',
+            required: true,
+        })) {
             ui.drawRect(banner, '#03070c', 0.32);
-        } else if (!drawArtImage(ui, artTextures, 'panel_dark', banner, { alpha: 0.9 })) {
+        } else if (!drawArtImage(ui, artTextures, 'panel_dark', banner, {
+            alpha: 0.9,
+            fit: 'stretch',
+            required: true,
+        })) {
             ui.drawRect(banner, '#132334', 0.94);
             drawBorder(ui, banner, '#31566b', 1, 0.85);
         }
@@ -1078,7 +1135,7 @@ function drawBattleHeader(ui, layout, run, battle, settings, state, artTextures)
             size: 13,
             color: '#d7c59e',
         });
-        drawPortraitBattleHud(ui, hud, run, state);
+        drawPortraitBattleHud(ui, artTextures, hud, run, state);
         return;
     }
 
@@ -1148,7 +1205,7 @@ function getBattleUiState(state, settings) {
     };
 }
 
-function drawPortraitFeedback(ui, layout, settings, state) {
+function drawPortraitFeedback(ui, artTextures, layout, settings, state) {
     if (layout.mode !== 'portrait') {
         if (state.feedback) {
             ui.drawText(state.feedback, layout.board.x, layout.hand[0].y - 34, {
@@ -1172,14 +1229,26 @@ function drawPortraitFeedback(ui, layout, settings, state) {
                 ? `Сдать руку ${formatHeartDelta(submitCost.totalDamage)} · карт ${submitCost.unplayedHandCards}`
                 : 'Ход';
 
-    ui.drawRect(feedback, '#101c2a', 0.36);
+    if (!drawArtImage(ui, artTextures, 'panel_dark', feedback, {
+        alpha: 0.48,
+        fit: 'stretch',
+        required: true,
+    })) {
+        ui.drawRect(feedback, '#101c2a', 0.36);
+    }
     drawBorder(ui, feedback, '#7d5a34', 1, 0.55);
     ui.drawText(state.feedback ?? fallback, feedback.x + 10, feedback.y + 8, {
         size: 14,
         color: state.feedback?.startsWith('Нельзя') ? '#ff8b9c' : '#f3d991',
     });
 
-    ui.drawRect(log, '#0d1824', 0.42);
+    if (!drawArtImage(ui, artTextures, 'panel_dark', log, {
+        alpha: 0.42,
+        fit: 'stretch',
+        required: true,
+    })) {
+        ui.drawRect(log, '#0d1824', 0.42);
+    }
     drawBorder(ui, log, '#7d5a34', 1, 0.45);
     const latestLog = (state.battleLog ?? []).slice(-2);
     const lines = latestLog.length > 0
@@ -1668,7 +1737,11 @@ export function createBattleScene({
                 y: 0,
                 width: screen.width,
                 height: screen.height,
-            }, { alpha: 0.95, fit: 'cover' });
+            }, {
+                alpha: 0.95,
+                fit: 'cover',
+                required: true,
+            });
             ui.drawRect({
                 x: 0,
                 y: 0,
@@ -1680,7 +1753,7 @@ export function createBattleScene({
             drawSidePanel(ui, this.layout, battle, run, settings, state, artTextures);
             drawHold(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
             drawHand(ui, this.layout, settings, state, mouse, tileTextures, artTextures);
-            drawPortraitFeedback(ui, this.layout, settings, state);
+            drawPortraitFeedback(ui, artTextures, this.layout, settings, state);
             const submitBlocked = usesHandSubmitEconomy(settings)
                 && state.phase === 'placing'
                 && !state.outcome

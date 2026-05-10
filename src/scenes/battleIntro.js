@@ -1,4 +1,5 @@
 import { drawBorder } from '../render/chrome.js';
+import { drawArtImage } from '../render/art.js';
 
 const PORTRAIT_BREAKPOINT = 760;
 const PORTRAIT_ASPECT = 1.08;
@@ -198,15 +199,8 @@ export function createBattleIntroLayout(screen) {
         : createDesktopLayout(screen);
 }
 
-function getTexture(artTextures, assetId) {
-    return artTextures?.textures?.get(assetId) ?? null;
-}
-
-function drawImageOrRect(ui, artTextures, assetId, rect, fallbackColor, alpha = 1, fit = 'cover') {
-    const texture = getTexture(artTextures, assetId);
-
-    if (texture) {
-        ui.drawImage(texture, rect, { alpha, fit });
+function drawImageOrRect(ui, artTextures, assetId, rect, fallbackColor, alpha = 1, fit = 'cover', required = false) {
+    if (drawArtImage(ui, artTextures, assetId, rect, { alpha, fit, required })) {
         return true;
     }
 
@@ -217,14 +211,15 @@ function drawImageOrRect(ui, artTextures, assetId, rect, fallbackColor, alpha = 
 function drawArtButton(ui, artTextures, rect, label, options = {}) {
     const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
     const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
-    const texture = getTexture(artTextures, `button_primary_${state}`);
+    const drawn = drawArtImage(ui, artTextures, `button_primary_${state}`, rect, {
+        required: true,
+    });
 
-    if (!texture) {
+    if (!drawn) {
         ui.drawButton(rect, label, options);
         return;
     }
 
-    ui.drawImage(texture, rect, { alpha: 1 });
     ui.drawText(label, rect.x + rect.width / 2, rect.y + rect.height / 2 - (options.textSize ?? 22) / 2 - 2, {
         align: 'center',
         size: options.textSize ?? 22,
@@ -313,13 +308,15 @@ export function createBattleIntroScene({
                 rect(0, 0, screen.width, screen.height),
                 '#091522',
                 1,
+                'cover',
+                true,
             );
 
             ui.drawRect(rect(0, 0, screen.width, screen.height), '#06101a', 0.38);
 
             if (layout.mode === 'portrait') {
                 ui.drawRect(layout.hud, '#06101a', 0.72);
-                drawImageOrRect(ui, artTextures, 'panel_dark', layout.hud, '#0f1d2b', 0.92, 'stretch');
+                drawImageOrRect(ui, artTextures, 'panel_dark', layout.hud, '#0f1d2b', 0.92, 'stretch', true);
                 ui.drawText(`Б${preview.battleNumber}/${preview.totalBattles}`, layout.hud.x + 10, layout.hud.y + 9, {
                     size: 13,
                     color: '#eef8ff',
@@ -341,9 +338,9 @@ export function createBattleIntroScene({
                     color: '#f3fbff',
                     maxWidth: layout.title.width - 20,
                 });
-                drawImageOrRect(ui, artTextures, preview.assetIds.portrait, layout.portrait, '#182838', 0.98);
+                drawImageOrRect(ui, artTextures, preview.assetIds.portrait, layout.portrait, '#182838', 0.98, 'cover', true);
                 drawBorder(ui, layout.portrait, '#486a87', 2, 0.9);
-                drawImageOrRect(ui, artTextures, preview.assetIds.icon, layout.icon, '#20394d', 0.98);
+                drawImageOrRect(ui, artTextures, preview.assetIds.icon, layout.icon, '#20394d', 0.98, 'cover', true);
                 drawBorder(ui, layout.icon, '#f3d991', 2, 0.9);
             } else {
                 ui.drawText(`Битва ${preview.battleNumber} / ${preview.totalBattles}`, layout.hud.x, layout.hud.y + 4, {
@@ -354,17 +351,17 @@ export function createBattleIntroScene({
                     size: 17,
                     color: '#98b4c8',
                 });
-                drawImageOrRect(ui, artTextures, preview.assetIds.backdrop, layout.backdrop, '#101d2b', 0.96);
+                drawImageOrRect(ui, artTextures, preview.assetIds.backdrop, layout.backdrop, '#101d2b', 0.96, 'cover', true);
                 ui.drawRect(layout.backdrop, '#07121f', 0.28);
-                drawImageOrRect(ui, artTextures, preview.assetIds.portrait, layout.portrait, '#182838', 0.98);
+                drawImageOrRect(ui, artTextures, preview.assetIds.portrait, layout.portrait, '#182838', 0.98, 'cover', true);
                 drawBorder(ui, layout.backdrop, '#31566b', 2, 0.85);
                 drawBorder(ui, layout.portrait, '#486a87', 2, 0.9);
             }
 
-            drawImageOrRect(ui, artTextures, 'panel_dark', layout.details, '#0f1d2b', 0.92, 'stretch');
+            drawImageOrRect(ui, artTextures, 'panel_dark', layout.details, '#0f1d2b', 0.92, 'stretch', true);
 
             if (layout.mode === 'desktop') {
-                drawImageOrRect(ui, artTextures, preview.assetIds.icon, layout.icon, '#20394d', 0.98);
+                drawImageOrRect(ui, artTextures, preview.assetIds.icon, layout.icon, '#20394d', 0.98, 'cover', true);
                 drawBorder(ui, layout.icon, '#f3d991', 2, 0.9);
                 ui.drawText(preview.monsterName, layout.details.x + 122, layout.details.y + 20, {
                     size: 28,

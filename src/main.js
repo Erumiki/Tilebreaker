@@ -96,25 +96,43 @@ async function loadArtTextures(PIXI) {
         const manifest = await response.json();
         const root = manifest.root ?? 'assets/art_mvp';
         const cacheBust = manifest.cacheBust ?? Date.now().toString(36);
+        const loadFailures = [];
         const entries = await Promise.all((manifest.assets ?? []).map(async (asset) => {
             try {
                 const url = `${root}/${asset.file}?v=${encodeURIComponent(cacheBust)}`;
                 return [asset.id, await PIXI.Assets.load(url)];
             } catch (error) {
                 console.warn(`Failed to load art texture ${asset.file}`, error);
+                loadFailures.push({
+                    id: asset.id,
+                    file: asset.file,
+                    error: String(error?.message ?? error),
+                });
                 return null;
             }
         }));
 
+        if (loadFailures.length > 0) {
+            console.error('Some MVP art textures failed to load', loadFailures);
+        }
+
         return {
             manifest,
             textures: new Map(entries.filter(Boolean)),
+            missingAssetIds: loadFailures.map((failure) => failure.id),
+            loadFailures,
         };
     } catch (error) {
-        console.warn('Art manifest unavailable; using drawn fallbacks', error);
+        console.error('Art manifest unavailable; required art will render as missing assets', error);
         return {
             manifest: null,
             textures: new Map(),
+            missingAssetIds: ['art_manifest'],
+            loadFailures: [{
+                id: 'art_manifest',
+                file: 'assets/art_mvp/art_manifest.json',
+                error: String(error?.message ?? error),
+            }],
         };
     }
 }
@@ -308,5 +326,13 @@ window.__tilebreakerDebug = {
     },
     getResultDebug() {
         return scene?.name === 'result' ? scene.getDebugState?.() ?? null : null;
+    },
+    getArtDebug() {
+        return {
+            loadedCount: artTextures.textures.size,
+            manifestAssetCount: artTextures.manifest?.assets?.length ?? 0,
+            missingAssetIds: [...artTextures.missingAssetIds ?? []],
+            loadFailures: [...artTextures.loadFailures ?? []],
+        };
     },
 };

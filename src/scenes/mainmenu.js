@@ -1,4 +1,5 @@
 import { getGameplayVariant } from '../entities/gameplayVariants.js';
+import { drawArtImage } from '../render/art.js';
 
 function getStartButton(screen) {
     const width = Math.min(340, screen.width - 48);
@@ -44,29 +45,14 @@ function getLogoLayout(screen) {
     };
 }
 
-function getArtTexture(artTextures, assetId) {
-    return artTextures?.textures?.get(assetId) ?? null;
-}
-
-function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
-    const texture = getArtTexture(artTextures, assetId);
-
-    if (!texture) {
-        return false;
-    }
-
-    ui.drawImage(texture, rect, {
-        alpha: options.alpha ?? 1,
-        fit: options.fit,
-    });
-    return true;
-}
-
 function drawArtButton(ui, artTextures, rect, label, options = {}) {
     const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
     const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
     const prefix = options.secondary ? 'button_secondary' : 'button_primary';
-    const drawn = drawArtImage(ui, artTextures, `${prefix}_${state}`, rect, { alpha: 1 });
+    const drawn = drawArtImage(ui, artTextures, `${prefix}_${state}`, rect, {
+        alpha: 1,
+        required: true,
+    });
 
     if (!drawn) {
         ui.drawButton(rect, label, options);
@@ -315,7 +301,10 @@ export function createMainMenuScene({ config, input, ui, artTextures = null, onS
                 height: screen.height,
             };
 
-            if (!drawArtImage(ui, artTextures, 'screen_background_menu', screenRect, { fit: 'cover' })) {
+            if (!drawArtImage(ui, artTextures, 'screen_background_menu', screenRect, {
+                fit: 'cover',
+                required: true,
+            })) {
                 ui.drawRect(screenRect, [
                     color[0] * pulse,
                     color[1] * pulse,

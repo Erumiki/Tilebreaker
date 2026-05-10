@@ -1,3 +1,5 @@
+import { drawArtImage, drawMissingArtAsset } from '../render/art.js';
+
 function getShopLayout(screen, offerCount) {
     const isPortrait = screen.width < 620;
     const gap = isPortrait ? 10 : 16;
@@ -74,28 +76,12 @@ function getShopLayout(screen, offerCount) {
     };
 }
 
-function getArtTexture(artTextures, assetId) {
-    return artTextures?.textures?.get(assetId) ?? null;
-}
-
-function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
-    const texture = getArtTexture(artTextures, assetId);
-
-    if (!texture) {
-        return false;
-    }
-
-    ui.drawImage(texture, rect, {
-        alpha: options.alpha ?? 1,
-        fit: options.fit,
-    });
-    return true;
-}
-
 function drawArtButton(ui, artTextures, rect, label, options = {}) {
     const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
     const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
-    const drawn = drawArtImage(ui, artTextures, `button_primary_${state}`, rect);
+    const drawn = drawArtImage(ui, artTextures, `button_primary_${state}`, rect, {
+        required: true,
+    });
 
     if (!drawn) {
         ui.drawButton(rect, label, options);
@@ -163,7 +149,7 @@ function drawOfferCard(ui, {
         ? 'shop_card_bought'
         : affordable ? 'shop_card_affordable' : 'shop_card_unaffordable';
 
-    if (!drawArtImage(ui, artTextures, assetId, rect)) {
+    if (!drawArtImage(ui, artTextures, assetId, rect, { required: true })) {
         ui.drawRect(rect, offer.bought ? '#263421' : affordable ? '#173747' : '#201d25', 0.96);
         ui.drawRect({
             x: rect.x,
@@ -196,12 +182,7 @@ function drawOfferCard(ui, {
     if (tileTexture) {
         ui.drawImage(tileTexture, previewRect, { fit: 'contain', alpha: offer.bought ? 0.78 : 1 });
     } else {
-        ui.drawRect(previewRect, '#3b2d31', 0.88);
-        ui.drawText('?', previewRect.x + previewRect.width / 2, previewRect.y + 7, {
-            align: 'center',
-            size: 28,
-            color: '#f4d36f',
-        });
+        drawMissingArtAsset(ui, previewRect, offer.assetId ?? offer.tileId ?? offer.cardId);
     }
 
     if (!compact) {
@@ -287,7 +268,10 @@ export function createShopScene({
                 height: screen.height,
             };
 
-            if (!drawArtImage(ui, artTextures, 'screen_background_shop', screenRect, { fit: 'cover' })) {
+            if (!drawArtImage(ui, artTextures, 'screen_background_shop', screenRect, {
+                fit: 'cover',
+                required: true,
+            })) {
                 ui.drawRect(screenRect, '#07111d', 1);
             }
             ui.drawRect(screenRect, '#03070c', 0.26);

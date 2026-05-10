@@ -114,7 +114,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-09] MVP Art Track 3: asset validation, cleanup and final art-lead audit
+### ~~[2026-05-09] MVP Art Track 3: asset validation, cleanup and final art-lead audit~~
 
 **Idea:** finish only the art extraction work that protects the final build from hidden missing assets or obvious prototype chrome.
 
@@ -130,6 +130,8 @@ The single list of planned features, improvements, work order and statuses for T
 - run an art-lead audit and record remaining prototype visuals as follow-up tasks only if they are visible in normal play.
 
 **Acceptance:** validation catches missing normal-path assets, the visible MVP screens render from manifest-backed art except for an explicit allowlist, and the art-lead audit confirms no major prototype visuals remain in the jam path.
+
+**Completed 2026-05-10:** added `scripts/validate-art-assets.js` and wired it into `./scripts/npm.sh run check` so normal-path art ids, PNG loadability, dimensions, opaque backgrounds, configured battle assets, active tile PNGs and enabled shop-card tile references fail fast. Added `src/render/art.js` missing-art rendering, runtime art load diagnostics and smoke coverage through `getArtDebug()`. Routed remaining normal-path surfaces for battle HUD panels, field resources, closure overlays, shop cards/buttons and result panels/buttons through manifest-backed art or explicit missing-art states. Recorded the final allowlist and audit in `design/art-track-3-audit.md`. Verified with `./scripts/npm.sh run check` and targeted Playwright coverage for the 5-battle loop, shop buy path and portrait shop layout.
 
 **Priority:** must
 
@@ -177,6 +179,30 @@ The single list of planned features, improvements, work order and statuses for T
 - write a short known-issues list if anything remains intentionally rough.
 
 **Acceptance:** the jam build can be opened from a clean production preview, the normal loop works through final victory or defeat, screenshots are captured, and docs describe exactly how to run and judge the submitted MVP.
+
+**Priority:** must
+
+**Layer:** MVP
+
+---
+
+### [2026-05-10] Itch.io Release Execution: package, page setup and art handoff
+
+**Idea:** turn the final jam build into a browser-playable itch.io page without improvising upload settings, copy or marketing art at the last minute.
+
+**Why:** itch release has a separate failure surface from the local build: HTML5 ZIP structure, relative asset paths, mobile/fullscreen embed behavior, cover/screenshot requirements, page metadata, and jam visibility/submission steps.
+
+**MVP:**
+
+- use `todo/itch-release-plan.md` as the executor-facing release specification;
+- build and package the production `dist/` contents into an itch HTML5 ZIP with top-level `index.html`;
+- verify relative asset paths, case-sensitive filenames, ZIP size/file limits and no missing runtime assets;
+- fill the itch project fields, description, tags, launch instructions and theme choices from the spec;
+- upload the required cover, header, embed background, page background and 3-5 final build screenshots from the art brief;
+- keep the project private until the itch-hosted browser build has been tested logged in and logged out/incognito;
+- if this is a jam submission, submit the saved project to the jam and verify the submission badge before making the page public.
+
+**Acceptance:** the itch.io page is public or jam-submitted as required, the browser build launches from itch on desktop and mobile, and every visible field/art asset came from `todo/itch-release-plan.md` or a recorded lead-approved change.
 
 **Priority:** must
 

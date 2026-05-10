@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tilebreaker Itch Art Compositor</title>
+  <style>
+    :root {
+      --w: 1200px;
+      --h: 360px;
+      --title: 96px;
+      --title-x: 74px;
+      --title-y: 112px;
+      --subtitle: 21px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #05090d;
+    }
+
+    #stage {
+      position: relative;
+      width: var(--w);
+      height: var(--h);
+      overflow: hidden;
+      background: #05090d;
+      color: #fff6dc;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .base {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: var(--object-position, center center);
+      filter: saturate(var(--sat, 1.04)) contrast(var(--contrast, 1.04)) brightness(var(--brightness, 1));
+    }
+
+    .vignette,
+    .left-shade,
+    .center-quiet,
+    .page-quiet {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .vignette {
+      background:
+        radial-gradient(circle at 55% 50%, transparent 0 38%, rgb(1 4 8 / 0.22) 68%, rgb(0 0 0 / 0.6) 100%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.5));
+    }
+
+    .left-shade {
+      background: linear-gradient(90deg, rgb(2 6 10 / 0.86) 0%, rgb(4 8 13 / 0.62) 28%, transparent 62%);
+    }
+
+    .center-quiet {
+      background:
+        radial-gradient(ellipse at center, rgb(3 6 9 / 0.58) 0 18%, rgb(3 6 9 / 0.34) 33%, transparent 55%),
+        linear-gradient(180deg, rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.3));
+    }
+
+    .page-quiet {
+      background:
+        linear-gradient(90deg, rgb(5 10 15 / 0.74), rgb(5 10 15 / 0.5) 46%, rgb(5 10 15 / 0.22) 78%),
+        radial-gradient(circle at 52% 46%, rgb(0 0 0 / 0.38) 0 42%, rgb(0 0 0 / 0.58) 100%);
+    }
+
+    .logo {
+      position: absolute;
+      left: var(--title-x);
+      top: var(--title-y);
+      width: var(--logo-w, 560px);
+      transform: translateY(-50%);
+      text-shadow:
+        0 5px 0 #070607,
+        0 -2px 0 #5d371b,
+        3px 0 0 #5d371b,
+        -3px 0 0 #5d371b,
+        0 0 18px rgb(255 220 150 / 0.5);
+    }
+
+    .title {
+      margin: 0;
+      font-size: var(--title);
+      line-height: 0.9;
+      font-style: italic;
+      font-weight: 800;
+      letter-spacing: 0;
+      color: #fff7db;
+      white-space: nowrap;
+    }
+
+    .subtitle {
+      margin-top: 16px;
+      color: #f2d08b;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: var(--subtitle);
+      font-weight: 700;
+      letter-spacing: 0;
+      text-shadow: 0 2px 6px rgb(0 0 0 / 0.9);
+      text-transform: uppercase;
+    }
+
+    .rule {
+      width: var(--rule-w, 420px);
+      height: 5px;
+      margin-top: 16px;
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, #ff5848 0 44%, #ffe4a7 47% 53%, #5db8ff 56% 100%);
+      box-shadow:
+        0 0 18px rgb(255 80 62 / 0.46),
+        0 0 22px rgb(91 180 255 / 0.34);
+    }
+
+    .corner-mark {
+      position: absolute;
+      width: var(--corner-size, 58px);
+      height: var(--corner-size, 58px);
+      left: var(--mark-x, 36px);
+      bottom: var(--mark-y, 32px);
+      border: 2px solid rgb(255 222 155 / 0.72);
+      transform: rotate(45deg);
+      box-shadow: 0 0 24px rgb(255 194 98 / 0.22);
+    }
+
+    .corner-mark::before,
+    .corner-mark::after {
+      content: "";
+      position: absolute;
+      background: rgb(255 222 155 / 0.78);
+    }
+
+    .corner-mark::before {
+      left: 50%;
+      top: 8px;
+      width: 2px;
+      height: calc(100% - 16px);
+      transform: translateX(-50%);
+    }
+
+    .corner-mark::after {
+      top: 50%;
+      left: 8px;
+      width: calc(100% - 16px);
+      height: 2px;
+      transform: translateY(-50%);
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <img class="base" alt="">
+    <div class="vignette"></div>
+    <div class="left-shade"></div>
+    <div class="center-quiet"></div>
+    <div class="page-quiet"></div>
+    <div class="logo">
+      <h1 class="title">Tilebreaker</h1>
+      <div class="rule"></div>
+      <div class="subtitle">Astral Archive puzzle battler</div>
+    </div>
+    <div class="corner-mark"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const asset = params.get('asset') || 'header';
+    const configs = {
+      cover: {
+        w: 630,
+        h: 500,
+        img: 'cover_base_generated.png',
+        objectPosition: 'center center',
+        title: 78,
+        titleX: 42,
+        titleY: 94,
+        logoW: 500,
+        subtitle: 15,
+        ruleW: 310,
+        markX: 36,
+        markY: 28,
+        cornerSize: 48,
+        sat: 1.08,
+        contrast: 1.06,
+        brightness: 1.02,
+        layers: ['vignette', 'left-shade', 'logo', 'corner-mark'],
+      },
+      header: {
+        w: 1200,
+        h: 360,
+        img: 'header_base_generated.png',
+        objectPosition: 'center center',
+        title: 96,
+        titleX: 70,
+        titleY: 145,
+        logoW: 620,
+        subtitle: 20,
+        ruleW: 430,
+        markX: 44,
+        markY: 34,
+        cornerSize: 54,
+        sat: 1.02,
+        contrast: 1.02,
+        brightness: 0.98,
+        layers: ['vignette', 'left-shade', 'logo', 'corner-mark'],
+      },
+      embed: {
+        w: 1280,
+        h: 720,
+        img: 'embed_background_base_generated.png',
+        objectPosition: 'center center',
+        sat: 0.96,
+        contrast: 0.98,
+        brightness: 0.88,
+        layers: ['vignette', 'center-quiet'],
+      },
+      page: {
+        w: 1920,
+        h: 1080,
+        img: 'page_background_base_generated.png',
+        objectPosition: 'center center',
+        sat: 0.82,
+        contrast: 0.92,
+        brightness: 0.72,
+        layers: ['page-quiet'],
+      },
+    };
+
+    const config = configs[asset] || configs.header;
+    const stage = document.querySelector('#stage');
+    const base = document.querySelector('.base');
+    const layerNames = ['vignette', 'left-shade', 'center-quiet', 'page-quiet', 'logo', 'corner-mark'];
+
+    document.documentElement.style.setProperty('--w', `${config.w}px`);
+    document.documentElement.style.setProperty('--h', `${config.h}px`);
+    document.documentElement.style.setProperty('--object-position', config.objectPosition);
+    document.documentElement.style.setProperty('--title', `${config.title || 96}px`);
+    document.documentElement.style.setProperty('--title-x', `${config.titleX || 70}px`);
+    document.documentElement.style.setProperty('--title-y', `${config.titleY || 145}px`);
+    document.documentElement.style.setProperty('--logo-w', `${config.logoW || 620}px`);
+    document.documentElement.style.setProperty('--subtitle', `${config.subtitle || 20}px`);
+    document.documentElement.style.setProperty('--rule-w', `${config.ruleW || 430}px`);
+    document.documentElement.style.setProperty('--mark-x', `${config.markX || 44}px`);
+    document.documentElement.style.setProperty('--mark-y', `${config.markY || 34}px`);
+    document.documentElement.style.setProperty('--corner-size', `${config.cornerSize || 54}px`);
+    document.documentElement.style.setProperty('--sat', config.sat || 1);
+    document.documentElement.style.setProperty('--contrast', config.contrast || 1);
+    document.documentElement.style.setProperty('--brightness', config.brightness || 1);
+
+    base.src = config.img;
+    base.alt = `${asset} base`;
+    stage.dataset.asset = asset;
+    layerNames.forEach((layer) => {
+      const element = document.querySelector(`.${layer}`);
+      if (element) {
+        element.style.display = config.layers?.includes(layer) ? 'block' : 'none';
+      }
+    });
+  </script>
+</body>
+</html>

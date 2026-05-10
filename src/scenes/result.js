@@ -1,5 +1,6 @@
 import { BattleOutcome } from '../entities/run.js';
 import { drawBorder, drawCornerBrackets } from '../render/chrome.js';
+import { drawArtImage } from '../render/art.js';
 
 function getResultLayout(screen) {
     const isPortrait = screen.width < 620;
@@ -54,27 +55,15 @@ function getResultLayout(screen) {
     };
 }
 
-function getArtTexture(artTextures, assetId) {
-    return artTextures?.textures?.get(assetId) ?? null;
-}
-
-function drawArtImage(ui, artTextures, assetId, rect, options = {}) {
-    const texture = getArtTexture(artTextures, assetId);
-
-    if (!texture) {
-        return false;
-    }
-
-    ui.drawImage(texture, rect, {
-        alpha: options.alpha ?? 1,
-        fit: options.fit,
-    });
-    return true;
-}
-
-function drawResultPanel(ui, rect, isDefeat) {
+function drawResultPanel(ui, artTextures, rect, isDefeat) {
     const accent = isDefeat ? '#d78486' : '#d6a25c';
-    ui.drawRect(rect, '#050911', isDefeat ? 0.9 : 0.86);
+    if (!drawArtImage(ui, artTextures, 'panel_dark', rect, {
+        alpha: isDefeat ? 0.96 : 0.92,
+        fit: 'stretch',
+        required: true,
+    })) {
+        ui.drawRect(rect, '#050911', isDefeat ? 0.9 : 0.86);
+    }
     ui.drawRect({
         x: rect.x + 12,
         y: rect.y + 12,
@@ -96,12 +85,18 @@ function drawResultPanel(ui, rect, isDefeat) {
     });
 }
 
-function drawResultButton(ui, rect, label, options = {}) {
+function drawResultButton(ui, artTextures, rect, label, options = {}) {
     const hovered = options.mouse ? ui.contains(rect, options.mouse) : false;
     const accent = options.accent ?? '#d6a25c';
     const fill = hovered ? options.hoverColor ?? '#294a5d' : options.color ?? '#1c3346';
+    const state = options.disabled ? 'disabled' : hovered ? 'hover' : 'default';
+    const drawn = drawArtImage(ui, artTextures, `button_primary_${state}`, rect, {
+        required: true,
+    });
 
-    ui.drawRect(rect, fill, 0.96);
+    if (!drawn) {
+        ui.drawRect(rect, fill, 0.96);
+    }
     drawBorder(ui, rect, '#1c130f', 3, 0.88);
     drawBorder(ui, {
         x: rect.x + 6,
@@ -168,11 +163,14 @@ export function createBattleResultScene({
                 height: screen.height,
             };
 
-            if (!drawArtImage(ui, artTextures, 'screen_background_result', screenRect, { fit: 'cover' })) {
+            if (!drawArtImage(ui, artTextures, 'screen_background_result', screenRect, {
+                fit: 'cover',
+                required: true,
+            })) {
                 ui.drawRect(screenRect, '#07111d', 1);
             }
             ui.drawRect(screenRect, '#03070c', isDefeat ? 0.38 : 0.24);
-            drawResultPanel(ui, this.layout.panel, isDefeat);
+            drawResultPanel(ui, artTextures, this.layout.panel, isDefeat);
 
             ui.drawText(title, screen.width / 2, this.layout.titleY, {
                 align: 'center',
@@ -202,7 +200,7 @@ export function createBattleResultScene({
                     wordWrap: this.layout.mode === 'portrait',
                 });
             }
-            drawResultButton(ui, this.actionButton, label, {
+            drawResultButton(ui, artTextures, this.actionButton, label, {
                 mouse,
                 color: isDefeat ? '#4a2430' : '#1c3346',
                 hoverColor: isDefeat ? '#6d2f3e' : '#244c61',

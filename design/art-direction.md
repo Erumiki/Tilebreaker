@@ -8,6 +8,12 @@ Tilebreaker is a roguelite about a defender of a star archive who builds magical
 
 The player is not simply attacking a monster with tiles. The player is holding a defensive ritual. A closed contour is a completed seal or ward. The monster loses hearts because part of its intrusion has been cut off by the barrier.
 
+## Game Jam Story Pitch
+
+Tilebreaker - это история последнего хранителя Астрального Архива, древней обсерватории знаний, куда через трещины между звездами прорываются существа из пустоты. У героя почти не осталось оружия: только живой свет сердца и каменные плитки с руническими линиями, из которых нужно срочно складывать защитные контуры. Каждый замкнутый узор становится печатью, отсекает часть вторжения и вырывает монстра из реальности.
+
+Но Архив сопротивляется не бесконечно. Когда рука бесполезна, хранитель может "сдать" ее, перегрузив архивные механизмы ценой собственного света. Между битвами он собирает золото и усиливает колоду новыми фрагментами печатей, пытаясь продержаться до последнего зала, где станет ясно: он спасает не просто библиотеку, а память о мирах, которые уже исчезли.
+
 ## Accepted Style References
 
 The accepted visual direction is captured in project-local reference images:
