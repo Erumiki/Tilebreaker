@@ -83,6 +83,8 @@ Production build and local preview:
 
 The production build uses relative Vite asset paths (`--base=./`) so the generated `dist/` contents can be packaged as an itch.io HTML5 upload with `index.html` at the ZIP root.
 
+The browser shell includes a lightweight loading screen, CSS substrate and an in-game top-right fullscreen fallback. Runtime QA details are exposed through `window.__tilebreakerDebug.getRuntimeDebug()`.
+
 Current itch project: `https://mikitava.itch.io/tilebreaker`.
 
 Butler hotfix upload target:

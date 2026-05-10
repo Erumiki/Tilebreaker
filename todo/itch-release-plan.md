@@ -80,7 +80,7 @@ Use `dist` as the butler source so the existing itch `html5` channel/browser-pla
 Latest uploaded hotfix version:
 
 ```text
-hotfix-mobile-2026-05-10
+runtime-polish-2026-05-10
 ```
 
 ### Upload Requirements To Verify
@@ -116,12 +116,15 @@ Then verify the production preview:
 - no missing textures or 403/404 asset requests;
 - no console errors during menu, intro, battle, result or shop;
 - touch targets and text fit on portrait;
+- the loading screen is visible when config/assets are delayed, then hides before the main menu;
+- the in-game top-right fullscreen affordance can enter/exit fullscreen locally, or reports a blocked fullscreen state in debug if the browser/embed forbids it;
 - final screenshots are captured from this production build, not from dev-only/debug states.
 
 After uploading to itch, use `Save & view page` while the project is still private and verify:
 
 - the game launches from itch;
 - fullscreen launch works;
+- if the itch fullscreen control is blocked, the in-game top-right fullscreen affordance works on supported desktop browsers or reports the browser/embed block;
 - mobile launch works or shows the intended itch mobile behavior;
 - the uploaded ZIP is marked as browser-playable;
 - the project page can be opened logged out or in an incognito window;
@@ -137,6 +140,8 @@ Use:
 - Mobile Friendly: enabled after portrait production preview passes;
 - Scrollbars: disabled;
 - Fullscreen Button: unnecessary for fullscreen launch; if the form requires a choice, keep the default/automatic option.
+
+The build also has its own small top-right fullscreen affordance. This is a code-side fallback for browsers or itch embeds where the page-level fullscreen control does not give the game a usable fullscreen transition. The debug hook is `window.__tilebreakerDebug.getRuntimeDebug().fullscreen`.
 
 Fallback only if fullscreen launch feels wrong on desktop:
 

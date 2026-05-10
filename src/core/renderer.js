@@ -10,7 +10,7 @@ export async function initPixi(PIXI, canvas, config) {
         canvas,
         resizeTo: window,
         backgroundColor: colorArrayToHex(config.game.clearColor),
-        backgroundAlpha: config.game.clearColor[3] ?? 1,
+        backgroundAlpha: 0,
         antialias: false,
         autoDensity: true,
         resolution: Math.min(window.devicePixelRatio || 1, 2),

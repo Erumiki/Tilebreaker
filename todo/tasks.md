@@ -251,7 +251,7 @@ The single list of planned features, improvements, work order and statuses for T
 
 ---
 
-### [2026-05-10] Itch Runtime Polish: fullscreen, substrate and loading screen
+### ~~[2026-05-10] Itch Runtime Polish: fullscreen, substrate and loading screen~~
 
 **Idea:** fix the remaining itch-facing runtime polish issues: itch fullscreen does not currently work as expected, the page/game needs a lightweight substrate so the background feels intentional, and boot needs a loading screen.
 
@@ -277,6 +277,8 @@ The single list of planned features, improvements, work order and statuses for T
 **Acceptance:** the itch-hosted private page can launch fullscreen on supported desktop browsers or has a documented tested fallback; canvas sizing remains correct after fullscreen enter/exit; the loading screen is visible on a throttled or cold load before the main menu and disappears without layout flash; the new substrate tiles or renders cleanly on mobile and desktop, adds only a small asset/runtime footprint, and does not reduce gameplay readability.
 
 **Parallelization:** safe as a release-polish lane. The itch/settings check can happen separately from the code/art work, but code and art should agree on whether the substrate is manifest-backed PNG or procedural.
+
+**Completed 2026-05-10:** added a lightweight browser shell with CSS repeating-pattern substrate, a visible loading screen before Pixi/config/art readiness, boot-failure status instead of a blank page, and an in-game top-right fullscreen fallback that uses `requestFullscreen()` on `gameShell`, records browser/embed failures and resizes cleanly through the existing Pixi window resize path. Exposed runtime QA through `window.__tilebreakerDebug.getRuntimeDebug()`, added smoke coverage for delayed loading, substrate, fullscreen enter/exit or blocked fallback and canvas sizing, and captured `release/itch/art/qa_loading_screen_390x664_runtime_polish.png` from production preview. Updated itch/README instructions with the fallback and debug hook. Verified with `./scripts/npm.sh run check`, full `./scripts/npm.sh run test:e2e`, `./scripts/npm.sh run build`, `./scripts/npm.sh run test:e2e:preview -- --grep "runtime polish|portrait battle layout fits"`, clean ZIP checks and butler upload to `mikitava/tilebreaker:html5` as `runtime-polish-2026-05-10` (`✓ #1662529`).
 
 **Priority:** must
 

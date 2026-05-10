@@ -28,16 +28,123 @@ import { createBattleResultScene } from './scenes/result.js';
 import { createShopScene } from './scenes/upgrades.js';
 
 const canvas = document.getElementById('game');
+const gameShell = document.getElementById('gameShell');
+const loadingScreen = document.getElementById('loadingScreen');
+const loadingStatus = document.getElementById('loadingStatus');
+const fullscreenButton = document.getElementById('fullscreenButton');
 const bootDebug = {
     step: 'start',
     completed: [],
     errors: [],
 };
+const runtimeDebug = {
+    loading: {
+        visible: true,
+        status: 'Loading archive...',
+        failed: false,
+    },
+    fullscreen: {
+        available: Boolean(gameShell?.requestFullscreen),
+        active: false,
+        error: null,
+        lastChange: null,
+    },
+    substrate: {
+        mode: 'css-repeating-pattern',
+        assetBytes: 0,
+    },
+};
 
 window.__tilebreakerBoot = bootDebug;
 
+function setLoadingStatus(status) {
+    runtimeDebug.loading.visible = !document.body.classList.contains('is-ready');
+    runtimeDebug.loading.status = status;
+    if (loadingStatus) {
+        loadingStatus.textContent = status;
+    }
+}
+
+function showBootFailure(error) {
+    const message = String(error?.message ?? error);
+    runtimeDebug.loading.visible = true;
+    runtimeDebug.loading.failed = true;
+    runtimeDebug.loading.status = `Loading failed: ${message}`;
+    document.body.classList.add('has-boot-error');
+    document.body.classList.remove('is-ready');
+    if (loadingStatus) {
+        loadingStatus.textContent = runtimeDebug.loading.status;
+    }
+}
+
+function hideLoadingScreen() {
+    runtimeDebug.loading.visible = false;
+    runtimeDebug.loading.failed = false;
+    document.body.classList.add('is-ready');
+}
+
+function updateFullscreenState() {
+    const fullscreenElement = document.fullscreenElement;
+    runtimeDebug.fullscreen.available = Boolean(gameShell?.requestFullscreen);
+    runtimeDebug.fullscreen.active = fullscreenElement === gameShell
+        || fullscreenElement === document.documentElement
+        || fullscreenElement === canvas;
+    runtimeDebug.fullscreen.lastChange = Date.now();
+
+    if (fullscreenButton) {
+        fullscreenButton.hidden = !runtimeDebug.fullscreen.available;
+        fullscreenButton.disabled = !runtimeDebug.fullscreen.available;
+        fullscreenButton.classList.toggle('is-active', runtimeDebug.fullscreen.active);
+        fullscreenButton.title = runtimeDebug.fullscreen.active ? 'Exit fullscreen' : 'Fullscreen';
+        fullscreenButton.setAttribute('aria-label', fullscreenButton.title);
+    }
+
+    requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+    });
+}
+
+async function toggleFullscreen() {
+    runtimeDebug.fullscreen.error = null;
+
+    try {
+        if (document.fullscreenElement) {
+            await document.exitFullscreen?.();
+        } else if (gameShell?.requestFullscreen) {
+            await gameShell.requestFullscreen();
+        } else {
+            throw new Error('Fullscreen API unavailable');
+        }
+    } catch (error) {
+        runtimeDebug.fullscreen.error = String(error?.message ?? error);
+        if (fullscreenButton) {
+            fullscreenButton.title = 'Fullscreen blocked by browser or embed';
+            fullscreenButton.setAttribute('aria-label', fullscreenButton.title);
+        }
+    } finally {
+        updateFullscreenState();
+    }
+}
+
+window.addEventListener('fullscreenchange', updateFullscreenState);
+fullscreenButton?.addEventListener('click', toggleFullscreen);
+updateFullscreenState();
+
+window.addEventListener('error', (event) => {
+    if (!document.body.classList.contains('is-ready')) {
+        showBootFailure(event.error ?? event.message);
+    }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    if (!document.body.classList.contains('is-ready')) {
+        showBootFailure(event.reason);
+    }
+});
+
 async function bootStep(name, action) {
     bootDebug.step = name;
+    setLoadingStatus(name);
     try {
         const value = await action();
         bootDebug.completed.push(name);
@@ -47,6 +154,7 @@ async function bootStep(name, action) {
             step: name,
             message: String(error?.message ?? error),
         });
+        showBootFailure(error);
         throw error;
     }
 }
@@ -316,6 +424,7 @@ function startRun(gameplayVariantId = config.game.tileBattle.gameplayVariant) {
 
 applyDebugOverrides();
 showMainMenu();
+hideLoadingScreen();
 
 app.ticker.add((ticker) => {
     const dt = Math.min((ticker.deltaMS ?? 16.67) / 1000, 0.1);
@@ -360,6 +469,28 @@ window.__tilebreakerDebug = {
             manifestAssetCount: artTextures.manifest?.assets?.length ?? 0,
             missingAssetIds: [...artTextures.missingAssetIds ?? []],
             loadFailures: [...artTextures.loadFailures ?? []],
+        };
+    },
+    getRuntimeDebug() {
+        return {
+            loading: { ...runtimeDebug.loading },
+            fullscreen: { ...runtimeDebug.fullscreen },
+            substrate: { ...runtimeDebug.substrate },
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+            },
+            canvas: canvas ? {
+                width: canvas.width,
+                height: canvas.height,
+                cssWidth: canvas.getBoundingClientRect().width,
+                cssHeight: canvas.getBoundingClientRect().height,
+            } : null,
+            loadingScreenVisible: loadingScreen
+                ? !document.body.classList.contains('is-ready')
+                    && getComputedStyle(loadingScreen).visibility !== 'hidden'
+                    && Number(getComputedStyle(loadingScreen).opacity) > 0
+                : false,
         };
     },
 };

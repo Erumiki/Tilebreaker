@@ -211,6 +211,65 @@ function expectResultFits(debug) {
   expectRectInsideViewport(debug.layout.actionButton, viewport, 'result.actionButton');
 }
 
+test('runtime polish shows loading substrate and fullscreen debug', async ({ page }) => {
+  await page.route('**/configs/game.json', async (route) => {
+    await page.waitForTimeout(500);
+    await route.continue();
+  });
+
+  const navigation = page.goto('/?seed=20260508&guaranteedLoopHands=true&drawMode=hand');
+
+  await expect(page.locator('#loadingScreen')).toBeVisible();
+  await expect(page.locator('#loadingStatus')).toHaveText(/Loading archive|loadConfig/);
+
+  await navigation;
+  await expect(page.locator('body')).toHaveClass(/is-ready/);
+  await expect(page.locator('#loadingScreen')).toBeHidden();
+  await expectScene(page, 'mainmenu');
+
+  const runtime = await page.evaluate(() => window.__tilebreakerDebug.getRuntimeDebug());
+  expect(runtime.loading.visible).toBe(false);
+  expect(runtime.loading.failed).toBe(false);
+  expect(runtime.loadingScreenVisible).toBe(false);
+  expect(runtime.substrate).toEqual({
+    mode: 'css-repeating-pattern',
+    assetBytes: 0,
+  });
+  expect(runtime.fullscreen.available).toEqual(expect.any(Boolean));
+  expect(runtime.canvas.cssWidth).toBeGreaterThan(0);
+  expect(runtime.canvas.cssHeight).toBeGreaterThan(0);
+
+  const backgroundImage = await page.locator('#gameShell').evaluate((element) => (
+    getComputedStyle(element).backgroundImage
+  ));
+  expect(backgroundImage).toContain('linear-gradient');
+
+  if (runtime.fullscreen.available) {
+    const fullscreenButton = page.locator('#fullscreenButton');
+    await expect(fullscreenButton).toBeVisible();
+    await fullscreenButton.click();
+    await expect.poll(() => page.evaluate(() => {
+      const debug = window.__tilebreakerDebug.getRuntimeDebug();
+      return debug.fullscreen.active || Boolean(debug.fullscreen.error);
+    })).toBe(true);
+
+    const fullscreenAfterClick = await page.evaluate(() => (
+      window.__tilebreakerDebug.getRuntimeDebug().fullscreen
+    ));
+    if (fullscreenAfterClick.active) {
+      await expect(fullscreenButton).toHaveClass(/is-active/);
+      await fullscreenButton.click();
+      await expect.poll(() => page.evaluate(() => (
+        window.__tilebreakerDebug.getRuntimeDebug().fullscreen.active
+      ))).toBe(false);
+    } else {
+      expect(fullscreenAfterClick.error).toEqual(expect.any(String));
+    }
+  } else {
+    await expect(page.locator('#fullscreenButton')).toBeHidden();
+  }
+});
+
 async function enterBattleFromIntro(page) {
   await expectScene(page, 'battleIntro');
   const introDebug = await getBattleIntroDebug(page);
